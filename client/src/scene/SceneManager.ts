@@ -288,6 +288,20 @@ export class SceneManager {
       }
     }
 
+    // Also add walk zones along inner city cross roads (center)
+    for (const axis of ['x', 'z']) {
+      const half = 25;
+      const offset = 2.5; // sidewalk offset from road center
+      this.walkZones.push({
+        start: new THREE.Vector3(axis === 'x' ? -half : -offset, 0, axis === 'z' ? -half : -offset),
+        end: new THREE.Vector3(axis === 'x' ? half : offset, 0, axis === 'z' ? half : offset),
+      });
+      this.walkZones.push({
+        start: new THREE.Vector3(axis === 'x' ? -half : offset, 0, axis === 'z' ? -half : offset),
+        end: new THREE.Vector3(axis === 'x' ? half : -offset, 0, axis === 'z' ? half : -offset),
+      });
+    }
+
     this.pedestrians.setWalkZones(this.walkZones);
   }
 

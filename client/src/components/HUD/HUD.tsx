@@ -54,6 +54,15 @@ export default function HUD() {
   const handleBuyProperty = (accept: boolean) => socket?.emit('buyProperty', accept);
   const handleSpinWheel = () => socket?.emit('spinWheel');
   const handleDeclareBankruptcy = () => socket?.emit('declareBankruptcy');
+  const handleTransferRing = (toRing: 'inner' | 'outer') => socket?.emit('transferRing', toRing);
+
+  // Check if current player is on a railway (for ring transfer)
+  const myPlayer = players.find(p => p.id === playerId);
+  const myTile = myPlayer && gameState ? gameState.tiles[myPlayer.position] : null;
+  const onRailway = myTile?.type === 'railway';
+  const onInnerRing = myPlayer?.groundRing === 'inner';
+  const ringTransferred = gameState?.ringTransferred ?? false;
+  const canTransferRing = isMyTurn && onRailway && myPlayer?.innerCityRing === 0 && !ringTransferred;
 
   return (
     <div className="hud">
@@ -171,12 +180,10 @@ export default function HUD() {
       <div className="dice-panel">
         {dice !== null ? (
           <div className="dice-display">
-            <div className={`dice-face dice-${dice.die1}`}>{dice.die1}</div>
-            <div className={`dice-face dice-${dice.die2}`}>{dice.die2}</div>
+            <div className="dice-face dice-total">{dice.die1}</div>
           </div>
         ) : (
           <div className="dice-display">
-            <div className="dice-face dice-empty">?</div>
             <div className="dice-face dice-empty">?</div>
           </div>
         )}
@@ -185,9 +192,19 @@ export default function HUD() {
       {/* Action Panel */}
       <div className="action-panel">
         {phase === 'rolling' && isMyTurn && !diceRolled && (
-          <button className="btn btn-primary btn-lg action-btn" onClick={handleRoll}>
-            {t('hud.rollDice')}
-          </button>
+          <div className="action-buttons">
+            <button className="btn btn-primary btn-lg" onClick={handleRoll}>
+              {t('hud.rollDice')}
+            </button>
+            <button className="btn btn-sm btn-outline" onClick={toggleBuildPanel}>
+              {t('hud.buildSell')}
+            </button>
+            {canTransferRing && (
+              <button className="btn btn-sm btn-outline" onClick={() => handleTransferRing(onInnerRing ? 'outer' : 'inner')}>
+                {t('hud.transferRing')} ({onInnerRing ? t('hud.toOuter') : t('hud.toInner')})
+              </button>
+            )}
+          </div>
         )}
 
         {phase === 'buying' && isMyTurn && phaseReady && (
@@ -235,6 +252,11 @@ export default function HUD() {
             <button className="btn btn-sm btn-outline" onClick={toggleBuildPanel}>
               {t('hud.buildSell')}
             </button>
+            {canTransferRing && (
+              <button className="btn btn-sm btn-outline" onClick={() => handleTransferRing(onInnerRing ? 'outer' : 'inner')}>
+                {t('hud.transferRing')} ({onInnerRing ? t('hud.toOuter') : t('hud.toInner')})
+              </button>
+            )}
             <button className="btn btn-primary" onClick={handleEndTurn}>
               {t('hud.endTurn')}
             </button>

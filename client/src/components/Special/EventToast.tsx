@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useGameStore } from '../../store/gameStore';
+import { useUIStore } from '../../store/uiStore';
 
 const CATEGORY_COLORS: Record<string, string> = {
   rent: '#E53935',
@@ -121,7 +122,28 @@ export default function EventToast() {
         <div className="event-log-panel">
           <div className="event-log-header">
             <span>📋 事件日志（{logs.length}条）</span>
-            <button onClick={() => setLogExpanded(false)}>✕</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => {
+                  const text = logs.map(l => `[R${l.round}] ${l.message}`).join('\n');
+                  navigator.clipboard.writeText(text).then(() => {
+                    useUIStore.getState().addToast('已复制日志', 'info');
+                  }).catch(() => {});
+                }}
+                title="复制全部日志"
+                style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', color: '#999', cursor: 'pointer', borderRadius: 4, padding: '2px 8px', fontSize: 12 }}
+              >
+                📋 复制
+              </button>
+              <button
+                onClick={() => useGameStore.getState().clearLogs()}
+                title="清空日志"
+                style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', color: '#999', cursor: 'pointer', borderRadius: 4, padding: '2px 8px', fontSize: 12 }}
+              >
+                🗑️ 清空
+              </button>
+              <button onClick={() => setLogExpanded(false)}>✕</button>
+            </div>
           </div>
           <div className="event-log-list" ref={listRef} onScroll={handleScroll}>
             {allLogs.map(log => (

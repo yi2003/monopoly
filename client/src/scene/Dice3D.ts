@@ -15,8 +15,8 @@ const RESTITUTION = 0.55;   // bounce energy retention
 const FRICTION = 0.7;       // surface friction (per second)
 const AIR_DAMPING = 0.3;    // angular velocity air damping
 const ROLL_COUPLING = 0.6;  // how much linear velocity converts to spin on contact
-const ANIM_DURATION = 2.5;  // total animation seconds
-const SETTLE_START = 1.8;   // when to start blending to target
+const ANIM_DURATION = 3.8;  // total animation seconds (slower single die)
+const SETTLE_START = 3.0;   // when to start blending to target
 
 // ---- Dot patterns & face mapping ----
 
@@ -67,7 +67,6 @@ export class Dice3D {
   private group: THREE.Group;
   private tableGroup: THREE.Group;
   private die1: DiePhysics;
-  private die2: DiePhysics;
 
   private animating = false;
   private animTime = 0;
@@ -121,12 +120,9 @@ export class Dice3D {
 
     this.group.add(this.tableGroup);
 
-    // ---- Dice ----
-    this.die1 = this.createDiePhysics(0, TABLE_Y + 2.5, 0);
-    this.die2 = this.createDiePhysics(999, -999, 999); // hidden off-screen
-
+    // ---- Single Die (center) ----
+    this.die1 = this.createDiePhysics(0, TABLE_Y + 3.5, 0);
     this.group.add(this.die1.group);
-    this.group.add(this.die2.group);
 
     // ---- Lighting ----
     const spotGeo = new THREE.SphereGeometry(0.3, 16, 16);
@@ -256,33 +252,21 @@ export class Dice3D {
 
   // ---- Public API ----
 
-  roll(die1: number, die2: number): void {
-    // Target rotations (final face-up values)
+  roll(die1: number, _die2: number): void {
+    // Single die: show die1 face-up at the end
     this.die1.targetQuat.copy(getTargetQuat(die1));
-    this.die2.targetQuat.copy(getTargetQuat(die2));
 
-    // Random initial toss for each die, offset left and right
-    const tossHeight1 = TABLE_Y + 2.5 + Math.random() * 2;
-    const tossX1 = -1.2 + (Math.random() - 0.5) * 0.8;
-    const tossZ1 = (Math.random() - 0.5) * 1.0;
-    this.resetDie(this.die1, tossX1, tossHeight1, tossZ1);
+    // Toss from center, slightly random
+    const tossX = (Math.random() - 0.5) * 1.0;
+    const tossZ = (Math.random() - 0.5) * 1.0;
+    const tossY = TABLE_Y + 3.5 + Math.random() * 2;
+    this.resetDie(this.die1, tossX, tossY, tossZ);
 
-    const tossHeight2 = TABLE_Y + 2.5 + Math.random() * 2;
-    const tossX2 = 1.2 + (Math.random() - 0.5) * 0.8;
-    const tossZ2 = (Math.random() - 0.5) * 1.0;
-    this.resetDie(this.die2, tossX2, tossHeight2, tossZ2);
-
-    // Show both dice
-    this.die2.group.visible = true;
-
-    // Show the table
     this.group.visible = true;
     this.animating = true;
     this.settling = false;
     this.animTime = 0;
     this.started = false;
-
-    // Small delay before physics starts (like hand releasing)
   }
 
   private resetDie(d: DiePhysics, x: number, y: number, z: number): void {
@@ -324,14 +308,12 @@ export class Dice3D {
 
     for (let s = 0; s < subSteps; s++) {
       this.stepDie(this.die1, subDt, progress);
-      this.stepDie(this.die2, subDt, progress);
     }
 
     // Check if settling phase
     if (progress >= SETTLE_START / ANIM_DURATION && !this.settling) {
       this.settling = true;
       this.die1.settleStartQuat.copy(this.die1.quat);
-      this.die2.settleStartQuat.copy(this.die2.quat);
     }
 
     // Settling: blend to target rotation
@@ -339,33 +321,21 @@ export class Dice3D {
       const settleProgress = (progress - SETTLE_START / ANIM_DURATION) / (1 - SETTLE_START / ANIM_DURATION);
       const t = this.smoothstep(settleProgress);
       this.die1.quat.slerpQuaternions(this.die1.settleStartQuat, this.die1.targetQuat, t);
-      this.die2.quat.slerpQuaternions(this.die2.settleStartQuat, this.die2.targetQuat, t);
-
-      // Gently push dice down to table surface during settle
       this.die1.pos.y = THREE.MathUtils.lerp(this.die1.pos.y, TABLE_Y + HALF, t * 0.5);
-      this.die2.pos.y = THREE.MathUtils.lerp(this.die2.pos.y, TABLE_Y + HALF, t * 0.5);
     }
 
-    // Apply rotations
+    // Apply rotation
     this.die1.group.position.copy(this.die1.pos);
-    this.die2.group.position.copy(this.die2.pos);
     this.die1.group.quaternion.copy(this.die1.quat);
-    this.die2.group.quaternion.copy(this.die2.quat);
 
     // Done
     if (progress >= 1) {
-      // Snap to exact final positions
-      this.die1.pos.set(-1.2, TABLE_Y + HALF, 0);
+      // Snap to exact final position
+      this.die1.pos.set(0, TABLE_Y + HALF, 0);
       this.die1.quat.copy(this.die1.targetQuat);
       this.die1.group.position.copy(this.die1.pos);
       this.die1.group.quaternion.copy(this.die1.quat);
 
-      this.die2.pos.set(1.2, TABLE_Y + HALF, 0);
-      this.die2.quat.copy(this.die2.targetQuat);
-      this.die2.group.position.copy(this.die2.pos);
-      this.die2.group.quaternion.copy(this.die2.quat);
-
-      // Hold then hide
       setTimeout(() => {
         this.group.visible = false;
         this.animating = false;
@@ -472,7 +442,6 @@ export class Dice3D {
       }
     };
     disposeMesh(this.die1.mesh);
-    disposeMesh(this.die2.mesh);
     this.group.traverse(c => {
       if (c instanceof THREE.Mesh && c.name !== '') {
         c.geometry.dispose();

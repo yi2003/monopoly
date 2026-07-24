@@ -84,6 +84,9 @@ export const translations = {
     'hud.buildSell': '🏗️ 建造/出售',
     'hud.sellHouse': '🏚️ 卖房筹资',
     'hud.declareBankrupt': '💀 宣布破产',
+    'hud.transferRing': '🔄 换环',
+    'hud.toOuter': '→外环',
+    'hud.toInner': '→内环',
     'hud.backToLobby': '🔄 返回大厅',
 
     // HUD - Player cards
@@ -283,6 +286,9 @@ export const translations = {
     'hud.buildSell': '🏗️ Build/Sell',
     'hud.sellHouse': '🏚️ Sell Assets',
     'hud.declareBankrupt': '💀 Bankruptcy',
+    'hud.transferRing': '🔄 Switch Ring',
+    'hud.toOuter': '→Outer',
+    'hud.toInner': '→Inner',
     'hud.backToLobby': '🔄 Back to Lobby',
 
     'hud.player.props': '{props} lots',

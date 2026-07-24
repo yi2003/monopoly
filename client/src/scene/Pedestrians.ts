@@ -67,7 +67,7 @@ export class Pedestrians {
     if (this.walkZones.length === 0) return;
 
     const colors = THEME_COLORS[this.theme] || THEME_COLORS.classic;
-    const baseCount = Math.floor(this.walkZones.length * 3 * this.density);
+    const baseCount = Math.floor(this.walkZones.length * 8 * this.density);
 
     for (let i = 0; i < baseCount; i++) {
       const zone = this.walkZones[i % this.walkZones.length];
@@ -87,27 +87,30 @@ export class Pedestrians {
     _paired: boolean,
   ): void {
     const group = this.createHumanoid(color);
-    const t = Math.random();
+    const goForward = Math.random() < 0.5;
 
     const start = zone.start.clone();
     const end = zone.end.clone();
+    const t = goForward ? Math.random() : 1; // start mid-path or at far end
     const pos = start.clone().lerp(end, t);
 
     group.position.copy(pos);
     group.position.y = 0.15;
 
-    // Face the direction of the zone
-    const dir = end.clone().sub(start).normalize();
+    // Face the walking direction
+    const dir = goForward
+      ? end.clone().sub(start).normalize()
+      : start.clone().sub(end).normalize();
     group.lookAt(pos.clone().add(dir));
 
     this.group.add(group);
     this.pedestrians.push({
       group,
-      target: Math.random() < 0.5 ? end.clone() : start.clone(),
+      target: end.clone(), // always far end (direction handles reverse)
       startPos: start.clone(),
       speed: 0.3 + Math.random() * 0.5,
-      t: Math.random(),
-      direction: Math.random() < 0.5 ? 0 : 1,
+      t,
+      direction: goForward ? 0 : 1,
       walkPhase: Math.random() * Math.PI * 2,
       paired: Math.random() < 0.25,
       pairOffset: (Math.random() - 0.5) * 0.8,

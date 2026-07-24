@@ -292,6 +292,7 @@ export interface GameState {
   wheelResult: number | null; // sector index
   lastCardDrawn: { type: CardType; card: Card } | null;
   gameEvent: GameEvent | null;
+  ringTransferred: boolean; // prevent double-transfer spam
   createdAt: number;
 }
 

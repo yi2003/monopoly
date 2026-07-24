@@ -93,6 +93,17 @@ export function connectSocket(): Socket {
       uiStore().markDiceRolled();
     }
 
+    // Auto-open stock panel when landing on stock market tile
+    if (state.phase === 'stock' && prevState?.phase !== 'stock') {
+      const store = useGameStore.getState();
+      if (!store.showStockPanel) store.toggleStockPanel();
+    }
+    // Auto-close stock panel when leaving stock phase
+    if (state.phase !== 'stock' && prevState?.phase === 'stock') {
+      const store = useGameStore.getState();
+      if (store.showStockPanel) store.toggleStockPanel();
+    }
+
     // Detect quiz result from log (when quiz transitions active→inactive)
     if (prevState?.quizActive && !state.quizActive) {
       const lastLog = state.logs[state.logs.length - 1];

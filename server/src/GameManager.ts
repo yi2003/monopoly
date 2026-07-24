@@ -61,6 +61,7 @@ export class GameManager {
       wheelResult: null,
       lastCardDrawn: null,
       gameEvent: null,
+      ringTransferred: false,
       createdAt: Date.now(),
     };
   }
@@ -167,7 +168,7 @@ export class GameManager {
     this.state.diceRolled = true;
 
     const result = this.engine.processDiceResult(dice);
-    this.addLog(`${this.currentPlayer.name} 掷出 [${dice.die1}][${dice.die2}] = ${dice.total}`);
+    this.addLog(`${this.currentPlayer.name} 掷出 ${dice.total} 点`);
 
     if (result.passedGo) {
       const eff = getEffectiveConfig(this.state.config.theme, this.state.config.difficulty);
@@ -353,6 +354,7 @@ export class GameManager {
     this.state.lastCardDrawn = null;
     this.state.wheelResult = null;
     this.state.gameEvent = null;
+    this.state.ringTransferred = false;
 
     // Check for quiz trigger at turn start
     if (QUIZ_TRIGGER_CHANCE > 0 && Math.random() < QUIZ_TRIGGER_CHANCE) {
@@ -731,6 +733,7 @@ export class GameManager {
     if (tile.type !== 'railway') return { success: false, error: '只能在铁路站换环' };
     if (player.innerCityRing !== 0) return { success: false, error: '不在街道环上' };
     if (player.groundRing === toRing) return { success: false, error: '已经在该环上' };
+    if (this.state.ringTransferred) return { success: false, error: '本回合已换过环' };
 
     const fee = toRing === 'outer' ? 100 : 50;
     if (player.cash < fee) return { success: false, error: '现金不足' };
@@ -745,6 +748,7 @@ export class GameManager {
     // Process landing on new tile
     const landing = this.engine.processLanding(player.position);
     this.state.phase = landing.phase === 'buying' ? 'buying' : 'awaitEnd';
+    this.state.ringTransferred = true;
     this.addLog(`${player.name} 换乘到${toRing === 'outer' ? '外环' : '内环'} (费用 $${fee})`, 'info');
     this.emitChange();
     return { success: true };

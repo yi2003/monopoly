@@ -32,6 +32,7 @@ interface GameStore {
   selectedTile: number | null;
   roamFov: number;
   phaseDelayUntil: number; // suppress action modals until character finishes walking
+  logCutoffId: number; // hide logs with id <= this after clear
 
   // Actions
   setConnected: (connected: boolean) => void;
@@ -43,6 +44,7 @@ interface GameStore {
   toggleStockPanel: () => void;
   togglePortfolio: () => void;
   toggleBuildPanel: () => void;
+  clearLogs: () => void;
   selectTile: (index: number | null) => void;
   reset: () => void;
 }
@@ -71,6 +73,7 @@ const defaultGameState: GameState = {
   wheelResult: null,
   lastCardDrawn: null,
   gameEvent: null,
+  ringTransferred: false,
   createdAt: Date.now(),
 };
 
@@ -97,6 +100,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectedTile: null,
   roamFov: 75,
   phaseDelayUntil: 0,
+  logCutoffId: 0,
 
   setConnected: (connected) => set({ connected }),
 
@@ -130,7 +134,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       dice: state.dice,
       diceRolled: state.diceRolled,
       winner: state.winner,
-      logs: [...state.logs],
+      logs: state.logs.filter(l => l.id > prev.logCutoffId),
       phaseDelayUntil: delayUntil,
     });
   },
@@ -141,6 +145,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   toggleStockPanel: () => set(s => ({ showStockPanel: !s.showStockPanel })),
   togglePortfolio: () => set(s => ({ showPortfolio: !s.showPortfolio })),
   toggleBuildPanel: () => set(s => ({ showBuildPanel: !s.showBuildPanel })),
+  clearLogs: () => {
+    const { logs } = get();
+    const maxId = logs.length > 0 ? Math.max(...logs.map(l => l.id)) : 0;
+    set({ logs: [], logCutoffId: maxId });
+  },
   selectTile: (index) => set({ selectedTile: index }),
 
   reset: () => set({
@@ -156,6 +165,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     showStockPanel: false,
     showPortfolio: false,
     showBuildPanel: false,
+    logCutoffId: 0,
     selectedTile: null,
   }),
 }));
