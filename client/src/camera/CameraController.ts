@@ -167,15 +167,13 @@ export class CameraController {
     if (this.mode === 'roam' && this.fpsController) {
       if (this.gameState) {
         const cp = this.gameState.players[this.gameState.currentPlayerIndex];
-        if (cp) {
-          // Use animated character position & yaw
+        if (cp && !cp.isBot) {
+          // Use animated character position & yaw (only for human players)
           const charPos = this.getCharacterPosition?.(cp.id);
           if (charPos) {
             this.fpsController.setFollowTarget(new THREE.Vector3(charPos.x, 0, charPos.z));
-            // Match camera yaw to character's actual facing direction
             const charYaw = this.getCharacterYaw?.(cp.id);
             if (charYaw !== null && charYaw !== undefined) {
-              // Camera -Z = forward, character +Z = forward — rotate 180° to align
               this.fpsController.setFollowYaw(charYaw + Math.PI);
             }
           } else {
@@ -211,7 +209,7 @@ export class CameraController {
     if (!this.gameState) { this.updateOrbit(); return; }
 
     const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
-    if (!currentPlayer) { this.updateOrbit(); return; }
+    if (!currentPlayer || currentPlayer.isBot) { this.updateOrbit(); return; }
 
     // Get character position from the board
     const boardPos = getCharacterTilePos(currentPlayer.position);
