@@ -10,6 +10,7 @@ import {
   INNER_BOARD_HALF, OUTER_BOARD_HALF, OUTER_RING_OFFSET,
   getGroundTilePosition, isCornerIndex,
 } from '@monopoly/shared';
+import { getModelClone } from './ModelLoader';
 
 // ---- Configuration ----
 
@@ -125,6 +126,20 @@ function propJitter(base: number, seed: number, amount: number): number {
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
+
+// ---- GLB model mapping (preloaded before build) ----
+
+/** URLs of GLB models to preload before building the city */
+export const SHOP_MODEL_URLS = [
+  '/models/corner-store-01.glb',
+  '/models/convenience-store-01.glb',
+] as const;
+
+/** Mapping from building type to GLB model URL */
+const TYPE_MODEL_URL: Partial<Record<BuildingType, string>> = {
+  shop: '/models/corner-store-01.glb',
+  convenience: '/models/convenience-store-01.glb',
+};
 
 export class CityBuilder {
   private scene: THREE.Scene;
@@ -363,6 +378,67 @@ export class CityBuilder {
 
     const centerX = tileX + dirX * depthOffset;
     const centerZ = tileZ + dirZ * depthOffset;
+
+    // ---- GLB model shortcut (full building replacement) ----
+    const glbUrl = TYPE_MODEL_URL[btConfig.type];
+    if (glbUrl) {
+      const model = getModelClone(glbUrl);
+      if (model) {
+        // Compute native bounding box of the model
+        const bbox = new THREE.Box3().setFromObject(model);
+        const nativeSize = bbox.getSize(new THREE.Vector3());
+
+        // Target building size from procedural params
+        const targetW = buildingWidth;
+        const targetH = buildingHeight;
+        const targetD = buildingDepth;
+
+        // Uniform scale: fit the largest dimension, then scale uniformly
+        const scaleX = targetW / Math.max(nativeSize.x, 0.01);
+        const scaleY = targetH / Math.max(nativeSize.y, 0.01);
+        const scaleZ = targetD / Math.max(nativeSize.z, 0.01);
+        const uniformScale = Math.min(scaleX, scaleY, scaleZ);
+
+        model.scale.setScalar(uniformScale);
+
+        // Center the model on the building footprint, ground at y=0
+        const nativeCenter = bbox.getCenter(new THREE.Vector3());
+        model.position.set(
+          centerX - nativeCenter.x * uniformScale,
+          -bbox.min.y * uniformScale, // ground the model
+          centerZ - nativeCenter.z * uniformScale,
+        );
+        model.rotation.y = tileRot;
+        model.name = `glb-${btConfig.type}`;
+        group.add(model);
+
+        if (btConfig.type === 'shop') {
+          console.log(`[GLB] corner-store: native=${nativeSize.toArray().map(v=>v.toFixed(1))}, scale=${uniformScale.toFixed(3)}, pos=${centerX.toFixed(1)},${centerZ.toFixed(1)}`);
+        } else {
+          console.log(`[GLB] convenience: native=${nativeSize.toArray().map(v=>v.toFixed(1))}, scale=${uniformScale.toFixed(3)}, pos=${centerX.toFixed(1)},${centerZ.toFixed(1)}`);
+        }
+
+        // Still add the sidewalk and type sign
+        const swGeo2 = new THREE.BoxGeometry(buildingWidth + 0.4, 0.1, SIDEWALK_WIDTH);
+        const swMat2 = new THREE.MeshStandardMaterial({ color: '#BDBDBD', roughness: 0.8 });
+        const sw2 = new THREE.Mesh(swGeo2, swMat2);
+        sw2.position.set(
+          tileX + dirX * sidewalkOffset,
+          0.05,
+          tileZ + dirZ * sidewalkOffset,
+        );
+        sw2.rotation.y = tileRot;
+        sw2.receiveShadow = true;
+        group.add(sw2);
+
+        if (btConfig.type !== 'residential') {
+          this.addBuildingTypeSign(group, buildingWidth, centerX, centerZ, tileRot, btConfig);
+        }
+
+        this.buildingGroup.add(group);
+        return; // skip procedural body/windows/roof/ground floor
+      }
+    }
 
     // ---- Body ----
     const bodyGeo = new THREE.BoxGeometry(buildingWidth, buildingHeight, buildingDepth);

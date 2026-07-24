@@ -15,27 +15,39 @@ export default function GameCanvas() {
     if (!containerRef.current || sceneRef.current) return;
 
     const scene = new SceneManager(containerRef.current);
-    sceneRef.current = scene;
+    let animId = 0;
+    let cancelled = false;
 
-    scene.init(qualityMode);
+    scene.init(qualityMode).then(() => {
+      if (cancelled) {
+        scene.dispose();
+        return;
+      }
+      sceneRef.current = scene;
 
-    // Animation loop
-    let animId: number;
-    const animate = () => {
-      animId = requestAnimationFrame(animate);
-      scene.render();
-    };
-    animate();
+      // Animation loop — start after init completes
+      const animate = () => {
+        animId = requestAnimationFrame(animate);
+        scene.render();
+      };
+      animate();
+    });
 
     // Resize handler
     const handleResize = () => scene.resize();
     window.addEventListener('resize', handleResize);
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', handleResize);
-      scene.dispose();
-      sceneRef.current = null;
+      if (sceneRef.current) {
+        sceneRef.current.dispose();
+        sceneRef.current = null;
+      } else {
+        // init hasn't finished yet — dispose raw scene
+        scene.dispose();
+      }
     };
   }, []);
 

@@ -14,11 +14,12 @@ import { Houses } from './Houses';
 import { Effects } from './Effects';
 import { DayNightCycle } from './DayNightCycle';
 import { WeatherEffects } from './WeatherEffects';
-import { CityBuilder } from './CityBuilder';
+import { CityBuilder, SHOP_MODEL_URLS } from './CityBuilder';
 import { Pedestrians } from './Pedestrians';
 import { Vehicles } from './Vehicles';
 import { NightGlow } from './NightGlow';
 import { Dice3D } from './Dice3D';
+import { preloadModels } from './ModelLoader';
 import { audioManager } from '../audio/AudioManager';
 
 export class SceneManager {
@@ -63,7 +64,7 @@ export class SceneManager {
     this.clock = new THREE.Clock();
   }
 
-  init(quality: QualityMode): void {
+  async init(quality: QualityMode): Promise<void> {
     this.qualityMode = quality;
 
     // Renderer
@@ -127,6 +128,7 @@ export class SceneManager {
 
     // Procedural city
     this.cityBuilder = new CityBuilder(this.scene);
+    await preloadModels([...SHOP_MODEL_URLS]);
     this.cityBuilder.build();
     this.nightGlow.registerAll(this.cityBuilder.nightGlowMaterials);
     this.nightGlow.autoRegisterFromScene(this.scene);
@@ -405,19 +407,19 @@ export class SceneManager {
   }
 
   dispose(): void {
-    this.dayNightCycle.dispose();
-    this.weatherEffects.dispose();
-    this.cityBuilder.dispose();
-    this.dice3D.dispose();
-    this.pedestrians.dispose();
-    this.vehicles.dispose();
-    this.board.dispose();
-    this.characters.dispose();
-    this.houses.dispose();
-    this.effects.dispose();
-    this.fpsController.dispose();
-    this.renderer.dispose();
-    if (this.renderer.domElement.parentNode) {
+    this.dayNightCycle?.dispose();
+    this.weatherEffects?.dispose();
+    this.cityBuilder?.dispose();
+    this.dice3D?.dispose();
+    this.pedestrians?.dispose();
+    this.vehicles?.dispose();
+    this.board?.dispose();
+    this.characters?.dispose();
+    this.houses?.dispose();
+    this.effects?.dispose();
+    this.fpsController?.dispose();
+    this.renderer?.dispose();
+    if (this.renderer?.domElement?.parentNode) {
       this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
     }
   }
