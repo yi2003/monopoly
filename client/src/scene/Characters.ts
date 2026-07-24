@@ -17,6 +17,7 @@ interface CharacterData {
   waypoints: THREE.Vector3[];
   waypointIndex: number;
   walkProgress: number; // 0-1 within current segment
+  footstepTimer: number; // accumulator for footstep sounds
 }
 
 const WALK_SPEED = 5.5; // tiles per second
@@ -60,6 +61,7 @@ export class Characters {
           waypoints: [],
           waypointIndex: 0,
           walkProgress: 1,
+          footstepTimer: 0,
         };
         this.characters.set(player.id, charData);
         this.prevPositions.set(player.id, player.position);
@@ -74,6 +76,7 @@ export class Characters {
         charData.waypoints = path;
         charData.waypointIndex = 0;
         charData.walkProgress = 0;
+        charData.footstepTimer = 0;
         charData.currentTile = player.position;
       }
 
@@ -310,6 +313,13 @@ export class Characters {
       const t = charData.walkProgress;
       const pos = new THREE.Vector3().lerpVectors(segFrom, segTo, t);
       charData.group.position.copy(pos);
+
+      // Footstep sounds: trigger every ~0.4s of walking
+      charData.footstepTimer += dt;
+      if (charData.footstepTimer >= 0.4) {
+        charData.footstepTimer -= 0.4;
+        audioManager.playFootstep();
+      }
 
       // Face movement direction
       const dir = segTo.clone().sub(segFrom);
