@@ -168,7 +168,8 @@ export class GameManager {
     this.addLog(`${this.currentPlayer.name} 掷出 [${dice.die1}][${dice.die2}] = ${dice.total}`);
 
     if (result.passedGo) {
-      this.addLog(`${this.currentPlayer.name} 经过起点，领取工资`, 'info');
+      const eff = getEffectiveConfig(this.state.config.theme, this.state.config.difficulty);
+      this.addLog(`💰 ${this.currentPlayer.name} 经过起点，银行发放工资 $${eff.goSalary}`, 'info');
     }
 
     // Track consecutive doubles
@@ -291,7 +292,7 @@ export class GameManager {
         const drain = Math.round(this.currentPlayer.cash * eff.drainPct);
         this.currentPlayer.cash -= drain;
         if (drain > 0) {
-          this.addLog(`${this.currentPlayer.name} 维护费: -$${drain}`, 'info');
+          this.addLog(`🔧 ${this.currentPlayer.name} → 银行 资产维护费 $${drain}（${Math.round(eff.drainPct * 100)}%）`, 'info');
         }
       }
     }
@@ -372,7 +373,7 @@ export class GameManager {
     this.currentPlayer.cash -= JAIL_FINE;
     this.currentPlayer.jailTurns = 0;
     this.currentPlayer.status = 'active';
-    this.addLog(`${this.currentPlayer.name} 支付 $${JAIL_FINE} 出狱`);
+    this.addLog(`🔓 ${this.currentPlayer.name} 向银行缴纳 $${JAIL_FINE} 保释出狱`, 'info');
     this.emitChange();
     return { success: true };
   }
@@ -383,7 +384,7 @@ export class GameManager {
     this.currentPlayer.getOutOfJailCards--;
     this.currentPlayer.jailTurns = 0;
     this.currentPlayer.status = 'active';
-    this.addLog(`${this.currentPlayer.name} 使用出狱卡`);
+    this.addLog(`🃏 ${this.currentPlayer.name} 使用出狱卡出狱`, 'info');
     this.emitChange();
     return { success: true };
   }
@@ -397,10 +398,10 @@ export class GameManager {
       this.currentPlayer.status = 'active';
       this.currentPlayer.consecutiveDoubles = 0;
       this.state.phase = 'rolling';
-      this.addLog(`${this.currentPlayer.name} 掷出对子 [${dice.die1}][${dice.die2}]，出狱！`);
+      this.addLog(`🎲 ${this.currentPlayer.name} 掷出对子 [${dice.die1}][${dice.die2}]，越狱成功！`, 'info');
     } else {
       this.currentPlayer.jailTurns++;
-      this.addLog(`${this.currentPlayer.name} 掷出 [${dice.die1}][${dice.die2}]，未能出狱`);
+      this.addLog(`🔒 ${this.currentPlayer.name} 掷出 [${dice.die1}][${dice.die2}]，未能出狱（${this.currentPlayer.jailTurns}/3回合）`, 'info');
       if (this.currentPlayer.jailTurns >= 3) {
         this.currentPlayer.cash -= JAIL_FINE;
         this.currentPlayer.jailTurns = 0;
@@ -531,14 +532,14 @@ export class GameManager {
     if (correct) {
       const reward = Math.round(200 * eff.rentMultiplier);
       this.currentPlayer.cash += reward;
-      this.addLog(`${this.currentPlayer.name} 答对了！获得 $${reward}`, 'info');
+      this.addLog(`✅ 问答正确！${this.currentPlayer.name} 获得 $${reward}`, 'info');
       this.state.quizActive = false;
       this.emitChange();
       return { correct: true, reward };
     } else {
       const penalty = Math.round(100 * eff.taxMultiplier);
       this.currentPlayer.cash -= penalty;
-      this.addLog(`${this.currentPlayer.name} 答错了！支付 $${penalty}`, 'info');
+      this.addLog(`❌ 问答错误！${this.currentPlayer.name} 支付罚款 $${penalty}`, 'info');
       this.state.quizActive = false;
       if (this.currentPlayer.cash < 0) this.state.phase = 'debt';
       this.emitChange();
@@ -654,7 +655,7 @@ export class GameManager {
 
     player.cash -= cost;
     this.state.config.theme = targetTheme;
-    this.addLog(`${player.name} 乘坐高铁切换到 ${THEMES[targetTheme].nameCN}`, 'info');
+    this.addLog(`🚄 ${player.name} 乘坐高铁切换到 ${THEMES[targetTheme].nameCN}（费用 $200）`, 'info');
     this.emitChange();
     return { success: true };
   }

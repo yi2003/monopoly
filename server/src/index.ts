@@ -316,7 +316,9 @@ io.on('connection', (socket) => {
   socket.on('answerQuiz', (optionIndex) => {
     const game = getGame();
     if (!game) return;
-    game.answerQuiz(optionIndex);
+    const result = game.answerQuiz(optionIndex);
+    // Reply directly to the answering player, so they always get the result
+    socket.emit('quizResult', result);
   });
 
   socket.on('takeHighSpeedRail', (targetTheme) => {

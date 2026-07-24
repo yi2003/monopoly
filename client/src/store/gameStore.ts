@@ -21,7 +21,7 @@ interface GameStore {
   dice: { die1: number; die2: number; total: number; isDoubles: boolean } | null;
   diceRolled: boolean;
   winner: string | null;
-  logs: { id: number; message: string; type: string; timestamp: number }[];
+  logs: { id: number; round: number; message: string; type: string; timestamp: number }[];
 
   // UI state
   cameraMode: CameraMode;

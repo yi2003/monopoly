@@ -326,5 +326,6 @@ export interface ServerToClientEvents {
   playerJoined: (player: Player) => void;
   playerLeft: (playerId: string) => void;
   chatMessage: (data: { playerId: string; playerName: string; message: string }) => void;
+  quizResult: (result: { correct: boolean; reward?: number; penalty?: number }) => void;
   pong: () => void;
 }

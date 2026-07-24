@@ -100,7 +100,7 @@ export class RuleEngine {
           rentTarget = owner.id;
           player.cash -= rentAmount;
           owner.cash += rentAmount;
-          this.addLog(`${player.name} 支付租金 $${rentAmount} 给 ${owner.name}`, 'rent');
+          this.addLog(`💸 ${player.name} → ${owner.name} 租金 $${rentAmount}`, 'rent');
         } else if (!owner) {
           if (player.cash >= (tile as PropertyTile).price) {
             return { phase: 'buying', rentAmount: 0, rentTarget: null, cardType: null };
@@ -118,7 +118,7 @@ export class RuleEngine {
           rentTarget = owner.id;
           player.cash -= rentAmount;
           owner.cash += rentAmount;
-          this.addLog(`${player.name} 支付铁路费 $${rentAmount} 给 ${owner.name}`, 'rent');
+          this.addLog(`🚂 ${player.name} → ${owner.name} 铁路费 $${rentAmount}（${railwayCount}条铁路）`, 'rent');
         }
         break;
       }
@@ -132,7 +132,7 @@ export class RuleEngine {
           rentTarget = owner.id;
           player.cash -= rentAmount;
           owner.cash += rentAmount;
-          this.addLog(`${player.name} 支付公共事业费 $${rentAmount} 给 ${owner.name}`, 'rent');
+          this.addLog(`🔌 ${player.name} → ${owner.name} 公共事业费 $${rentAmount}（骰子${diceSum}×${utilityCount}处）`, 'rent');
         }
         break;
       }
@@ -140,7 +140,7 @@ export class RuleEngine {
       case 'tax': {
         const taxAmount = Math.round(tile.amount * this.effConfig.taxMultiplier);
         player.cash -= taxAmount;
-        this.addLog(`${player.name} 缴纳税费 $${taxAmount}`, 'info');
+        this.addLog(`🏛️ ${player.name} → 银行 缴纳税费 $${taxAmount}`, 'info');
         break;
       }
 
@@ -182,7 +182,8 @@ export class RuleEngine {
       case 'inner_food': {
         player.cash += tile.fee;
         if (tile.fee > 0) {
-          this.addLog(`${player.name} ${tile.nameCN}: ${tile.fee > 0 ? '获得' : '支付'} $${Math.abs(tile.fee)}`, 'info');
+          const verb = tile.fee > 0 ? '获得' : '支付给银行';
+          this.addLog(`${player.name} 在${tile.nameCN} ${verb} $${Math.abs(tile.fee)}`, 'info');
         }
         break;
       }
@@ -294,14 +295,14 @@ export class RuleEngine {
       player.houses = {};
       player.stocks = [];
       player.cash = 0;
-      this.addLog(`${player.name} 破产！资产转移给 ${creditor.name}`, 'bankrupt');
+      this.addLog(`💀 ${player.name} 破产！全部资产 → ${creditor.name}`, 'bankrupt');
     } else {
       // Release properties back to market
       player.properties = [];
       player.houses = {};
       player.stocks = [];
       player.cash = 0;
-      this.addLog(`${player.name} 破产！资产已释放`, 'bankrupt');
+      this.addLog(`💀 ${player.name} 破产！资产回归银行`, 'bankrupt');
     }
 
     return { creditor };

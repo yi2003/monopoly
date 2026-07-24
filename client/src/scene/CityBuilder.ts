@@ -174,12 +174,14 @@ export class CityBuilder {
     const curbMat = new THREE.MeshStandardMaterial({ color: '#BDBDBD', roughness: 0.7 });
     const sidewalkMat = new THREE.MeshStandardMaterial({ color: '#C8C0B8', roughness: 0.85 });
 
-    const roadCenterOffset = TILE_D / 2 + SIDEWALK_WIDTH + ROAD_WIDTH / 2; // ~6.75
-    const roadExtend = 50; // how far roads extend beyond board
+    // Road sits OUTSIDE the outer-ring buildings (outermost element).
+    // Layout: outer-ring tile → sidewalk → buildings → ROAD
+    const roadCenterOffset = TILE_D / 2 + SIDEWALK_WIDTH + BUILDING_SETBACK + 2.0 + ROAD_WIDTH / 2;
+    // 2.75 + 2.0 + 0.5 + 2.0 + 2.0 = 9.25
+    const roadExtend = 50;
 
-    // Build roads for both rings
+    // Single ring road at the outermost ring
     const rings = [
-      { half: INNER_BOARD_HALF, label: 'inner' },
       { half: OUTER_BOARD_HALF, label: 'outer' },
     ];
 
@@ -224,8 +226,12 @@ export class CityBuilder {
           this.roadGroup.add(dash);
         }
 
-        // Curbs on both sides of the road
-        for (const sideSign of [-1, 1]) {
+        // Only outer curb + sidewalk (inner side abuts the tile directly)
+        // Outer side: away from the board center
+        for (const sideSign of [1]) {
+          const isOuter = sideSign > 0;
+
+          // Curb
           const curbGeo = new THREE.BoxGeometry(
             isHorizontal ? rc.w : 0.3,
             0.14,
@@ -267,20 +273,15 @@ export class CityBuilder {
       if (isCorner) continue;
 
       const propDef = ALL_PROPERTIES.find(p => p.index === i);
-      const group = propDef?.group || 'railway';
+      const groupName = propDef?.group || 'railway';
 
       const seed = i * 137 + (this.theme === 'shanghai' ? 1000 : this.theme === 'tokyo' ? 2000 : 0);
       if (seededRandom(seed) > OUTER_BUILDING_COVERAGE) continue;
 
-      const style = STYLES[group] || STYLES.brown;
+      const style = STYLES[groupName] || STYLES.brown;
       const buildingType = selectBuildingType(seed);
+      // Inner ring: tiles → sidewalk → buildings (facing outward)
       this.createBuilding(x, z, rotation, style, seed, 'outer', buildingType);
-
-      // Inner-facing buildings (~60% coverage)
-      if (seededRandom(seed + 500) <= INNER_BUILDING_COVERAGE) {
-        const innerType = selectBuildingType(seed + 500);
-        this.createBuilding(x, z, rotation, style, seed + 500, 'inner', innerType);
-      }
     }
   }
 
@@ -319,22 +320,16 @@ export class CityBuilder {
       if (isCornerIndex(tileIndex)) continue;
 
       const propDef = ALL_PROPERTIES.find(p => p.index === tileIndex);
-      const group = propDef?.group || 'railway';
+      const groupName = propDef?.group || 'railway';
 
       const seed = tileIndex * 137 + (this.theme === 'shanghai' ? 1000 : this.theme === 'tokyo' ? 2000 : 0);
       if (seededRandom(seed) > OUTER_COMMERCIAL_COVERAGE) continue;
 
-      const style = STYLES[group] || STYLES.brown;
+      const style = STYLES[groupName] || STYLES.brown;
 
-      // Outer-facing: mostly commercial
+      // Outer ring: tiles → sidewalk → buildings (facing outward)
       const outerType = this.selectOuterRingType(seed);
       this.createBuilding(pos.x, pos.z, pos.rotation, style, seed, 'outer', outerType);
-
-      // Inner-facing (toward inner ring): also commercial-biased but more mixed
-      if (seededRandom(seed + 500) <= 0.75) {
-        const innerType = this.selectOuterRingType(seed + 500);
-        this.createBuilding(pos.x, pos.z, pos.rotation, style, seed + 500, 'inner', innerType);
-      }
     }
   }
 
@@ -342,12 +337,15 @@ export class CityBuilder {
     tileX: number, tileZ: number, tileRot: number,
     style: BuildingStyle, seed: number, position: 'outer' | 'inner',
     btConfig: BuildingTypeConfig,
+    extraOffset: number = 0, // extra distance beyond the standard sidewalk (e.g. for road)
   ): void {
     const group = new THREE.Group();
 
-    const depthOffset = position === 'outer'
-      ? -(TILE_D / 2 + SIDEWALK_WIDTH + BUILDING_SETBACK)
-      : (TILE_D / 2 + SIDEWALK_WIDTH + BUILDING_SETBACK);
+    const sign = position === 'outer' ? -1 : 1;
+    const depthOffset = sign * (TILE_D / 2 + SIDEWALK_WIDTH + BUILDING_SETBACK + extraOffset);
+
+    // building sidewalk offset (same side, just past the tile edge)
+    const sidewalkOffset = sign * (TILE_D / 2 + SIDEWALK_WIDTH / 2 + extraOffset);
 
     const dirX = Math.sin(tileRot);
     const dirZ = Math.cos(tileRot);
@@ -399,20 +397,17 @@ export class CityBuilder {
     }
 
     // Sidewalk
-    const sidewalkGeo = new THREE.BoxGeometry(buildingWidth + 0.4, 0.1, SIDEWALK_WIDTH);
-    const sidewalkMat = new THREE.MeshStandardMaterial({ color: '#BDBDBD', roughness: 0.8 });
-    const sidewalk = new THREE.Mesh(sidewalkGeo, sidewalkMat);
-    const sidewalkOffset = position === 'outer'
-      ? -(TILE_D / 2 + SIDEWALK_WIDTH / 2)
-      : TILE_D / 2 + SIDEWALK_WIDTH / 2;
-    sidewalk.position.set(
+    const swGeo = new THREE.BoxGeometry(buildingWidth + 0.4, 0.1, SIDEWALK_WIDTH);
+    const swMat = new THREE.MeshStandardMaterial({ color: '#BDBDBD', roughness: 0.8 });
+    const sw = new THREE.Mesh(swGeo, swMat);
+    sw.position.set(
       tileX + dirX * sidewalkOffset,
       0.05,
       tileZ + dirZ * sidewalkOffset,
     );
-    sidewalk.rotation.y = tileRot;
-    sidewalk.receiveShadow = true;
-    group.add(sidewalk);
+    sw.rotation.y = tileRot;
+    sw.receiveShadow = true;
+    group.add(sw);
 
     // Building type label on the building
     if (btConfig.type !== 'residential') {

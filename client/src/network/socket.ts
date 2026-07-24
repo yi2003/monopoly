@@ -71,6 +71,16 @@ export function connectSocket(): Socket {
     uiStore().addToast(message, 'error');
   });
 
+  // ---- Quiz Result (direct response, no need to detect state transition) ----
+
+  socket.on('quizResult', (result: { correct: boolean; reward?: number; penalty?: number }) => {
+    if (result.correct) {
+      uiStore().setQuizResult('correct', result.reward);
+    } else {
+      uiStore().setQuizResult('wrong', result.penalty);
+    }
+  });
+
   // ---- Game State ----
 
   socket.on('gameState', (state: GameState) => {
@@ -120,11 +130,13 @@ export function connectSocket(): Socket {
         uiStore().setWheelResult(state.wheelResult);
       }
 
-      // Check for quiz (only if still active after delay)
-      if (state.quizActive && state.quizQuestion) {
+      // Check for quiz — read from the LIVE store state (not the closure-captured state)
+      // to avoid re-showing an already-resolved quiz after a delay.
+      const liveState = useGameStore.getState().gameState;
+      if (liveState?.quizActive && liveState.quizQuestion) {
         uiStore().setQuizData({
-          question: state.quizQuestion.question,
-          options: state.quizQuestion.options,
+          question: liveState.quizQuestion.question,
+          options: liveState.quizQuestion.options,
           reward: '租金倍率奖励',
           penalty: '税费倍率惩罚',
         });
@@ -162,6 +174,7 @@ export function connectSocket(): Socket {
   socket.on('chatMessage', (data: { playerId: string; playerName: string; message: string }) => {
     useGameStore.getState().logs.push({
       id: Date.now(),
+      round: 0,
       message: `[${data.playerName}]: ${data.message}`,
       type: 'info',
       timestamp: Date.now(),

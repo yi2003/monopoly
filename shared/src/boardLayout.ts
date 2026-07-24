@@ -55,8 +55,7 @@ export function isCornerIndex(index: number): boolean {
   return index % SIDE_LENGTH === 0;
 }
 
-// ---- Character standing position (on the sidewalk, between tile edge and road) ----
-// Characters stand on the outer sidewalk, facing the road.
+// ---- Character standing position (center of the tile) ----
 
 export function getCharacterTilePos(index: number): { x: number; z: number } {
   const isOuter = index >= OUTER_RING_OFFSET;
@@ -64,15 +63,13 @@ export function getCharacterTilePos(index: number): { x: number; z: number } {
   const localIdx = isOuter ? index - OUTER_RING_OFFSET : index;
   const side = Math.floor(localIdx / SIDE_LENGTH);
   const sideIdx = localIdx % SIDE_LENGTH;
-  const offset = CORNER_SIZE / 2 + sideIdx * (TILE_W + SPACING) + 1.4;
-  // Place character on the sidewalk (outer side of tile, between tile edge and road)
-  const sidewalkDist = TILE_D / 2 + 1.0; // half tile depth + sidewalk half-width
+  const offset = CORNER_SIZE / 2 + sideIdx * (TILE_W + SPACING) + 1.4; // center of tile width
 
   switch (side) {
-    case 0: return { x: -boardHalf + offset, z: -boardHalf - sidewalkDist };
-    case 1: return { x: boardHalf + sidewalkDist, z: -boardHalf + offset };
-    case 2: return { x: boardHalf - offset, z: boardHalf + sidewalkDist };
-    case 3: return { x: -boardHalf - sidewalkDist, z: boardHalf - offset };
+    case 0: return { x: -boardHalf + offset, z: -boardHalf }; // bottom — tile center
+    case 1: return { x: boardHalf, z: -boardHalf + offset };  // right — tile center
+    case 2: return { x: boardHalf - offset, z: boardHalf };   // top — tile center
+    case 3: return { x: -boardHalf, z: boardHalf - offset };  // left — tile center
     default: return { x: 0, z: 0 };
   }
 }
