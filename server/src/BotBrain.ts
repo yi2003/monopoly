@@ -6,8 +6,9 @@ import type { GameState, Player } from '@monopoly/shared';
 import { getPropertyDef, getRailwayDef, getUtilityDef, canBuildHouse, getGroupTiles } from '@monopoly/shared';
 
 export interface BotDecision {
-  action: 'roll' | 'buy' | 'pass' | 'build' | 'sellHouse' | 'endTurn' | 'payJail' | 'useCard' | 'tryDoubles';
+  action: 'roll' | 'buy' | 'pass' | 'build' | 'sellHouse' | 'endTurn' | 'payJail' | 'useCard' | 'tryDoubles' | 'spinWheel' | 'answerQuiz';
   tileIndex?: number;
+  quizAnswer?: number;
   stockAction?: { symbol: string; shares: number; action: 'buy' | 'sell' };
   delay: number; // ms before executing
 }
@@ -29,6 +30,10 @@ export function decideBotAction(state: GameState, player: Player): BotDecision {
       return decideAwaitEndAction(state, player);
     case 'stock':
       return decideStockAction(state, player);
+    case 'wheel':
+      return { action: 'spinWheel' as any, delay: REGULAR_DELAY };
+    case 'quiz':
+      return decideQuizAction(state, player);
     default:
       return { action: 'pass', delay: REGULAR_DELAY };
   }
@@ -126,6 +131,16 @@ function decideStockAction(state: GameState, player: Player): BotDecision {
   }
 
   return { action: 'endTurn', delay: REGULAR_DELAY };
+}
+
+function decideQuizAction(state: GameState, _player: Player): BotDecision {
+  if (state.quizQuestion) {
+    // Bot randomly guesses — correct ~25% of the time
+    const answer = Math.floor(Math.random() * state.quizQuestion.options.length);
+    return { action: 'answerQuiz', quizAnswer: answer, delay: REGULAR_DELAY };
+  }
+  // No question loaded — skip
+  return { action: 'pass', delay: REGULAR_DELAY };
 }
 
 function findBestBuild(state: GameState, player: Player): number | null {

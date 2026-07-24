@@ -63,13 +63,13 @@ export function getCharacterTilePos(index: number): { x: number; z: number } {
   const localIdx = isOuter ? index - OUTER_RING_OFFSET : index;
   const side = Math.floor(localIdx / SIDE_LENGTH);
   const sideIdx = localIdx % SIDE_LENGTH;
-  const offset = CORNER_SIZE / 2 + sideIdx * (TILE_W + SPACING) + 1.4; // center of tile width
+  const offset = CORNER_SIZE / 2 + sideIdx * (TILE_W + SPACING); // tile center (same as getGroundTilePosition)
 
   switch (side) {
-    case 0: return { x: -boardHalf + offset, z: -boardHalf }; // bottom — tile center
-    case 1: return { x: boardHalf, z: -boardHalf + offset };  // right — tile center
-    case 2: return { x: boardHalf - offset, z: boardHalf };   // top — tile center
-    case 3: return { x: -boardHalf, z: boardHalf - offset };  // left — tile center
+    case 0: return { x: -boardHalf + offset, z: -boardHalf }; // bottom
+    case 1: return { x: boardHalf, z: -boardHalf + offset };  // right
+    case 2: return { x: boardHalf - offset, z: boardHalf };   // top
+    case 3: return { x: -boardHalf, z: boardHalf - offset };  // left
     default: return { x: 0, z: 0 };
   }
 }

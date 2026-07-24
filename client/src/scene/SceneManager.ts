@@ -19,6 +19,7 @@ import { Pedestrians } from './Pedestrians';
 import { Vehicles } from './Vehicles';
 import { NightGlow } from './NightGlow';
 import { Dice3D } from './Dice3D';
+import { SkyEnvironment } from './SkyEnvironment';
 import { preloadModels } from './ModelLoader';
 import { audioManager } from '../audio/AudioManager';
 
@@ -45,6 +46,7 @@ export class SceneManager {
   private vehicles!: Vehicles;
   private nightGlow!: NightGlow;
   private dice3D!: Dice3D;
+  private skyEnv!: SkyEnvironment;
 
   private gameState: GameState | null = null;
   private qualityMode: QualityMode = 'balanced';
@@ -169,6 +171,9 @@ export class SceneManager {
     // 3D Dice
     this.dice3D = new Dice3D(this.scene);
     this.dice3D.setPosition(0, 0, 0);
+
+    // Sky environment (sun, moon, stars, clouds, birds)
+    this.skyEnv = new SkyEnvironment(this.scene);
 
     // Apply quality mode to city sub-systems
     this.cityBuilder.setQuality(quality);
@@ -305,6 +310,9 @@ export class SceneManager {
     // Night glow
     this.nightGlow.setNightFactor(this.dayNightCycle.nightFactor);
 
+    // Sky environment (sun, moon, stars, clouds, birds)
+    this.skyEnv.update(dt, this.dayNightCycle.dayTime, this.camera.position);
+
     // Notify audio system of night factor
     audioManager.setNightFactor(this.dayNightCycle.nightFactor);
 
@@ -411,6 +419,7 @@ export class SceneManager {
     this.weatherEffects?.dispose();
     this.cityBuilder?.dispose();
     this.dice3D?.dispose();
+    this.skyEnv?.dispose();
     this.pedestrians?.dispose();
     this.vehicles?.dispose();
     this.board?.dispose();

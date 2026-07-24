@@ -111,7 +111,7 @@ export class DayNightCycle {
 
   // Current values exposed for other systems
   nightFactor = 0; // 0=day, 1=night
-  private dayTime = 0.3;
+  dayTime = 0.3;
   private cycleSpeed = 1 / 120; // ~120 seconds per full cycle
 
   constructor(

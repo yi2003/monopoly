@@ -24,6 +24,7 @@ export class GameManager {
   state: GameState;
   private botTimers: Map<string, NodeJS.Timeout> = new Map();
   private onStateChange: (roomCode: string, state: GameState) => void;
+  private logIdCounter = 0;
 
   constructor(config: GameConfig, onStateChange: (roomCode: string, state: GameState) => void) {
     this.onStateChange = onStateChange;
@@ -725,9 +726,15 @@ export class GameManager {
 
   private scheduleBotTurn(): void {
     const player = this.currentPlayer;
+
+    // Clear any stale timer for this player
+    const existing = this.botTimers.get(player.id);
+    if (existing) clearTimeout(existing);
+
     const delay = player.isBot ? 1000 : 1500; // bots faster than auto-pilot
 
     const timer = setTimeout(() => {
+      this.botTimers.delete(player.id);
       this.executeBotAction();
     }, delay);
 
@@ -821,6 +828,18 @@ export class GameManager {
         this.tryJailDice();
         setTimeout(() => this.executeBotAction(), 1500);
         break;
+
+      case 'spinWheel':
+        this.spinWheel();
+        setTimeout(() => this.endTurn(), 1500);
+        break;
+
+      case 'answerQuiz':
+        if (decision.quizAnswer !== undefined) {
+          this.answerQuiz(decision.quizAnswer);
+        }
+        setTimeout(() => this.endTurn(), 1500);
+        break;
     }
   }
 
@@ -839,7 +858,7 @@ export class GameManager {
 
   private addLog(message: string, type: 'info' | 'rent' | 'card' | 'buy' | 'sell' | 'dividend' | 'bankrupt' | 'victory' | 'jail' = 'info'): void {
     this.state.logs.push({
-      id: this.state.logs.length,
+      id: this.logIdCounter++, // monotonically increasing, never collides
       round: this.state.round,
       timestamp: Date.now(),
       message,
