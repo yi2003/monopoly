@@ -125,11 +125,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       phase: state.phase,
       round: state.round,
       currentPlayerIndex: state.currentPlayerIndex,
-      players: state.players,
+      players: [...state.players],
       dice: state.dice,
       diceRolled: state.diceRolled,
       winner: state.winner,
-      logs: state.logs,
+      logs: [...state.logs],
       phaseDelayUntil: delayUntil,
     });
   },
