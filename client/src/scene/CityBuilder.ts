@@ -158,11 +158,105 @@ export class CityBuilder {
   }
 
   build(): void {
+    this.buildRingRoadSurfaces();
     this.buildInnerRing();
     this.buildOuterRing();
     this.buildStreetProps();
     this.buildInnerCityRoads();
     this.buildLandmarks();
+  }
+
+  // ---- Ring Road Surfaces (visible asphalt roads) ----
+
+  private buildRingRoadSurfaces(): void {
+    const roadMat = new THREE.MeshStandardMaterial({ color: '#3D3D3D', roughness: 0.95 });
+    const laneMat = new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.5, emissive: '#FFD700', emissiveIntensity: 0.1 });
+    const curbMat = new THREE.MeshStandardMaterial({ color: '#BDBDBD', roughness: 0.7 });
+    const sidewalkMat = new THREE.MeshStandardMaterial({ color: '#C8C0B8', roughness: 0.85 });
+
+    const roadCenterOffset = TILE_D / 2 + SIDEWALK_WIDTH + ROAD_WIDTH / 2; // ~6.75
+    const roadExtend = 50; // how far roads extend beyond board
+
+    // Build roads for both rings
+    const rings = [
+      { half: INNER_BOARD_HALF, label: 'inner' },
+      { half: OUTER_BOARD_HALF, label: 'outer' },
+    ];
+
+    for (const ring of rings) {
+      const roadZ = ring.half + roadCenterOffset;
+      const length = ring.half * 2 + roadExtend;
+
+      // 4 sides: bottom(+z out), right(+x out), top(-z out), left(-x out)
+      const roadConfigs: { x: number; z: number; w: number; d: number }[] = [
+        { x: 0, z: -roadZ, w: length, d: ROAD_WIDTH }, // bottom
+        { x: 0, z: roadZ, w: length, d: ROAD_WIDTH },  // top
+        { x: roadZ, z: 0, w: ROAD_WIDTH, d: length },  // right
+        { x: -roadZ, z: 0, w: ROAD_WIDTH, d: length }, // left
+      ];
+
+      for (const rc of roadConfigs) {
+        // Road surface
+        const roadGeo = new THREE.BoxGeometry(rc.w, 0.06, rc.d);
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.position.set(rc.x, 0.02, rc.z);
+        road.receiveShadow = true;
+        this.roadGroup.add(road);
+
+        // Dashed center line
+        const isHorizontal = rc.w > rc.d;
+        const dashLen = 1.5;
+        const dashGap = 1.5;
+        const dashCount = Math.floor((isHorizontal ? rc.w : rc.d) / (dashLen + dashGap));
+        for (let d = 0; d < dashCount; d++) {
+          const dashPos = -((isHorizontal ? rc.w : rc.d) / 2) + dashLen / 2 + d * (dashLen + dashGap);
+          const dashGeo = new THREE.BoxGeometry(
+            isHorizontal ? dashLen : 0.12,
+            0.07,
+            isHorizontal ? 0.12 : dashLen,
+          );
+          const dash = new THREE.Mesh(dashGeo, laneMat);
+          dash.position.set(
+            isHorizontal ? dashPos : rc.x,
+            0.04,
+            isHorizontal ? rc.z : dashPos,
+          );
+          this.roadGroup.add(dash);
+        }
+
+        // Curbs on both sides of the road
+        for (const sideSign of [-1, 1]) {
+          const curbGeo = new THREE.BoxGeometry(
+            isHorizontal ? rc.w : 0.3,
+            0.14,
+            isHorizontal ? 0.3 : rc.d,
+          );
+          const curb = new THREE.Mesh(curbGeo, curbMat);
+          curb.position.set(
+            isHorizontal ? 0 : rc.x + sideSign * (ROAD_WIDTH / 2 + 0.3),
+            0.06,
+            isHorizontal ? rc.z + sideSign * (ROAD_WIDTH / 2 + 0.3) : 0,
+          );
+          curb.receiveShadow = true;
+          this.roadGroup.add(curb);
+
+          // Sidewalk slab
+          const swGeo = new THREE.BoxGeometry(
+            isHorizontal ? rc.w : SIDEWALK_WIDTH,
+            0.08,
+            isHorizontal ? SIDEWALK_WIDTH : rc.d,
+          );
+          const sw = new THREE.Mesh(swGeo, sidewalkMat);
+          sw.position.set(
+            isHorizontal ? 0 : rc.x + sideSign * (ROAD_WIDTH / 2 + SIDEWALK_WIDTH / 2 + 0.3),
+            0.03,
+            isHorizontal ? rc.z + sideSign * (ROAD_WIDTH / 2 + SIDEWALK_WIDTH / 2 + 0.3) : 0,
+          );
+          sw.receiveShadow = true;
+          this.roadGroup.add(sw);
+        }
+      }
+    }
   }
 
   // ---- Inner Ring Buildings (tiles 0-47) ----
