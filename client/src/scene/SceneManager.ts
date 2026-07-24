@@ -14,7 +14,7 @@ import { Houses } from './Houses';
 import { Effects } from './Effects';
 import { DayNightCycle } from './DayNightCycle';
 import { WeatherEffects } from './WeatherEffects';
-import { CityBuilder, SHOP_MODEL_URLS } from './CityBuilder';
+import { CityBuilder, PRELOAD_MODEL_URLS } from './CityBuilder';
 import { Pedestrians } from './Pedestrians';
 import { Vehicles } from './Vehicles';
 import { NightGlow } from './NightGlow';
@@ -130,7 +130,7 @@ export class SceneManager {
 
     // Procedural city
     this.cityBuilder = new CityBuilder(this.scene);
-    await preloadModels([...SHOP_MODEL_URLS]);
+    await preloadModels([...PRELOAD_MODEL_URLS]);
     this.board.plantTrees();
     this.cityBuilder.build();
     this.nightGlow.registerAll(this.cityBuilder.nightGlowMaterials);
