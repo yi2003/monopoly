@@ -143,6 +143,7 @@ io.on('connection', (socket) => {
       position: 0,
       innerCityRing: 0,
       innerCitySector: 0,
+      groundRing: 'inner',
       properties: [],
       houses: {},
       stocks: [],
@@ -334,6 +335,12 @@ io.on('connection', (socket) => {
     const game = getGame();
     if (!game) return;
     game.exitInnerCity();
+  });
+
+  socket.on('transferRing', (toRing: 'inner' | 'outer') => {
+    const game = getGame();
+    if (!game) return;
+    game.transferRing(toRing);
   });
 
   socket.on('drawChanceCard', () => {

@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import type { ThemeId } from '@monopoly/shared';
+import { audioManager } from '../audio/AudioManager';
 
 type VehicleType = 'car' | 'bus' | 'truck' | 'bicycle';
 
@@ -15,6 +16,7 @@ interface VehicleData {
   pathT: number;
   speed: number;
   direction: number; // 0=forward, 1=backward
+  hornCooldown: number; // seconds until can honk again
 }
 
 const CAR_COLORS = ['#E53935', '#1E88E5', '#43A047', '#FB8C00', '#FDD835', '#FFFFFF', '#424242', '#8E24AA'];
@@ -72,6 +74,7 @@ export class Vehicles {
         pathT: startT,
         speed: this.getSpeed(vtype),
         direction: Math.random() < 0.5 ? 0 : 1,
+        hornCooldown: 8 + Math.random() * 25,
       });
     }
   }
@@ -346,6 +349,19 @@ export class Vehicles {
         if (v.direction === 1) dir.negate();
         const angle = Math.atan2(dir.x, dir.z);
         v.group.rotation.y = angle;
+      }
+
+      // Random horns and bells
+      v.hornCooldown -= dt;
+      if (v.hornCooldown <= 0) {
+        v.hornCooldown = 6 + Math.random() * 25;
+        if (Math.random() < 0.25) {
+          if (v.vehicleType === 'bicycle') {
+            audioManager.playBicycleBell();
+          } else {
+            audioManager.playCarHorn();
+          }
+        }
       }
     }
   }

@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import type { GameState } from '@monopoly/shared';
+import { getGroundTilePosition, TILE_W, TILE_D, CORNER_SIZE } from '@monopoly/shared';
 
 interface HouseGroup {
   tileIndex: number;
@@ -120,20 +121,8 @@ export class Houses {
   }
 
   private getTilePosition(index: number): { x: number; z: number } {
-    const TILE_W = 2.8;
-    const BOARD_HALF = 5.0 + 7 * TILE_W;
-    const CORNER_SIZE = 5.0;
-    const side = Math.floor(index / 12);
-    const sideIdx = index % 12;
-    const offset = CORNER_SIZE / 2 + sideIdx * (TILE_W + 0.15);
-
-    switch (side) {
-      case 0: return { x: -BOARD_HALF + offset, z: -BOARD_HALF };
-      case 1: return { x: BOARD_HALF, z: -BOARD_HALF + offset };
-      case 2: return { x: BOARD_HALF - offset, z: BOARD_HALF };
-      case 3: return { x: -BOARD_HALF, z: BOARD_HALF - offset };
-      default: return { x: 0, z: 0 };
-    }
+    const pos = getGroundTilePosition(index);
+    return { x: pos.x, z: pos.z };
   }
 
   dispose(): void {

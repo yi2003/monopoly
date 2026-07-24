@@ -29,7 +29,6 @@ export default function WheelSpinner() {
   useEffect(() => {
     if (showWheelModal && wheelResult !== null) {
       setSpinning(true);
-      // Calculate rotation: each sector is ~25.7°, spin 5+ full rotations + land on sector
       const sectorAngle = 360 / SECTORS.length;
       const targetAngle = 360 * 5 + wheelResult * sectorAngle + sectorAngle / 2;
       setRotation(targetAngle);

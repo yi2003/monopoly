@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import type { GameState, CameraMode, QualityMode, WeatherType } from '@monopoly/shared';
+import { INNER_BOARD_HALF, TILE_D, OUTER_BOARD_HALF, OUTER_RING_OFFSET } from '@monopoly/shared';
 import { CameraController } from '../camera/CameraController';
 import { FirstPersonController } from '../roam/FirstPersonController';
 import { RoamCollision } from '../roam/RoamCollision';
@@ -173,6 +174,10 @@ export class SceneManager {
     this.vehicles.setDensity(quality === 'performance' ? 0.5 : 1.0);
 
     this.initialized = true;
+
+    // Start persistent city audio
+    audioManager.startCityAmbience();
+    audioManager.startCitySounds();
   }
 
   private setupLighting(): void {
@@ -205,34 +210,55 @@ export class SceneManager {
 
   /** Compute road paths and walk zones for NPC navigation */
   private computePaths(): void {
-    const BOARD_HALF_TILES = 5.0 + 7 * 2.8;
-    const TILE_D = 5.5;
+    const BOARD_HALF_TILES = INNER_BOARD_HALF;
+    const OUTER_HALF = OUTER_BOARD_HALF;
     const SIDEWALK_WIDTH = 2.0;
     const ROAD_WIDTH = 4.0;
 
-    const outerOffset = TILE_D / 2 + SIDEWALK_WIDTH + ROAD_WIDTH / 2;
+    const innerOffset = TILE_D / 2 + SIDEWALK_WIDTH + ROAD_WIDTH / 2;
+    const outerOffset = OUTER_HALF + TILE_D / 2 + SIDEWALK_WIDTH + ROAD_WIDTH / 2;
 
-    // Four road paths around the board (outer ring)
+    // Road paths: inner ring roads + outer ring roads + cross roads
     const paths: THREE.Vector3[][] = [
-      // Bottom road (east-west)
+      // Inner ring — Bottom road
       [
-        new THREE.Vector3(-BOARD_HALF_TILES - 20, 0, -BOARD_HALF_TILES - outerOffset),
-        new THREE.Vector3(BOARD_HALF_TILES + 20, 0, -BOARD_HALF_TILES - outerOffset),
+        new THREE.Vector3(-BOARD_HALF_TILES - 20, 0, -BOARD_HALF_TILES - innerOffset),
+        new THREE.Vector3(BOARD_HALF_TILES + 20, 0, -BOARD_HALF_TILES - innerOffset),
       ],
-      // Top road
+      // Inner ring — Top road
       [
-        new THREE.Vector3(-BOARD_HALF_TILES - 20, 0, BOARD_HALF_TILES + outerOffset),
-        new THREE.Vector3(BOARD_HALF_TILES + 20, 0, BOARD_HALF_TILES + outerOffset),
+        new THREE.Vector3(-BOARD_HALF_TILES - 20, 0, BOARD_HALF_TILES + innerOffset),
+        new THREE.Vector3(BOARD_HALF_TILES + 20, 0, BOARD_HALF_TILES + innerOffset),
       ],
-      // Left road (north-south)
+      // Inner ring — Left road
       [
-        new THREE.Vector3(-BOARD_HALF_TILES - outerOffset, 0, -BOARD_HALF_TILES - 20),
-        new THREE.Vector3(-BOARD_HALF_TILES - outerOffset, 0, BOARD_HALF_TILES + 20),
+        new THREE.Vector3(-BOARD_HALF_TILES - innerOffset, 0, -BOARD_HALF_TILES - 20),
+        new THREE.Vector3(-BOARD_HALF_TILES - innerOffset, 0, BOARD_HALF_TILES + 20),
       ],
-      // Right road
+      // Inner ring — Right road
       [
-        new THREE.Vector3(BOARD_HALF_TILES + outerOffset, 0, -BOARD_HALF_TILES - 20),
-        new THREE.Vector3(BOARD_HALF_TILES + outerOffset, 0, BOARD_HALF_TILES + 20),
+        new THREE.Vector3(BOARD_HALF_TILES + innerOffset, 0, -BOARD_HALF_TILES - 20),
+        new THREE.Vector3(BOARD_HALF_TILES + innerOffset, 0, BOARD_HALF_TILES + 20),
+      ],
+      // Outer ring — Bottom road
+      [
+        new THREE.Vector3(-OUTER_HALF - 20, 0, -OUTER_HALF - innerOffset),
+        new THREE.Vector3(OUTER_HALF + 20, 0, -OUTER_HALF - innerOffset),
+      ],
+      // Outer ring — Top road
+      [
+        new THREE.Vector3(-OUTER_HALF - 20, 0, OUTER_HALF + innerOffset),
+        new THREE.Vector3(OUTER_HALF + 20, 0, OUTER_HALF + innerOffset),
+      ],
+      // Outer ring — Left road
+      [
+        new THREE.Vector3(-OUTER_HALF - innerOffset, 0, -OUTER_HALF - 20),
+        new THREE.Vector3(-OUTER_HALF - innerOffset, 0, OUTER_HALF + 20),
+      ],
+      // Outer ring — Right road
+      [
+        new THREE.Vector3(OUTER_HALF + innerOffset, 0, -OUTER_HALF - 20),
+        new THREE.Vector3(OUTER_HALF + innerOffset, 0, OUTER_HALF + 20),
       ],
       // Inner cross roads
       [
@@ -248,19 +274,22 @@ export class SceneManager {
     this.roadPaths = paths;
     this.vehicles.setRoadPaths(paths);
 
-    // Walk zones along sidewalks
+    // Walk zones along sidewalks (both inner and outer rings)
     const walkOffset = TILE_D / 2 + SIDEWALK_WIDTH / 2;
-    for (let side = 0; side < 4; side++) {
-      const isHorizontal = side % 2 === 0;
-      const sign = side < 2 ? -1 : 1;
-      const length = 60;
-      const start = isHorizontal
-        ? new THREE.Vector3(-length / 2, 0, sign * (BOARD_HALF_TILES + walkOffset))
-        : new THREE.Vector3(sign * (BOARD_HALF_TILES + walkOffset), 0, -length / 2);
-      const end = isHorizontal
-        ? new THREE.Vector3(length / 2, 0, sign * (BOARD_HALF_TILES + walkOffset))
-        : new THREE.Vector3(sign * (BOARD_HALF_TILES + walkOffset), 0, length / 2);
-      this.walkZones.push({ start, end });
+    for (let ring = 0; ring < 2; ring++) {
+      const ringHalf = ring === 0 ? BOARD_HALF_TILES : OUTER_HALF;
+      for (let side = 0; side < 4; side++) {
+        const isHorizontal = side % 2 === 0;
+        const sign = side < 2 ? -1 : 1;
+        const length = 60;
+        const start = isHorizontal
+          ? new THREE.Vector3(-length / 2, 0, sign * (ringHalf + walkOffset))
+          : new THREE.Vector3(sign * (ringHalf + walkOffset), 0, -length / 2);
+        const end = isHorizontal
+          ? new THREE.Vector3(length / 2, 0, sign * (ringHalf + walkOffset))
+          : new THREE.Vector3(sign * (ringHalf + walkOffset), 0, length / 2);
+        this.walkZones.push({ start, end });
+      }
     }
 
     this.pedestrians.setWalkZones(this.walkZones);

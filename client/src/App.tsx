@@ -14,10 +14,12 @@ import WheelSpinner from './components/Special/WheelSpinner';
 import EventToast from './components/Special/EventToast';
 import Toast from './components/Special/Toast';
 import GameCanvas from './scene/GameCanvas';
+import { useI18n } from './i18n/useI18n';
 
 export default function App() {
   const phase = useGameStore(s => s.phase);
   const connected = useGameStore(s => s.connected);
+  const { t } = useI18n();
 
   useEffect(() => {
     connectSocket();
@@ -33,30 +35,21 @@ export default function App() {
 
   return (
     <div className="app">
-      {/* 3D Canvas fills the background */}
       <GameCanvas />
-
-      {/* HUD Overlay */}
       <HUD />
-
-      {/* Modals */}
       <BuyModal />
       <BuildModal />
       <StockModal />
       <PortfolioModal />
       <QuizModal />
       <BankruptcyModal />
-
-      {/* Special UI */}
       <CardFlip />
       <WheelSpinner />
       <EventToast />
       <Toast />
-
-      {/* Connection indicator */}
       {!connected && (
         <div className="connection-lost">
-          ⚠ 连接已断开，正在重连...
+          {t('app.connectionLost')}
         </div>
       )}
     </div>

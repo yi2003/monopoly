@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { useUIStore } from '../../store/uiStore';
 import { getSocket } from '../../network/socket';
 import { getPropertyDef, getRailwayDef, getUtilityDef } from '@monopoly/shared';
+import { useI18n } from '../../i18n/useI18n';
 
 export default function BuyModal() {
   const gameState = useGameStore(s => s.gameState);
@@ -10,9 +10,9 @@ export default function BuyModal() {
   const phase = useGameStore(s => s.phase);
   const players = useGameStore(s => s.players);
   const phaseDelayUntil = useGameStore(s => s.phaseDelayUntil);
+  const { t, localName } = useI18n();
   const [delayTick, setDelayTick] = useState(0);
 
-  // Force re-render when phase delay expires
   useEffect(() => {
     const remaining = phaseDelayUntil - Date.now();
     if (remaining > 0) {
@@ -22,7 +22,7 @@ export default function BuyModal() {
   }, [phaseDelayUntil, delayTick]);
 
   if (!gameState || phase !== 'buying') return null;
-  if (Date.now() < phaseDelayUntil) return null; // wait for character walk
+  if (Date.now() < phaseDelayUntil) return null;
 
   const currentPlayer = players[gameState.currentPlayerIndex];
   if (currentPlayer?.id !== playerId) return null;
@@ -38,20 +38,25 @@ export default function BuyModal() {
 
   if (prop) {
     price = prop.price;
-    typeLabel = `地产 · ${prop.nameCN}`;
+    typeLabel = `${t('buy.property')} · ${localName(prop)}`;
     rentInfo = prop.rent.map((r, i) =>
-      i === 0 ? `空地: $${r}` :
-      i === 5 ? `酒店: $${r}` :
-      `${i}栋: $${r}`
+      i === 0 ? `${t('buy.rent.vacant')}: $${r}` :
+      i === 5 ? `${t('buy.rent.hotel')}: $${r}` :
+      `${t('buy.rent.houses', { n: i })}: $${r}`
     );
   } else if (rail) {
     price = rail.price;
-    typeLabel = `铁路 · ${rail.nameCN}`;
-    rentInfo = ['1条: $25', '2条: $50', '3条: $100', '4条: $200'];
+    typeLabel = `${t('buy.railway')} · ${localName(rail)}`;
+    rentInfo = [
+      `${t('buy.rent.railway.1')}: $25`,
+      `${t('buy.rent.railway.2')}: $50`,
+      `${t('buy.rent.railway.3')}: $100`,
+      `${t('buy.rent.railway.4')}: $200`,
+    ];
   } else if (util) {
     price = util.price;
-    typeLabel = `公共事业 · ${util.nameCN}`;
-    rentInfo = ['1个: 骰点×4', '2个: 骰点×10'];
+    typeLabel = `${t('buy.utility')} · ${localName(util)}`;
+    rentInfo = [t('buy.rent.util.1'), t('buy.rent.util.2')];
   }
 
   if (!price) return null;
@@ -62,33 +67,33 @@ export default function BuyModal() {
   return (
     <div className="modal-overlay">
       <div className="modal buy-modal">
-        <h2>🏘️ 购买地产</h2>
+        <h2>{t('buy.title')}</h2>
         <div className="buy-property-info">
           <h3>{typeLabel}</h3>
           <div className="buy-price">
-            价格: <strong>${price.toLocaleString()}</strong>
+            {t('buy.price')}: <strong>${price.toLocaleString()}</strong>
           </div>
           <div className="buy-rent-table">
-            <h4>租金表</h4>
+            <h4>{t('buy.rentTable')}</h4>
             {rentInfo.map((r, i) => (
               <div key={i} className="rent-row">{r}</div>
             ))}
           </div>
           {prop && (
             <div className="buy-house-cost">
-              建房成本: ${prop.houseCost}/栋
+              {t('buy.houseCost')}: ${prop.houseCost}/{t('buy.rent.hotel').replace(': $', '').toLowerCase()}
             </div>
           )}
         </div>
         <div className="buy-cash">
-          你的现金: <strong>${currentPlayer.cash.toLocaleString()}</strong>
+          {t('buy.yourCash')}: <strong>${currentPlayer.cash.toLocaleString()}</strong>
         </div>
         <div className="modal-actions">
           <button className="btn btn-success btn-lg" onClick={handleBuy}>
-            ✅ 购买 (${price.toLocaleString()})
+            {t('buy.confirm')} (${price.toLocaleString()})
           </button>
           <button className="btn btn-danger" onClick={handlePass}>
-            ❌ 放弃
+            {t('buy.passBtn')}
           </button>
         </div>
       </div>

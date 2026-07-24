@@ -1,17 +1,15 @@
 // ============================================================
-// Board — 48 ground-ring tiles + 24 inner-city tiles
+// Board — inner ground-ring tiles (0-47) + outer ground-ring tiles (72-119)
 // ============================================================
 
 import * as THREE from 'three';
 import type { GameState } from '@monopoly/shared';
-import { GROUP_COLORS, PROPERTIES, RAILWAYS, UTILITIES } from '@monopoly/shared';
-
-const BOARD_SIZE = 48;
-const TILES_PER_SIDE = 13;
-const TILE_W = 2.8;
-const TILE_D = 5.5;
-const CORNER_SIZE = 5.0;
-const BOARD_HALF = CORNER_SIZE + 7 * TILE_W;
+import {
+  GROUP_COLORS, ALL_PROPERTIES, ALL_RAILWAYS, ALL_UTILITIES,
+  TILE_W, TILE_D, CORNER_SIZE, INNER_BOARD_HALF, OUTER_BOARD_HALF,
+  GROUND_INNER_RING_SIZE, GROUND_OUTER_RING_SIZE, OUTER_RING_OFFSET,
+  getGroundTilePosition, isCornerIndex,
+} from '@monopoly/shared';
 
 export class Board {
   private scene: THREE.Scene;
@@ -29,8 +27,10 @@ export class Board {
   }
 
   private build(): void {
+    const outerExtent = OUTER_BOARD_HALF + 3;
+
     // Base platform (green base)
-    const baseGeo = new THREE.BoxGeometry(BOARD_HALF * 2 + 4, 1.5, BOARD_HALF * 2 + 4);
+    const baseGeo = new THREE.BoxGeometry(outerExtent * 2 + 4, 1.5, outerExtent * 2 + 4);
     const baseMat = new THREE.MeshStandardMaterial({ color: '#2E7D32', roughness: 0.6 });
     const base = new THREE.Mesh(baseGeo, baseMat);
     base.position.y = -1.5;
@@ -39,8 +39,7 @@ export class Board {
     this.group.add(base);
 
     // Wooden border frame
-    const frameOuter = BOARD_HALF + 3;
-    const frameGeo = new THREE.BoxGeometry(frameOuter * 2 + 2, 0.6, frameOuter * 2 + 2);
+    const frameGeo = new THREE.BoxGeometry(outerExtent * 2 + 2, 0.6, outerExtent * 2 + 2);
     const frameMat = new THREE.MeshStandardMaterial({ color: '#5D4037', roughness: 0.4, metalness: 0.1 });
     const frame = new THREE.Mesh(frameGeo, frameMat);
     frame.position.y = -0.5;
@@ -48,7 +47,7 @@ export class Board {
     this.group.add(frame);
 
     // Gold trim
-    const trimGeo = new THREE.BoxGeometry(frameOuter * 2 + 2.2, 0.1, frameOuter * 2 + 2.2);
+    const trimGeo = new THREE.BoxGeometry(outerExtent * 2 + 2.2, 0.1, outerExtent * 2 + 2.2);
     const trimMat = new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.3, metalness: 0.8, emissive: '#996600', emissiveIntensity: 0.3 });
     const trim = new THREE.Mesh(trimGeo, trimMat);
     trim.position.y = -0.2;
@@ -70,25 +69,34 @@ export class Board {
     ring.position.y = 0.2;
     this.group.add(ring);
 
-    // Build tiles
-    for (let i = 0; i < BOARD_SIZE; i++) {
+    // Build inner ring tiles (0-47)
+    for (let i = 0; i < GROUND_INNER_RING_SIZE; i++) {
+      this.buildTile(i);
+    }
+
+    // Build outer ring tiles (72-119)
+    for (let i = OUTER_RING_OFFSET; i < OUTER_RING_OFFSET + GROUND_OUTER_RING_SIZE; i++) {
       this.buildTile(i);
     }
   }
 
   private buildTile(index: number): void {
-    const pos = this.getTilePosition(index);
+    const pos = getGroundTilePosition(index);
     const tileGroup = new THREE.Group();
     tileGroup.position.set(pos.x, 0, pos.z);
     tileGroup.rotation.y = pos.rotation;
 
+    const isCorner = isCornerIndex(index);
+    const isOuter = index >= OUTER_RING_OFFSET;
+
     // Concrete slab
     const slabGeo = new THREE.BoxGeometry(
-      this.isCorner(index) ? CORNER_SIZE : TILE_W,
+      isCorner ? CORNER_SIZE : TILE_W,
       0.3,
-      this.isCorner(index) ? CORNER_SIZE : TILE_D,
+      isCorner ? CORNER_SIZE : TILE_D,
     );
-    const slabMat = new THREE.MeshStandardMaterial({ color: '#D7CCC8', roughness: 0.7 });
+    const slabColor = isOuter ? '#BDB5A8' : '#D7CCC8';
+    const slabMat = new THREE.MeshStandardMaterial({ color: slabColor, roughness: 0.7 });
     const slab = new THREE.Mesh(slabGeo, slabMat);
     slab.position.y = 0.05;
     slab.receiveShadow = true;
@@ -96,7 +104,7 @@ export class Board {
     tileGroup.add(slab);
 
     // Color strip for properties
-    const propDef = PROPERTIES.find(p => p.index === index);
+    const propDef = ALL_PROPERTIES.find(p => p.index === index);
     if (propDef) {
       const colorHex = GROUP_COLORS[propDef.group];
       const stripGeo = new THREE.BoxGeometry(TILE_W, 0.08, 0.6);
@@ -114,7 +122,7 @@ export class Board {
     }
 
     // Railway marker
-    if (RAILWAYS.some(r => r.index === index)) {
+    if (ALL_RAILWAYS.some(r => r.index === index)) {
       const markerGeo = new THREE.CylinderGeometry(0.15, 0.2, 0.8, 8);
       const markerMat = new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.3, metalness: 0.7 });
       const marker = new THREE.Mesh(markerGeo, markerMat);
@@ -123,7 +131,7 @@ export class Board {
     }
 
     // Utility icon
-    if (UTILITIES.some(u => u.index === index)) {
+    if (ALL_UTILITIES.some(u => u.index === index)) {
       const iconGeo = new THREE.SphereGeometry(0.3, 16, 16);
       const iconMat = new THREE.MeshStandardMaterial({
         color: index === 14 ? '#FFD700' : '#2196F3',
@@ -253,7 +261,7 @@ export class Board {
     }
 
     // Railway: small locomotive
-    const railDef = RAILWAYS.find(r => r.index === index);
+    const railDef = ALL_RAILWAYS.find(r => r.index === index);
     if (railDef) {
       const locoGroup = new THREE.Group();
       // Boiler
@@ -340,7 +348,7 @@ export class Board {
     }
 
     // Corner treatments
-    if (this.isCorner(index)) {
+    if (isCornerIndex(index)) {
       const cornerPillarGeo = new THREE.CylinderGeometry(0.35, 0.4, 1.0, 8);
       const cornerPillarMat = new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.3, metalness: 0.8 });
       const pillar = new THREE.Mesh(cornerPillarGeo, cornerPillarMat);
@@ -350,47 +358,6 @@ export class Board {
 
     this.group.add(tileGroup);
     this.tileMeshes.set(index, tileGroup);
-  }
-
-  private getTilePosition(index: number): { x: number; z: number; rotation: number } {
-    const sideLength = 12; // tiles per side between corners
-    const side = Math.floor(index / sideLength);
-    const sideIdx = index % sideLength;
-
-    const halfSide = sideLength / 2;
-
-    switch (side) {
-      case 0: // Bottom edge (GO to just before Jail) — going RIGHT
-        return {
-          x: -BOARD_HALF + CORNER_SIZE / 2 + sideIdx * (TILE_W + 0.15),
-          z: -BOARD_HALF,
-          rotation: 0,
-        };
-      case 1: // Right edge (Jail to just before Stock) — going UP
-        return {
-          x: BOARD_HALF,
-          z: -BOARD_HALF + CORNER_SIZE / 2 + sideIdx * (TILE_W + 0.15),
-          rotation: Math.PI / 2,
-        };
-      case 2: // Top edge (Stock to just before GoToJail) — going LEFT
-        return {
-          x: BOARD_HALF - CORNER_SIZE / 2 - sideIdx * (TILE_W + 0.15),
-          z: BOARD_HALF,
-          rotation: Math.PI,
-        };
-      case 3: // Left edge (GoToJail to just before GO) — going DOWN
-        return {
-          x: -BOARD_HALF,
-          z: BOARD_HALF - CORNER_SIZE / 2 - sideIdx * (TILE_W + 0.15),
-          rotation: -Math.PI / 2,
-        };
-      default:
-        return { x: 0, z: 0, rotation: 0 };
-    }
-  }
-
-  private isCorner(index: number): boolean {
-    return index === 0 || index === 12 || index === 24 || index === 36;
   }
 
   update(_state: GameState): void {

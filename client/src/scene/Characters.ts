@@ -4,22 +4,22 @@
 
 import * as THREE from 'three';
 import type { GameState, Player } from '@monopoly/shared';
+import { getCharacterTilePos, OUTER_RING_OFFSET, GROUND_INNER_RING_SIZE } from '@monopoly/shared';
+import { audioManager } from '../audio/AudioManager';
 
 interface CharacterData {
   playerId: string;
   group: THREE.Group;
   color: string;
   currentTile: number;
+  nameLabel: THREE.Sprite;
   // Path following
   waypoints: THREE.Vector3[];
   waypointIndex: number;
   walkProgress: number; // 0-1 within current segment
 }
 
-const WALK_SPEED = 5.5; // tiles per second (~19 units/s, fast board traversal)
-const TILE_W = 2.8;
-const BOARD_HALF = 5.0 + 7 * TILE_W;
-const CORNER_SIZE = 5.0;
+const WALK_SPEED = 5.5; // tiles per second
 const WAYPOINT_THRESHOLD = 0.08;
 
 export class Characters {
@@ -45,15 +45,18 @@ export class Characters {
 
       // New character
       if (!charData) {
-        const charGroup = this.createCharacter(player.color);
+        const charGroup = this.createCharacter(player.color, player.name);
         this.group.add(charGroup);
         const pos = this.getTileWorldPos(player.position);
         charGroup.position.set(pos.x, 0.7, pos.z);
+        const nameLabel = this.createNameLabel(player.name, player.color);
+        charGroup.add(nameLabel);
         charData = {
           playerId: player.id,
           group: charGroup,
           color: player.color,
           currentTile: player.position,
+          nameLabel,
           waypoints: [],
           waypointIndex: 0,
           walkProgress: 1,
@@ -85,26 +88,30 @@ export class Characters {
     }
   }
 
-  /** Build tile-by-tile path along the board perimeter */
+  /** Build tile-by-tile path along the board perimeter (ring-aware) */
   private buildPath(from: number, to: number): THREE.Vector3[] {
     const waypoints: THREE.Vector3[] = [];
 
-    // Handle wrapping around GO (passing through tile 0)
-    // If going forward past tile 47, wrap to 0
-    let tiles: number[] = [];
-    if (from <= to) {
-      // Normal forward movement
-      for (let i = from; i <= to; i++) {
-        tiles.push(i);
-      }
-    } else {
-      // Wrapped around — go from 'from' to 47, then 0 to 'to'
-      for (let i = from; i < 48; i++) tiles.push(i);
-      for (let i = 0; i <= to; i++) tiles.push(i);
+    // Determine which ring we're on
+    const isOuter = from >= OUTER_RING_OFFSET || to >= OUTER_RING_OFFSET;
+    const ringStart = isOuter ? OUTER_RING_OFFSET : 0;
+    const ringEnd = ringStart + 48;
+
+    // Ring transfer: snap directly (no animation)
+    if ((from >= OUTER_RING_OFFSET) !== (to >= OUTER_RING_OFFSET)) {
+      const pos = this.getTileWorldPos(to);
+      waypoints.push(new THREE.Vector3(pos.x, 0.7, pos.z));
+      return waypoints;
     }
 
-    // Only emit waypoints for every Nth tile to avoid too many points
-    // But always include the starting position and each corner
+    let tiles: number[] = [];
+    if (from <= to) {
+      for (let i = from; i <= to; i++) tiles.push(i);
+    } else {
+      for (let i = from; i < ringEnd; i++) tiles.push(i);
+      for (let i = ringStart; i <= to; i++) tiles.push(i);
+    }
+
     for (const t of tiles) {
       const pos = this.getTileWorldPos(t);
       waypoints.push(new THREE.Vector3(pos.x, 0.7, pos.z));
@@ -113,7 +120,7 @@ export class Characters {
     return waypoints;
   }
 
-  private createCharacter(color: string): THREE.Group {
+  private createCharacter(color: string, name: string): THREE.Group {
     const group = new THREE.Group();
     const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.1 });
     const pantsMat = new THREE.MeshStandardMaterial({ color: '#333333', roughness: 0.7 });
@@ -199,6 +206,67 @@ export class Characters {
     return group;
   }
 
+  /** Create a canvas-based sprite label floating above the character */
+  private createNameLabel(name: string, color: string): THREE.Sprite {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d')!;
+
+    // Background pill
+    const bgWidth = 200;
+    const bgHeight = 36;
+    const bgX = (256 - bgWidth) / 2;
+    const bgY = (64 - bgHeight) / 2;
+    const radius = 12;
+
+    // Draw rounded rect background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.beginPath();
+    ctx.moveTo(bgX + radius, bgY);
+    ctx.lineTo(bgX + bgWidth - radius, bgY);
+    ctx.quadraticCurveTo(bgX + bgWidth, bgY, bgX + bgWidth, bgY + radius);
+    ctx.lineTo(bgX + bgWidth, bgY + bgHeight - radius);
+    ctx.quadraticCurveTo(bgX + bgWidth, bgY + bgHeight, bgX + bgWidth - radius, bgY + bgHeight);
+    ctx.lineTo(bgX + radius, bgY + bgHeight);
+    ctx.quadraticCurveTo(bgX, bgY + bgHeight, bgX, bgY + bgHeight - radius);
+    ctx.lineTo(bgX, bgY + radius);
+    ctx.quadraticCurveTo(bgX, bgY, bgX + radius, bgY);
+    ctx.closePath();
+    ctx.fill();
+
+    // Colored accent bar on top
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(bgX + radius, bgY);
+    ctx.lineTo(bgX + bgWidth - radius, bgY);
+    ctx.quadraticCurveTo(bgX + bgWidth, bgY, bgX + bgWidth, bgY + radius);
+    ctx.lineTo(bgX + bgWidth, bgY + 5);
+    ctx.lineTo(bgX, bgY + 5);
+    ctx.lineTo(bgX, bgY + radius);
+    ctx.quadraticCurveTo(bgX, bgY, bgX + radius, bgY);
+    ctx.closePath();
+    ctx.fill();
+
+    // Player name text
+    ctx.font = 'bold 18px "Microsoft YaHei", "PingFang SC", sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const displayName = name.length > 8 ? name.slice(0, 7) + '…' : name;
+    ctx.fillText(displayName, 128, 34);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.scale.set(2.0, 0.5, 1);
+    sprite.position.y = 1.45;
+    sprite.renderOrder = 999;
+    return sprite;
+  }
+
   update(dt: number): void {
     for (const [, charData] of this.characters) {
       if (charData.waypoints.length === 0) continue;
@@ -270,6 +338,16 @@ export class Characters {
     const armSwing = Math.sin(newPhase) * swing * 0.8;
     const bounce = Math.abs(Math.sin(newPhase * 2)) * 0.06;
 
+    // Footstep trigger on sign change (foot hits ground)
+    const prevSinKey = `prevSin_${charData.playerId}`;
+    const prevSin = (charData.group.userData[prevSinKey] as number) || 0;
+    const newSin = Math.sin(newPhase);
+    // Trigger when sin crosses zero (foot strikes ground)
+    if ((prevSin > 0 && newSin <= 0) || (prevSin < 0 && newSin >= 0)) {
+      audioManager.playFootstep();
+    }
+    charData.group.userData[prevSinKey] = newSin;
+
     const legL = charData.group.getObjectByName('legL');
     const legR = charData.group.getObjectByName('legR');
     const armL = charData.group.getObjectByName('armL');
@@ -313,20 +391,12 @@ export class Characters {
 
   /** Get world position for a tile on the ground ring */
   private getTileWorldPos(index: number): { x: number; z: number } {
-    // Clamp to ground ring
-    if (index >= 48) index = 48 - 1;
-    const side = Math.floor(index / 12);
-    const sideIdx = index % 12;
-    const offset = CORNER_SIZE / 2 + sideIdx * (TILE_W + 0.15) + 1.4;
-    const inner = 1.8; // inset from board edge
-
-    switch (side) {
-      case 0: return { x: -BOARD_HALF + offset, z: -BOARD_HALF + inner };
-      case 1: return { x: BOARD_HALF - inner, z: -BOARD_HALF + offset };
-      case 2: return { x: BOARD_HALF - offset, z: BOARD_HALF - inner };
-      case 3: return { x: -BOARD_HALF + inner, z: BOARD_HALF - offset };
-      default: return { x: 0, z: 0 };
+    // Ground ring tiles (inner or outer)
+    if (index < GROUND_INNER_RING_SIZE || index >= OUTER_RING_OFFSET) {
+      return getCharacterTilePos(index);
     }
+    // Inner city — fallback to center
+    return { x: 0, z: 0 };
   }
 
   private removeCharacter(id: string): void {

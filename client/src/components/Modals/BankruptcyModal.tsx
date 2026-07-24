@@ -1,9 +1,11 @@
 import { useGameStore } from '../../store/gameStore';
 import { getSocket } from '../../network/socket';
+import { useI18n } from '../../i18n/useI18n';
 
 export default function BankruptcyModal() {
   const gameState = useGameStore(s => s.gameState);
   const phase = useGameStore(s => s.phase);
+  const { t } = useI18n();
 
   if (!gameState || phase !== 'debt') return null;
 
@@ -17,17 +19,17 @@ export default function BankruptcyModal() {
   return (
     <div className="modal-overlay">
       <div className="modal bankruptcy-modal">
-        <h2>⚠️ 现金不足！</h2>
+        <h2>{t('bankrupt.title')}</h2>
         <div className="bankruptcy-info">
-          <p>{currentPlayer.name}，你的现金不足支付债务。</p>
-          <p>当前现金: <strong className="negative">-${Math.abs(currentPlayer.cash).toLocaleString()}</strong></p>
-          <p>你可以尝试出售房屋或股票来筹集资金。</p>
+          <p>{t('bankrupt.desc', { name: currentPlayer.name })}</p>
+          <p>{t('bankrupt.currentCash')}: <strong className="negative">-${Math.abs(currentPlayer.cash).toLocaleString()}</strong></p>
+          <p>{t('bankrupt.hint')}</p>
         </div>
         <div className="modal-actions">
           <button className="btn btn-danger" onClick={handleDeclare}>
-            💀 宣布破产
+            {t('bankrupt.declare')}
           </button>
-          <p className="hint">提示: 使用右侧建造面板出售房屋</p>
+          <p className="hint">{t('bankrupt.tip')}</p>
         </div>
       </div>
     </div>

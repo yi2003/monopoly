@@ -3,20 +3,20 @@
 // ============================================================
 
 import type { Player, PropertyTile, Tile, ColorGroup, Stock } from './types';
-import { PROPERTIES, RAILWAYS, UTILITIES, STOCKS } from './constants';
+import { ALL_PROPERTIES, ALL_RAILWAYS, ALL_UTILITIES, STOCKS, OUTER_RING_OFFSET } from './constants';
 
 // ---- Helper: find property definition by tile index ----
 
 export function getPropertyDef(tileIndex: number) {
-  return PROPERTIES.find(p => p.index === tileIndex);
+  return ALL_PROPERTIES.find(p => p.index === tileIndex);
 }
 
 export function getRailwayDef(tileIndex: number) {
-  return RAILWAYS.find(r => r.index === tileIndex);
+  return ALL_RAILWAYS.find(r => r.index === tileIndex);
 }
 
 export function getUtilityDef(tileIndex: number) {
-  return UTILITIES.find(u => u.index === tileIndex);
+  return ALL_UTILITIES.find(u => u.index === tileIndex);
 }
 
 export function isPropertyTile(tile: Tile): tile is PropertyTile {
@@ -26,7 +26,7 @@ export function isPropertyTile(tile: Tile): tile is PropertyTile {
 // ---- Color Group Checks ----
 
 export function getGroupTiles(group: ColorGroup): number[] {
-  return PROPERTIES.filter(p => p.group === group).map(p => p.index);
+  return ALL_PROPERTIES.filter(p => p.group === group).map(p => p.index);
 }
 
 export function ownsFullGroup(player: Player, group: ColorGroup): boolean {
@@ -35,7 +35,7 @@ export function ownsFullGroup(player: Player, group: ColorGroup): boolean {
 }
 
 export function getOwnedGroups(player: Player): ColorGroup[] {
-  const groups = new Set(PROPERTIES.filter(p => player.properties.includes(p.index)).map(p => p.group));
+  const groups = new Set(ALL_PROPERTIES.filter(p => player.properties.includes(p.index)).map(p => p.group));
   return Array.from(groups).filter(g => ownsFullGroup(player, g));
 }
 
@@ -234,17 +234,21 @@ export function advancePosition(
   steps: number,
   innerCityRing: number,
   innerCitySector: number,
-): { position: number; passedGo: boolean; ring: number; sector: number } {
+  groundRing: 'inner' | 'outer' = 'inner',
+): { position: number; passedGo: boolean; ring: number; sector: number; groundRing: 'inner' | 'outer' } {
   let passedGo = false;
 
   if (innerCityRing === 0) {
-    // On ground ring
-    let newPos = currentPos + steps;
-    if (newPos >= 48) {
+    // On a ground ring
+    const ringSize = 48;
+    const ringStart = groundRing === 'inner' ? 0 : OUTER_RING_OFFSET;
+    const localPos = currentPos - ringStart;
+    let newLocalPos = localPos + steps;
+    if (newLocalPos >= ringSize) {
       passedGo = true;
-      newPos = newPos % 48;
+      newLocalPos = newLocalPos % ringSize;
     }
-    return { position: newPos, passedGo, ring: 0, sector: 0 };
+    return { position: ringStart + newLocalPos, passedGo, ring: 0, sector: 0, groundRing };
   } else {
     // In inner city: circular within ring
     const ringOffset = 48 + (innerCityRing - 1) * 8;
@@ -258,6 +262,7 @@ export function advancePosition(
       passedGo: false,
       ring: innerCityRing,
       sector: innerCitySector,
+      groundRing,
     };
   }
 }
@@ -280,10 +285,14 @@ export function moveToTile(
 export function findNearestTile(
   currentPos: number,
   tileType: 'railway' | 'utility',
+  groundRing: 'inner' | 'outer' = 'inner',
 ): number {
+  // Get candidates for the player's current ring
   const candidates = tileType === 'railway'
-    ? RAILWAYS.map(r => r.index)
-    : UTILITIES.map(u => u.index);
+    ? ALL_RAILWAYS.filter(r => (groundRing === 'outer') === (r.index >= OUTER_RING_OFFSET)).map(r => r.index)
+    : ALL_UTILITIES.filter(u => (groundRing === 'outer') === (u.index >= OUTER_RING_OFFSET)).map(u => u.index);
+
+  if (candidates.length === 0) return currentPos;
 
   // Find next one clockwise
   const sorted = candidates.sort((a, b) => a - b);

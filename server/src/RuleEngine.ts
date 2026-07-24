@@ -10,6 +10,7 @@ import {
   canMortgage, getMortgageValue, getUnmortgageCost,
   ownsFullGroup,
   CORNER_GO, CORNER_JAIL, CORNER_GOTO_JAIL,
+  OUTER_RING_OFFSET,
   JAIL_FINE, MAX_JAIL_TURNS,
 } from '@monopoly/shared';
 import { getEffectiveConfig, THEMES } from '@monopoly/shared';
@@ -58,14 +59,18 @@ export class RuleEngine {
       return { passedGo: false, newPosition: player.position, extraRoll: false };
     }
 
-    // Calculate new position on ground ring
+    // Calculate new position on ground ring (ring-aware)
     const steps = dice.total;
-    let newPos = player.position + steps;
-    if (newPos >= 48) {
+    const ringStart = player.groundRing === 'inner' ? 0 : OUTER_RING_OFFSET;
+    const ringSize = 48;
+    const localPos = player.position - ringStart;
+    let newLocalPos = localPos + steps;
+    if (newLocalPos >= ringSize) {
       passedGo = true;
       player.cash += this.effConfig.goSalary;
     }
-    newPos = newPos % 48;
+    newLocalPos = newLocalPos % ringSize;
+    const newPos = ringStart + newLocalPos;
 
     return { passedGo, newPosition: newPos, extraRoll };
   }

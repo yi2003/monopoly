@@ -81,6 +81,7 @@ export class GameManager {
       position: 0,
       innerCityRing: 0,
       innerCitySector: 0,
+      groundRing: 'inner',
       properties: [],
       houses: {},
       stocks: [],
@@ -118,6 +119,9 @@ export class GameManager {
     for (const player of activePlayers) {
       player.cash = eff.startingCash;
       player.position = 0;
+      player.groundRing = 'inner';
+      player.innerCityRing = 0;
+      player.innerCitySector = 0;
       player.properties = [];
       player.houses = {};
       player.stocks = [];
@@ -491,8 +495,11 @@ export class GameManager {
       }
 
       case 'moveBack': {
-        const newPos = player.position - effect.spaces;
-        player.position = newPos < 0 ? 48 + newPos : newPos;
+        const ringStart = player.groundRing === 'inner' ? 0 : 72;
+        const ringSize = 48;
+        const localPos = player.position - ringStart;
+        const newLocalPos = localPos - effect.spaces;
+        player.position = newLocalPos < 0 ? ringStart + ringSize + newLocalPos : ringStart + newLocalPos;
         const landing = this.engine.processLanding(player.position);
         this.state.phase = landing.phase === 'buying' ? 'buying' : 'awaitEnd';
         break;
@@ -666,10 +673,39 @@ export class GameManager {
     const player = this.currentPlayer;
     player.innerCityRing = 0;
     player.innerCitySector = 0;
-    // Exit to nearest railway
+    player.groundRing = 'inner';
+    // Exit to nearest railway on inner ground ring
     const railways = [5, 11, 17, 29, 35, 41];
     player.position = railways[Math.floor(Math.random() * railways.length)];
     this.addLog(`${player.name} 离开内城`, 'info');
+    this.emitChange();
+    return { success: true };
+  }
+
+  // ---- Ring Transfer (inner <-> outer ground ring) ----
+
+  transferRing(toRing: 'inner' | 'outer'): { success: boolean; error?: string } {
+    const player = this.currentPlayer;
+    const tile = this.state.tiles[player.position];
+
+    if (tile.type !== 'railway') return { success: false, error: '只能在铁路站换环' };
+    if (player.innerCityRing !== 0) return { success: false, error: '不在街道环上' };
+    if (player.groundRing === toRing) return { success: false, error: '已经在该环上' };
+
+    const fee = toRing === 'outer' ? 100 : 50;
+    if (player.cash < fee) return { success: false, error: '现金不足' };
+
+    player.cash -= fee;
+    player.groundRing = toRing;
+
+    // Map to corresponding railway on target ring
+    const localIdx = (player.position >= 72) ? player.position - 72 : player.position;
+    player.position = toRing === 'outer' ? 72 + localIdx : localIdx;
+
+    // Process landing on new tile
+    const landing = this.engine.processLanding(player.position);
+    this.state.phase = landing.phase === 'buying' ? 'buying' : 'awaitEnd';
+    this.addLog(`${player.name} 换乘到${toRing === 'outer' ? '外环' : '内环'} (费用 $${fee})`, 'info');
     this.emitChange();
     return { success: true };
   }

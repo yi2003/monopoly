@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { useUIStore } from '../../store/uiStore';
 import { getSocket } from '../../network/socket';
 import { getPropertyDef, canBuildHouse, canSellHouse, getSellHouseValue, ownsFullGroup } from '@monopoly/shared';
+import { useI18n } from '../../i18n/useI18n';
 
 export default function BuildModal() {
   const showBuildPanel = useGameStore(s => s.showBuildPanel);
@@ -10,6 +10,7 @@ export default function BuildModal() {
   const players = useGameStore(s => s.players);
   const playerId = useGameStore(s => s.playerId);
   const toggleBuildPanel = useGameStore(s => s.toggleBuildPanel);
+  const { t, localName } = useI18n();
 
   const [mode, setMode] = useState<'build' | 'sell'>('build');
 
@@ -26,9 +27,9 @@ export default function BuildModal() {
     return (
       <div className="modal-overlay" onClick={toggleBuildPanel}>
         <div className="modal build-modal" onClick={e => e.stopPropagation()}>
-          <h2>🏗️ 建造/出售</h2>
-          <p className="empty-msg">你还没有任何地产</p>
-          <button className="btn btn-ghost" onClick={toggleBuildPanel}>关闭</button>
+          <h2>{t('build.title')}</h2>
+          <p className="empty-msg">{t('build.noProperties')}</p>
+          <button className="btn btn-ghost" onClick={toggleBuildPanel}>{t('build.close')}</button>
         </div>
       </div>
     );
@@ -45,20 +46,20 @@ export default function BuildModal() {
   return (
     <div className="modal-overlay" onClick={toggleBuildPanel}>
       <div className="modal build-modal" onClick={e => e.stopPropagation()}>
-        <h2>🏗️ 地产管理</h2>
+        <h2>{t('build.title')}</h2>
 
         <div className="build-tabs">
           <button
             className={`btn btn-sm ${mode === 'build' ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setMode('build')}
           >
-            建造
+            {t('build.tab.build')}
           </button>
           <button
             className={`btn btn-sm ${mode === 'sell' ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setMode('sell')}
           >
-            出售
+            {t('build.tab.sell')}
           </button>
         </div>
 
@@ -74,7 +75,7 @@ export default function BuildModal() {
             return (
               <div key={prop.index} className="build-item">
                 <div className="build-item-info">
-                  <span className="build-item-name">{prop.nameCN}</span>
+                  <span className="build-item-name">{localName(prop)}</span>
                   <span className="build-item-houses">
                     {'🏠'.repeat(Math.min(houses, 4))}
                     {houses >= 5 && '🏨'}
@@ -87,7 +88,7 @@ export default function BuildModal() {
                       className="btn btn-sm btn-success"
                       disabled={!canBuild}
                       onClick={() => handleBuild(prop.index)}
-                      title={!hasFullGroup ? '需要拥有整组颜色' : houses >= 5 ? '已达上限' : `建房 $${prop.houseCost}`}
+                      title={!hasFullGroup ? t('build.needFullGroup') : houses >= 5 ? t('build.atLimit') : `${t('build.buildCost')} $${prop.houseCost}`}
                     >
                       +1 (${prop.houseCost})
                     </button>
@@ -108,10 +109,10 @@ export default function BuildModal() {
         </div>
 
         <div className="build-cash">
-          现金: <strong>${player.cash.toLocaleString()}</strong>
+          {t('build.cash')}: <strong>${player.cash.toLocaleString()}</strong>
         </div>
 
-        <button className="btn btn-ghost" onClick={toggleBuildPanel}>关闭</button>
+        <button className="btn btn-ghost" onClick={toggleBuildPanel}>{t('build.close')}</button>
       </div>
     </div>
   );

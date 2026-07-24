@@ -4,30 +4,12 @@ import { useUIStore } from '../../store/uiStore';
 import { getSocket } from '../../network/socket';
 import type { CameraMode, QualityMode } from '@monopoly/shared';
 import { THEMES, DIFFICULTIES } from '@monopoly/shared';
+import { useI18n } from '../../i18n/useI18n';
 
-const PHASE_LABELS: Record<string, string> = {
-  rolling: '掷骰阶段',
-  buying: '购买决策',
-  stock: '股票交易',
-  wheel: '大转盘',
-  quiz: '知识问答',
-  debt: '债务处理',
-  awaitEnd: '回合结束',
-  ended: '游戏结束',
-};
-
-const WEATHER_EMOJI: Record<string, string> = {
-  clear: '☀️',
-  rain: '🌧️',
-  snow: '❄️',
-  fog: '🌫️',
-  storm: '⛈️',
-};
-
-const CAMERA_OPTIONS: { mode: CameraMode; label: string; emoji: string }[] = [
-  { mode: 'orbit', label: '俯瞰', emoji: '🗺️' },
-  { mode: 'thirdPerson', label: '第三人称', emoji: '👁' },
-  { mode: 'roam', label: '漫游', emoji: '🚶' },
+const CAMERA_OPTIONS: { mode: CameraMode; key: string; emoji: string }[] = [
+  { mode: 'orbit', key: 'camera.orbit', emoji: '🗺️' },
+  { mode: 'thirdPerson', key: 'camera.thirdPerson', emoji: '👁' },
+  { mode: 'roam', key: 'camera.roam', emoji: '🚶' },
 ];
 
 export default function HUD() {
@@ -50,12 +32,13 @@ export default function HUD() {
   const playerId = useGameStore(s => s.playerId);
   const phaseDelayUntil = useGameStore(s => s.phaseDelayUntil);
 
+  const { t, lang, switchLang } = useI18n();
   const socket = getSocket();
   const isMyTurn = players[currentPlayerIndex]?.id === playerId;
   const currentPlayer = players[currentPlayerIndex];
   const weather = gameState?.weather || 'clear';
 
-  // Force re-render when phase delay expires, since Date.now() doesn't trigger reactivity
+  // Force re-render when phase delay expires
   const [delayTick, setDelayTick] = useState(0);
   useEffect(() => {
     const remaining = phaseDelayUntil - Date.now();
@@ -78,15 +61,19 @@ export default function HUD() {
       <div className="hud-top-bar">
         <div className="hud-top-left">
           <span className="hud-room">🏠 {gameState?.config.roomCode || ''}</span>
-          <span className="hud-round">第 {round} 回合</span>
-          <span className="hud-weather">{WEATHER_EMOJI[weather] || '☀️'}</span>
+          <span className="hud-round">{t('hud.round', { round })}</span>
+          <span className="hud-weather">{t(`weather.${weather}` as any)}</span>
+          {/* Language toggle */}
+          <button className="btn btn-sm btn-ghost" onClick={switchLang} title={t('lang.label')}>
+            {t('lang.switch')}
+          </button>
         </div>
 
         <div className="hud-top-center">
-          <span className="hud-phase">{PHASE_LABELS[phase] || phase}</span>
+          <span className="hud-phase">{t(`phase.${phase}` as any)}</span>
           {currentPlayer && (
             <span className="hud-turn" style={{ color: currentPlayer.color }}>
-              🎯 {currentPlayer.name} 的回合
+              🎯 {t('hud.turn', { name: currentPlayer.name })}
             </span>
           )}
         </div>
@@ -99,7 +86,7 @@ export default function HUD() {
                 key={opt.mode}
                 className={`btn btn-icon ${cameraMode === opt.mode ? 'active' : ''}`}
                 onClick={() => setCameraMode(opt.mode)}
-                title={opt.label}
+                title={t(opt.key as any)}
               >
                 {opt.emoji}
               </button>
@@ -111,12 +98,12 @@ export default function HUD() {
             className={`btn btn-sm ${qualityMode === 'balanced' ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setQualityMode(qualityMode === 'balanced' ? 'performance' : 'balanced')}
           >
-            {qualityMode === 'balanced' ? '⚡均衡' : '🚀性能'}
+            {qualityMode === 'balanced' ? t('quality.balanced') : t('quality.performance')}
           </button>
 
           {/* FOV Slider (only in roam mode) */}
           {cameraMode === 'roam' && (
-            <div className="fov-slider" title={`视角: ${roamFov}°`}>
+            <div className="fov-slider" title={`FOV: ${roamFov}°`}>
               <span style={{ fontSize: '11px', color: '#aaa' }}>FOV</span>
               <input
                 type="range"
@@ -131,8 +118,8 @@ export default function HUD() {
           )}
 
           {/* Stock & Portfolio */}
-          <button className="btn btn-sm btn-outline" onClick={toggleStockPanel}>📈 股市</button>
-          <button className="btn btn-sm btn-outline" onClick={togglePortfolio}>💼 资产</button>
+          <button className="btn btn-sm btn-outline" onClick={toggleStockPanel}>{t('hud.stockMarket')}</button>
+          <button className="btn btn-sm btn-outline" onClick={togglePortfolio}>{t('hud.portfolio')}</button>
         </div>
       </div>
 
@@ -155,7 +142,7 @@ export default function HUD() {
               <span className="player-card-cash">${p.cash.toLocaleString()}</span>
             </div>
             <div className="player-card-props">
-              {p.properties.length}块地 | 🏠 {Object.values(p.houses).reduce((a, b) => a + b, 0)}栋
+              {t('hud.player.props', { props: p.properties.length })} | 🏠 {t('hud.player.houses', { houses: Object.values(p.houses).reduce((a, b) => a + b, 0) })}
             </div>
           </div>
         ))}
@@ -199,46 +186,46 @@ export default function HUD() {
       <div className="action-panel">
         {phase === 'rolling' && isMyTurn && !diceRolled && (
           <button className="btn btn-primary btn-lg action-btn" onClick={handleRoll}>
-            🎲 掷骰子
+            {t('hud.rollDice')}
           </button>
         )}
 
         {phase === 'buying' && isMyTurn && phaseReady && (
           <div className="action-buttons">
             <button className="btn btn-success btn-lg" onClick={() => handleBuyProperty(true)}>
-              ✅ 购买
+              {t('hud.buy')}
             </button>
             <button className="btn btn-danger btn-lg" onClick={() => handleBuyProperty(false)}>
-              ❌ 放弃
+              {t('hud.pass')}
             </button>
           </div>
         )}
 
         {phase === 'buying' && isMyTurn && !phaseReady && (
-          <div className="action-panel-waiting">🚶 移动中...</div>
+          <div className="action-panel-waiting">{t('phase.moving')}</div>
         )}
 
         {phase === 'wheel' && isMyTurn && phaseReady && (
           <button className="btn btn-primary btn-lg action-btn" onClick={handleSpinWheel}>
-            🎡 转动转盘
+            {t('hud.spinWheel')}
           </button>
         )}
 
         {phase === 'wheel' && isMyTurn && !phaseReady && (
-          <div className="action-panel-waiting">🚶 移动中...</div>
+          <div className="action-panel-waiting">{t('phase.moving')}</div>
         )}
 
         {phase === 'stock' && isMyTurn && !phaseReady && (
-          <div className="action-panel-waiting">🚶 移动中...</div>
+          <div className="action-panel-waiting">{t('phase.moving')}</div>
         )}
 
         {phase === 'stock' && isMyTurn && phaseReady && (
           <div className="action-buttons">
             <button className="btn btn-sm btn-outline" onClick={toggleStockPanel}>
-              📈 股票交易
+              {t('hud.stockTrade')}
             </button>
             <button className="btn btn-primary" onClick={handleEndTurn}>
-              ⏭ 结束回合
+              {t('hud.endTurn')}
             </button>
           </div>
         )}
@@ -246,32 +233,32 @@ export default function HUD() {
         {phase === 'awaitEnd' && isMyTurn && phaseReady && (
           <div className="action-buttons">
             <button className="btn btn-sm btn-outline" onClick={toggleBuildPanel}>
-              🏗️ 建造/出售
+              {t('hud.buildSell')}
             </button>
             <button className="btn btn-primary" onClick={handleEndTurn}>
-              ⏭ 结束回合
+              {t('hud.endTurn')}
             </button>
           </div>
         )}
 
         {phase === 'awaitEnd' && isMyTurn && !phaseReady && (
-          <div className="action-panel-waiting">🚶 移动中...</div>
+          <div className="action-panel-waiting">{t('phase.moving')}</div>
         )}
 
         {phase === 'debt' && isMyTurn && (
           <div className="action-buttons">
             <button className="btn btn-sm btn-outline" onClick={toggleBuildPanel}>
-              🏚️ 卖房筹资
+              {t('hud.sellHouse')}
             </button>
             <button className="btn btn-danger" onClick={handleDeclareBankruptcy}>
-              💀 宣布破产
+              {t('hud.declareBankrupt')}
             </button>
           </div>
         )}
 
         {phase === 'ended' && (
           <button className="btn btn-primary btn-lg action-btn" onClick={() => useGameStore.getState().reset()}>
-            🔄 返回大厅
+            {t('hud.backToLobby')}
           </button>
         )}
       </div>

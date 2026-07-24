@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 
 interface UIStore {
+  // Language
+  language: 'zh' | 'en';
+  setLanguage: (lang: 'zh' | 'en') => void;
+
   // Modal visibility
   showBuyModal: boolean;
   showBuildModal: boolean;
@@ -40,6 +44,12 @@ interface UIStore {
 let toastId = 0;
 
 export const useUIStore = create<UIStore>((set) => ({
+  language: (localStorage.getItem('monopoly_lang') as 'zh' | 'en') || 'zh',
+  setLanguage: (lang) => {
+    localStorage.setItem('monopoly_lang', lang);
+    set({ language: lang });
+  },
+
   showBuyModal: false,
   showBuildModal: false,
   showStockModal: false,

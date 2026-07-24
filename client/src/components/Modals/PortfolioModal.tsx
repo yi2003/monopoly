@@ -1,5 +1,6 @@
 import { useGameStore } from '../../store/gameStore';
 import { getPropertyDef, getRailwayDef, getUtilityDef, calcNetWorth } from '@monopoly/shared';
+import { useI18n } from '../../i18n/useI18n';
 
 export default function PortfolioModal() {
   const showPortfolio = useGameStore(s => s.showPortfolio);
@@ -7,6 +8,7 @@ export default function PortfolioModal() {
   const players = useGameStore(s => s.players);
   const playerId = useGameStore(s => s.playerId);
   const togglePortfolio = useGameStore(s => s.togglePortfolio);
+  const { t, localName } = useI18n();
 
   if (!showPortfolio || !gameState) return null;
 
@@ -19,19 +21,19 @@ export default function PortfolioModal() {
   return (
     <div className="modal-overlay" onClick={togglePortfolio}>
       <div className="modal portfolio-modal" onClick={e => e.stopPropagation()}>
-        <h2>💼 {player.name} 的资产组合</h2>
+        <h2>💼 {t('portfolio.title', { name: player.name })}</h2>
         <div className="portfolio-summary">
           <div className="portfolio-networth">
-            净资产: <strong>${netWorth.toLocaleString()}</strong>
+            {t('portfolio.netWorth')}: <strong>${netWorth.toLocaleString()}</strong>
           </div>
           <div className="portfolio-cash">
-            现金: ${player.cash.toLocaleString()}
+            {t('portfolio.cash')}: ${player.cash.toLocaleString()}
           </div>
         </div>
 
         {/* Properties */}
         <div className="portfolio-section">
-          <h3>🏘️ 地产 ({player.properties.length})</h3>
+          <h3>{t('portfolio.properties')} ({player.properties.length})</h3>
           <div className="portfolio-grid">
             {player.properties.map(idx => {
               const prop = getPropertyDef(idx);
@@ -42,7 +44,7 @@ export default function PortfolioModal() {
 
               return (
                 <div key={idx} className="portfolio-card">
-                  <div className="portfolio-card-name">{tile.nameCN}</div>
+                  <div className="portfolio-card-name">{localName(tile)}</div>
                   <div className="portfolio-card-houses">
                     {houses > 0 && '🏠'.repeat(Math.min(houses, 4))}
                     {houses >= 5 && '🏨'}
@@ -53,13 +55,13 @@ export default function PortfolioModal() {
                 </div>
               );
             })}
-            {player.properties.length === 0 && <p className="empty-msg">暂无地产</p>}
+            {player.properties.length === 0 && <p className="empty-msg">{t('portfolio.noProperties')}</p>}
           </div>
         </div>
 
         {/* Stocks */}
         <div className="portfolio-section">
-          <h3>📈 股票持仓</h3>
+          <h3>{t('portfolio.stocks')}</h3>
           {player.stocks.map(h => {
             const stock = gameState.stocks.find(s => s.symbol === h.symbol);
             const currentPrice = stock?.price || h.avgCost;
@@ -69,30 +71,30 @@ export default function PortfolioModal() {
             return (
               <div key={h.symbol} className="portfolio-stock-row">
                 <span>{h.symbol}</span>
-                <span>{h.shares}股</span>
-                <span>均价 ${h.avgCost.toFixed(1)}</span>
-                <span>现价 ${currentPrice}</span>
+                <span>{h.shares}{t('stock.shares')}</span>
+                <span>{t('portfolio.avgPrice')} ${h.avgCost.toFixed(1)}</span>
+                <span>{t('portfolio.currentPrice')} ${currentPrice}</span>
                 <span className={profit >= 0 ? 'up' : 'down'}>
                   {profit >= 0 ? '+' : ''}${profit.toFixed(0)} ({profitPct.toFixed(1)}%)
                 </span>
               </div>
             );
           })}
-          {player.stocks.length === 0 && <p className="empty-msg">暂无持仓</p>}
+          {player.stocks.length === 0 && <p className="empty-msg">{t('portfolio.noStocks')}</p>}
         </div>
 
         {/* Stats */}
         <div className="portfolio-section">
-          <h3>📊 统计</h3>
+          <h3>{t('portfolio.stats')}</h3>
           <div className="portfolio-stats">
-            <div>总收租: ${player.totalRentCollected.toLocaleString()}</div>
-            <div>总付租: ${player.totalRentPaid.toLocaleString()}</div>
-            <div>股票盈亏: ${player.totalStockProfit.toLocaleString()}</div>
-            <div>累计分红: ${player.totalDividends.toLocaleString()}</div>
+            <div>{t('portfolio.totalRentCollected')}: ${player.totalRentCollected.toLocaleString()}</div>
+            <div>{t('portfolio.totalRentPaid')}: ${player.totalRentPaid.toLocaleString()}</div>
+            <div>{t('portfolio.totalStockProfit')}: ${player.totalStockProfit.toLocaleString()}</div>
+            <div>{t('portfolio.totalDividends')}: ${player.totalDividends.toLocaleString()}</div>
           </div>
         </div>
 
-        <button className="btn btn-ghost" onClick={togglePortfolio}>关闭</button>
+        <button className="btn btn-ghost" onClick={togglePortfolio}>{t('build.close')}</button>
       </div>
     </div>
   );

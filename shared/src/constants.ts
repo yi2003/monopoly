@@ -4,18 +4,29 @@
 
 import type { Tile, Card, Stock, WheelSector, QuizQuestion, ColorGroup, ThemeId } from './types';
 
-// ---- Board Layout (48 ground tiles + 24 inner city) ----
+// ---- Board Layout (48 inner ground + 48 outer ground + 24 inner city) ----
 
-export const BOARD_SIZE = 48;
+export const GROUND_INNER_RING_SIZE = 48;
+export const GROUND_OUTER_RING_SIZE = 48;
+export const BOARD_SIZE = GROUND_INNER_RING_SIZE + GROUND_OUTER_RING_SIZE; // 96
 export const INNER_CITY_SIZE = 24;
-export const TOTAL_TILES = BOARD_SIZE + INNER_CITY_SIZE;
-export const TILES_PER_SIDE = 13; // 13 tiles per side including corners
+export const TOTAL_TILES = BOARD_SIZE + INNER_CITY_SIZE; // 120
+export const TILES_PER_SIDE = 12; // tiles per side (excluding wrap count)
 
-// Corner tile indices
+// Corner tile indices — inner ring
 export const CORNER_GO = 0;
 export const CORNER_JAIL = 12;
 export const CORNER_STOCK = 24;
 export const CORNER_GOTO_JAIL = 36;
+
+// Outer ring starts after inner ring + inner city
+export const OUTER_RING_OFFSET = GROUND_INNER_RING_SIZE + INNER_CITY_SIZE; // 72
+
+// Corner tile indices — outer ring
+export const OUTER_CORNER_GO = OUTER_RING_OFFSET;        // 72
+export const OUTER_CORNER_JAIL = OUTER_RING_OFFSET + 12;  // 84
+export const OUTER_CORNER_STOCK = OUTER_RING_OFFSET + 24; // 96
+export const OUTER_CORNER_GOTO_JAIL = OUTER_RING_OFFSET + 36; // 108
 
 // ---- Property Definitions ----
 
@@ -80,6 +91,57 @@ export const PROPERTIES: PropertyDef[] = [
   { index: 45, nameCN: '蓝钻广场', nameEN: 'Blue Diamond Plaza', group: 'blue', price: 480, rent: [80, 320, 880, 2000, 2400, 2800], houseCost: 200, mortgageValue: 240 },
 ];
 
+// ---- Outer Ring Property Definitions (indices 72-119) ----
+
+export const OUTER_PROPERTIES: PropertyDef[] = [
+  // ===== Outer Amber Group =====
+  { index: 73, nameCN: '琥珀巷', nameEN: 'Amber Alley', group: 'outer_amber', price: 80, rent: [4, 20, 60, 180, 320, 450], houseCost: 50, mortgageValue: 40 },
+  { index: 75, nameCN: '蜜糖路', nameEN: 'Honey Lane', group: 'outer_amber', price: 100, rent: [6, 30, 90, 270, 400, 550], houseCost: 50, mortgageValue: 50 },
+
+  // ===== Outer Mint Group =====
+  { index: 78, nameCN: '薄荷广场', nameEN: 'Mint Plaza', group: 'outer_mint', price: 120, rent: [8, 40, 100, 300, 450, 600], houseCost: 50, mortgageValue: 60 },
+  { index: 80, nameCN: '薄荷花园', nameEN: 'Mint Garden', group: 'outer_mint', price: 120, rent: [8, 40, 100, 300, 450, 600], houseCost: 50, mortgageValue: 60 },
+  { index: 81, nameCN: '翡翠台', nameEN: 'Mint Terrace', group: 'outer_mint', price: 140, rent: [10, 50, 150, 450, 625, 750], houseCost: 100, mortgageValue: 70 },
+
+  // ===== Outer Coral Group =====
+  { index: 85, nameCN: '珊瑚街', nameEN: 'Coral Street', group: 'outer_coral', price: 160, rent: [12, 60, 180, 500, 700, 900], houseCost: 100, mortgageValue: 80 },
+  { index: 87, nameCN: '海贝湾', nameEN: 'Shell Bay', group: 'outer_coral', price: 180, rent: [14, 70, 200, 550, 750, 950], houseCost: 100, mortgageValue: 90 },
+  { index: 88, nameCN: '海星阁', nameEN: 'Starfish Court', group: 'outer_coral', price: 200, rent: [16, 80, 220, 600, 800, 1000], houseCost: 100, mortgageValue: 100 },
+
+  // ===== Outer Lime Group =====
+  { index: 90, nameCN: '柠檬大道', nameEN: 'Lemon Avenue', group: 'outer_lime', price: 220, rent: [18, 90, 250, 700, 875, 1050], houseCost: 150, mortgageValue: 110 },
+  { index: 92, nameCN: '青柠花园', nameEN: 'Lime Garden', group: 'outer_lime', price: 240, rent: [20, 100, 300, 750, 925, 1100], houseCost: 150, mortgageValue: 120 },
+  { index: 93, nameCN: '柑橘台', nameEN: 'Citrus Heights', group: 'outer_lime', price: 260, rent: [22, 110, 330, 800, 975, 1150], houseCost: 150, mortgageValue: 130 },
+
+  // ===== Outer Violet Group =====
+  { index: 97, nameCN: '紫罗兰路', nameEN: 'Violet Road', group: 'outer_violet', price: 280, rent: [24, 120, 360, 850, 1025, 1200], houseCost: 150, mortgageValue: 140 },
+  { index: 99, nameCN: '薰衣草巷', nameEN: 'Lavender Lane', group: 'outer_violet', price: 300, rent: [26, 130, 390, 900, 1100, 1275], houseCost: 200, mortgageValue: 150 },
+  { index: 100, nameCN: '丁香台', nameEN: 'Lilac Terrace', group: 'outer_violet', price: 320, rent: [28, 150, 450, 1000, 1200, 1400], houseCost: 200, mortgageValue: 160 },
+
+  // ===== Outer Rose Group =====
+  { index: 102, nameCN: '玫瑰大道', nameEN: 'Rose Boulevard', group: 'outer_rose', price: 350, rent: [35, 175, 500, 1100, 1300, 1500], houseCost: 200, mortgageValue: 175 },
+  { index: 103, nameCN: '芙蓉广场', nameEN: 'Hibiscus Plaza', group: 'outer_rose', price: 380, rent: [40, 200, 600, 1300, 1500, 1800], houseCost: 200, mortgageValue: 190 },
+  { index: 106, nameCN: '牡丹大道', nameEN: 'Peony Avenue', group: 'outer_rose', price: 400, rent: [50, 200, 600, 1400, 1700, 2000], houseCost: 200, mortgageValue: 200 },
+
+  // ===== Outer Sky Group =====
+  { index: 109, nameCN: '蓝天路', nameEN: 'Sky Way', group: 'outer_sky', price: 420, rent: [55, 220, 650, 1500, 1800, 2100], houseCost: 200, mortgageValue: 210 },
+  { index: 111, nameCN: '云中阁', nameEN: 'Cloud Court', group: 'outer_sky', price: 440, rent: [60, 240, 700, 1600, 1900, 2200], houseCost: 200, mortgageValue: 220 },
+  { index: 115, nameCN: '星光台', nameEN: 'Starlight Terrace', group: 'outer_sky', price: 460, rent: [65, 260, 750, 1700, 2000, 2300], houseCost: 200, mortgageValue: 230 },
+
+  // ===== Outer Ruby Group =====
+  { index: 82, nameCN: '红宝石街', nameEN: 'Ruby Street', group: 'outer_ruby', price: 500, rent: [70, 300, 850, 1850, 2200, 2600], houseCost: 200, mortgageValue: 250 },
+  { index: 94, nameCN: '石榴石路', nameEN: 'Garnet Road', group: 'outer_ruby', price: 520, rent: [75, 320, 880, 1900, 2300, 2700], houseCost: 200, mortgageValue: 260 },
+  { index: 107, nameCN: '钻石广场', nameEN: 'Diamond Plaza', group: 'outer_ruby', price: 550, rent: [85, 350, 950, 2100, 2500, 3000], houseCost: 200, mortgageValue: 275 },
+
+  // ===== Outer Copper Group =====
+  { index: 116, nameCN: '铜锣湾', nameEN: 'Copper Cove', group: 'outer_copper', price: 50, rent: [2, 10, 30, 90, 160, 250], houseCost: 50, mortgageValue: 25 },
+  { index: 118, nameCN: '铜雀台', nameEN: 'Bronze Terrace', group: 'outer_copper', price: 70, rent: [4, 20, 60, 120, 250, 400], houseCost: 50, mortgageValue: 35 },
+
+  // ===== Outer Navy Group =====
+  { index: 112, nameCN: '深蓝港', nameEN: 'Navy Harbor', group: 'outer_navy', price: 580, rent: [90, 380, 1000, 2200, 2600, 3200], houseCost: 200, mortgageValue: 290 },
+  { index: 119, nameCN: '海军路', nameEN: 'Marina Drive', group: 'outer_navy', price: 620, rent: [100, 420, 1100, 2400, 2800, 3500], houseCost: 200, mortgageValue: 310 },
+];
+
 // ---- Railway Definitions ----
 
 export interface RailwayDef {
@@ -100,6 +162,16 @@ export const RAILWAYS: RailwayDef[] = [
   { index: 41, nameCN: '短线', nameEN: 'Short Line', price: 200, mortgageValue: 100, direction: 5 },
 ];
 
+// Outer ring railways (offset by 72)
+export const OUTER_RAILWAYS: RailwayDef[] = [
+  { index: 77, nameCN: '环城线', nameEN: 'Loop Line', price: 250, mortgageValue: 125, direction: 0 },
+  { index: 83, nameCN: '快线', nameEN: 'Express Line', price: 250, mortgageValue: 125, direction: 1 },
+  { index: 89, nameCN: '高铁线', nameEN: 'HSR Line', price: 250, mortgageValue: 125, direction: 2 },
+  { index: 101, nameCN: '城际线', nameEN: 'Intercity Line', price: 250, mortgageValue: 125, direction: 3 },
+  { index: 107, nameCN: '观光线', nameEN: 'Scenic Line', price: 250, mortgageValue: 125, direction: 4 },
+  { index: 113, nameCN: '滨海线', nameEN: 'Coastal Line', price: 250, mortgageValue: 125, direction: 5 },
+];
+
 // ---- Utility Definitions ----
 
 export interface UtilityDef {
@@ -113,6 +185,12 @@ export interface UtilityDef {
 export const UTILITIES: UtilityDef[] = [
   { index: 14, nameCN: '电力公司', nameEN: 'Electric Company', price: 150, mortgageValue: 75 },
   { index: 32, nameCN: '自来水厂', nameEN: 'Water Works', price: 150, mortgageValue: 75 },
+];
+
+// Outer ring utilities
+export const OUTER_UTILITIES: UtilityDef[] = [
+  { index: 86, nameCN: '通信公司', nameEN: 'Telecom Company', price: 180, mortgageValue: 90 },
+  { index: 104, nameCN: '燃气公司', nameEN: 'Gas Company', price: 180, mortgageValue: 90 },
 ];
 
 // ---- Tax Definitions ----
@@ -129,101 +207,122 @@ export const TAXES: TaxDef[] = [
   { index: 46, nameCN: '奢侈税', amount: 200, isLuxury: true },
 ];
 
+// Outer ring taxes
+export const OUTER_TAXES: TaxDef[] = [
+  { index: 76, nameCN: '碳排放税', amount: 150, isLuxury: false },
+  { index: 118, nameCN: '豪宅税', amount: 250, isLuxury: true },
+];
+
+// ---- Combined Arrays (for unified lookups) ----
+
+export const ALL_PROPERTIES = [...PROPERTIES, ...OUTER_PROPERTIES];
+export const ALL_RAILWAYS = [...RAILWAYS, ...OUTER_RAILWAYS];
+export const ALL_UTILITIES = [...UTILITIES, ...OUTER_UTILITIES];
+
 // ---- Complete Tiles Array ----
 
 export function createTiles(): Tile[] {
   const tiles: Tile[] = [];
-  const propMap = new Map(PROPERTIES.map(p => [p.index, p]));
-  const railMap = new Map(RAILWAYS.map(r => [r.index, r]));
-  const utilMap = new Map(UTILITIES.map(u => [u.index, u]));
-  const taxMap = new Map(TAXES.map(t => [t.index, t]));
+  const propMap = new Map(ALL_PROPERTIES.map(p => [p.index, p]));
+  const railMap = new Map(ALL_RAILWAYS.map(r => [r.index, r]));
+  const utilMap = new Map(ALL_UTILITIES.map(u => [u.index, u]));
+  const taxMap = new Map([...TAXES, ...OUTER_TAXES].map(t => [t.index, t]));
 
-  // Ground ring (0-47)
-  for (let i = 0; i < BOARD_SIZE; i++) {
+  const isGroundInner = (i: number) => i < GROUND_INNER_RING_SIZE;
+  const isGroundOuter = (i: number) => i >= OUTER_RING_OFFSET && i < TOTAL_TILES;
+
+  const ringFor = (i: number) =>
+    isGroundInner(i) ? 'ground-inner' as const :
+    isGroundOuter(i) ? 'ground-outer' as const :
+    'inner' as const;
+
+  // Process all tile indices: inner ground (0-47) + inner city (48-71) + outer ground (72-119)
+  for (let i = 0; i < TOTAL_TILES; i++) {
+    // Inner city tiles (48-71)
+    if (i >= GROUND_INNER_RING_SIZE && i < OUTER_RING_OFFSET) {
+      tiles.push(createInnerTile(i));
+      continue;
+    }
+
+    const ring = ringFor(i);
+
     if (propMap.has(i)) {
       const p = propMap.get(i)!;
       tiles.push({
-        index: i,
-        name: p.nameEN,
-        nameCN: p.nameCN,
-        type: 'property' as const,
-        ring: 'ground',
-        group: p.group,
-        price: p.price,
-        rent: p.rent,
-        houseCost: p.houseCost,
-        mortgageValue: p.mortgageValue,
+        index: i, name: p.nameEN, nameCN: p.nameCN,
+        type: 'property' as const, ring,
+        group: p.group, price: p.price, rent: p.rent,
+        houseCost: p.houseCost, mortgageValue: p.mortgageValue,
       });
     } else if (railMap.has(i)) {
       const r = railMap.get(i)!;
       tiles.push({
-        index: i,
-        name: r.nameEN,
-        nameCN: r.nameCN,
-        type: 'railway' as const,
-        ring: 'ground',
-        price: r.price,
-        mortgageValue: r.mortgageValue,
+        index: i, name: r.nameEN, nameCN: r.nameCN,
+        type: 'railway' as const, ring,
+        price: r.price, mortgageValue: r.mortgageValue,
       });
     } else if (utilMap.has(i)) {
       const u = utilMap.get(i)!;
       tiles.push({
-        index: i,
-        name: u.nameEN,
-        nameCN: u.nameCN,
-        type: 'utility' as const,
-        ring: 'ground',
-        price: u.price,
-        mortgageValue: u.mortgageValue,
+        index: i, name: u.nameEN, nameCN: u.nameCN,
+        type: 'utility' as const, ring,
+        price: u.price, mortgageValue: u.mortgageValue,
       });
     } else if (taxMap.has(i)) {
       const t = taxMap.get(i)!;
       tiles.push({
-        index: i,
-        name: t.nameCN,
-        nameCN: t.nameCN,
-        type: 'tax' as const,
-        ring: 'ground',
-        amount: t.amount,
-        isLuxury: t.isLuxury,
+        index: i, name: t.nameCN, nameCN: t.nameCN,
+        type: 'tax' as const, ring,
+        amount: t.amount, isLuxury: t.isLuxury,
       });
     } else {
-      // Special tiles
       tiles.push(createSpecialTile(i));
     }
-  }
-
-  // Inner city (48-71)
-  for (let i = BOARD_SIZE; i < TOTAL_TILES; i++) {
-    tiles.push(createInnerTile(i));
   }
 
   return tiles;
 }
 
 function createSpecialTile(i: number): Tile {
-  switch (i) {
-    case CORNER_GO:
-      return { index: 0, name: 'GO', nameCN: '起点', type: 'go', ring: 'ground' };
-    case 2:
-      return { index: 2, name: 'Community Chest', nameCN: '公益金', type: 'community_chest', ring: 'ground' };
-    case 7:
-    case 26:
-    case 42:
-      return { index: i, name: 'Chance', nameCN: '机会', type: 'chance', ring: 'ground' };
-    case CORNER_JAIL:
-      return { index: 12, name: 'Jail', nameCN: '监狱', type: 'jail', ring: 'ground' };
-    case 19:
-      return { index: 19, name: 'Community Chest', nameCN: '公益金', type: 'community_chest', ring: 'ground' };
-    case CORNER_STOCK:
-      return { index: 24, name: 'Stock Market', nameCN: '股市', type: 'stock_market', ring: 'ground' };
-    case CORNER_GOTO_JAIL:
-      return { index: 36, name: 'Go To Jail', nameCN: '进监狱', type: 'goto_jail', ring: 'ground' };
-    case 38:
-      return { index: 38, name: 'Wheel of Fortune', nameCN: '大转盘', type: 'wheel', ring: 'ground' };
-    default:
-      return { index: i, name: 'Unknown', nameCN: '未知', type: 'go', ring: 'ground' };
+  const ring = (i >= OUTER_RING_OFFSET) ? 'ground-outer' as const : 'ground-inner' as const;
+  // Normalize to local position for outer ring
+  const localIdx = i >= OUTER_RING_OFFSET ? i - OUTER_RING_OFFSET : i;
+
+  // GO
+  if (localIdx === 0) {
+    return { index: i, name: 'GO', nameCN: '起点', type: 'go', ring };
   }
+  // Jail
+  if (localIdx === 12) {
+    return { index: i, name: 'Jail', nameCN: '监狱', type: 'jail', ring };
+  }
+  // Stock Market
+  if (localIdx === 24) {
+    return { index: i, name: 'Stock Market', nameCN: '股市', type: 'stock_market', ring };
+  }
+  // Go To Jail
+  if (localIdx === 36) {
+    return { index: i, name: 'Go To Jail', nameCN: '进监狱', type: 'goto_jail', ring };
+  }
+
+  // Community Chest
+  if ((i >= OUTER_RING_OFFSET && (localIdx === 2 || localIdx === 19)) ||
+      (i < GROUND_INNER_RING_SIZE && (i === 2 || i === 19))) {
+    return { index: i, name: 'Community Chest', nameCN: '公益金', type: 'community_chest', ring };
+  }
+
+  // Chance
+  if ((i >= OUTER_RING_OFFSET && [7, 26, 42].includes(localIdx)) ||
+      (i < GROUND_INNER_RING_SIZE && [7, 26, 42].includes(i))) {
+    return { index: i, name: 'Chance', nameCN: '机会', type: 'chance', ring };
+  }
+
+  // Wheel
+  if (localIdx === 38) {
+    return { index: i, name: 'Wheel of Fortune', nameCN: '大转盘', type: 'wheel', ring };
+  }
+
+  return { index: i, name: 'Unknown', nameCN: '未知', type: 'go', ring };
 }
 
 function createInnerTile(i: number): Tile {
@@ -277,6 +376,17 @@ export const GROUP_COLORS: Record<ColorGroup, string> = {
   plum: '#8B008B',
   green: '#228B22',
   blue: '#0000CD',
+  // Outer ring groups
+  outer_amber: '#FFBF00',
+  outer_mint: '#98FB98',
+  outer_coral: '#FF7F50',
+  outer_lime: '#32CD32',
+  outer_violet: '#8A2BE2',
+  outer_rose: '#FF1493',
+  outer_sky: '#00BFFF',
+  outer_ruby: '#E0115F',
+  outer_copper: '#B87333',
+  outer_navy: '#000080',
   railway: '#FFD700',
   utility: '#C0C0C0',
 };

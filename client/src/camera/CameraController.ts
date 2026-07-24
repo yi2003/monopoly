@@ -5,10 +5,11 @@
 import * as THREE from 'three';
 import type { GameState, CameraMode } from '@monopoly/shared';
 import type { FirstPersonController } from '../roam/FirstPersonController';
+import { getCharacterTilePos } from '@monopoly/shared';
 
 const ORBIT_MIN = 28;
-const ORBIT_MAX = 130;
-const ORBIT_DEFAULT = 70;
+const ORBIT_MAX = 150;
+const ORBIT_DEFAULT = 90;
 const THIRD_PERSON_DISTANCE = 18;
 const THIRD_PERSON_HEIGHT = 10;
 
@@ -132,8 +133,8 @@ export class CameraController {
           groundTarget.set(charPos.x, 0, charPos.z);
           targetYaw = this.getCharacterYaw?.(cp.id) ?? undefined;
         } else {
-          const boardPos = this.getBoardPosition(cp.position);
-          groundTarget.set(boardPos.x, 0, boardPos.y);
+          const boardPos = getCharacterTilePos(cp.position);
+          groundTarget.set(boardPos.x, 0, boardPos.z);
         }
         // Hide own character for first-person view
         this.currentRoamPlayerId = cp.id;
@@ -178,8 +179,8 @@ export class CameraController {
               this.fpsController.setFollowYaw(charYaw + Math.PI);
             }
           } else {
-            const pos = this.getBoardPosition(cp.position);
-            this.fpsController.setFollowTarget(new THREE.Vector3(pos.x, 0, pos.y));
+            const pos = getCharacterTilePos(cp.position);
+            this.fpsController.setFollowTarget(new THREE.Vector3(pos.x, 0, pos.z));
           }
         }
       }
@@ -213,52 +214,14 @@ export class CameraController {
     if (!currentPlayer) { this.updateOrbit(); return; }
 
     // Get character position from the board
-    const boardPos = this.getBoardPosition(currentPlayer.position);
-    const target = new THREE.Vector3(boardPos.x, 0, boardPos.y);
+    const boardPos = getCharacterTilePos(currentPlayer.position);
+    const target = new THREE.Vector3(boardPos.x, 0, boardPos.z);
 
     const behind = new THREE.Vector3(0, THIRD_PERSON_HEIGHT, THIRD_PERSON_DISTANCE);
     const camPos = target.clone().add(behind);
 
     this.camera.position.lerp(camPos, 0.08);
     this.camera.lookAt(target.clone().add(new THREE.Vector3(0, 2, 0)));
-  }
-
-  private getBoardPosition(tileIndex: number): { x: number; y: number } {
-    // Convert tile index (0-47) to board coordinates
-    const BOARD_SIZE = 48;
-    const TILES_PER_SIDE = 13;
-    const SIDE_LENGTH = 13; // tiles per side
-    const TILE_WIDTH = 2.2; // inner tile width
-    const TILE_DEPTH = 4.5; // property tile depth
-    const CORNER_SIZE = 4.5;
-    const BOARD_HALF = CORNER_SIZE + SIDE_LENGTH * TILE_WIDTH / 2 + TILE_DEPTH;
-
-    // Ring-based positioning for ground tiles
-    const side = Math.floor(tileIndex / 12); // 0=bottom, 1=right, 2=top, 3=left
-    const sideIdx = tileIndex % 12;
-
-    let x = 0, y = 0;
-
-    switch (side) {
-      case 0: // Bottom (GO at left, going right)
-        x = -BOARD_HALF + CORNER_SIZE / 2 + sideIdx * (TILE_WIDTH * 0.8);
-        y = -BOARD_HALF;
-        break;
-      case 1: // Right (going up)
-        x = BOARD_HALF;
-        y = -BOARD_HALF + CORNER_SIZE / 2 + sideIdx * (TILE_WIDTH * 0.8);
-        break;
-      case 2: // Top (going left)
-        x = BOARD_HALF - CORNER_SIZE / 2 - sideIdx * (TILE_WIDTH * 0.8);
-        y = BOARD_HALF;
-        break;
-      case 3: // Left (going down)
-        x = -BOARD_HALF;
-        y = BOARD_HALF - CORNER_SIZE / 2 - sideIdx * (TILE_WIDTH * 0.8);
-        break;
-    }
-
-    return { x, y };
   }
 
   getCamera(): THREE.PerspectiveCamera {

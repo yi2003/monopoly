@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
 import { getSocket } from '../../network/socket';
+import { useI18n } from '../../i18n/useI18n';
 
 export default function QuizModal() {
   const gameState = useGameStore(s => s.gameState);
@@ -11,6 +12,7 @@ export default function QuizModal() {
   const quizRewardAmount = useUIStore(s => s.quizRewardAmount);
   const showQuizModal = useUIStore(s => s.showQuizModal);
   const setQuizData = useUIStore(s => s.setQuizData);
+  const { t } = useI18n();
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -52,7 +54,7 @@ export default function QuizModal() {
         <div className={`modal quiz-modal quiz-result ${isCorrect ? 'correct' : 'wrong'}`}>
           <div className="quiz-result-icon">{isCorrect ? '🎉' : '😞'}</div>
           <h2 style={{ color: isCorrect ? '#4CAF50' : '#E53935' }}>
-            {isCorrect ? '回答正确！' : '回答错误！'}
+            {isCorrect ? t('quiz.correct') : t('quiz.wrong')}
           </h2>
           {quizRewardAmount !== null && (
             <p className="quiz-result-amount" style={{ color: isCorrect ? '#4CAF50' : '#E53935', fontSize: '1.5em', fontWeight: 'bold' }}>
@@ -60,7 +62,7 @@ export default function QuizModal() {
             </p>
           )}
           <p className="quiz-result-hint" style={{ color: '#aaa', fontSize: '0.85em' }}>
-            {isCorrect ? '奖励已发放' : '罚金已扣除'}
+            {isCorrect ? t('quiz.rewardGiven') : t('quiz.penaltyTaken')}
           </p>
         </div>
       </div>
@@ -72,7 +74,7 @@ export default function QuizModal() {
   return (
     <div className="modal-overlay">
       <div className="modal quiz-modal">
-        <h2>🧠 知识问答</h2>
+        <h2>{t('quiz.title')}</h2>
         <div className="quiz-question">
           <p>{question.question}</p>
         </div>
@@ -90,12 +92,12 @@ export default function QuizModal() {
         </div>
         {!submitted && (
           <div className="quiz-info">
-            <small>✅ 正确: 获得奖励 (租金倍率) | ❌ 错误: 支付罚金 (税费倍率)</small>
+            <small>{t('quiz.hint')}</small>
           </div>
         )}
         {submitted && !quizResult && (
           <div className="quiz-waiting">
-            <p>⏳ 等待结果...</p>
+            <p>{t('quiz.waiting')}</p>
           </div>
         )}
       </div>

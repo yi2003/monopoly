@@ -12,6 +12,9 @@ export class AudioManager {
   private rainNoise: AudioBufferSourceNode | null = null;
   private rainGain: GainNode | null = null;
   private ambienceGain: GainNode | null = null;
+  private cityAmbienceSource: AudioBufferSourceNode | null = null;
+  private cityAmbienceGain: GainNode | null = null;
+  private citySoundTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Track ambient state
   private currentWeather = 'clear';
@@ -83,6 +86,169 @@ export class AudioManager {
   playQuizCorrect(): void { this.playMelody([523, 784, 1047], 0.1); }
   playQuizWrong(): void { this.playNoiseBurst(0.2, 150, 300, 0.4); }
 
+  // ---- City & Environmental Sounds ----
+
+  /** Car horn: two-tone honk */
+  playCarHorn(): void {
+    const ctx = this.ensureContext();
+    if (!ctx || !this.masterGain) return;
+    const now = ctx.currentTime;
+
+    // Two quick horn tones
+    const tones = [380, 460];
+    tones.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, now + i * 0.12);
+      gain.gain.setValueAtTime(0.08, now + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.15);
+      gain.connect(this.masterGain!);
+      osc.connect(gain);
+      osc.start(now + i * 0.12);
+      osc.stop(now + i * 0.12 + 0.18);
+    });
+  }
+
+  /** Bicycle bell: high-pitched ding-ding */
+  playBicycleBell(): void {
+    const ctx = this.ensureContext();
+    if (!ctx || !this.masterGain) return;
+    const now = ctx.currentTime;
+
+    // Two quick high-pitched rings
+    for (let i = 0; i < 2; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1800, now + i * 0.18);
+      osc.frequency.setValueAtTime(2200, now + i * 0.18 + 0.03);
+      osc.frequency.exponentialRampToValueAtTime(1200, now + i * 0.18 + 0.1);
+      gain.gain.setValueAtTime(0.06, now + i * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.18 + 0.12);
+      gain.connect(this.masterGain!);
+      osc.connect(gain);
+      osc.start(now + i * 0.18);
+      osc.stop(now + i * 0.18 + 0.15);
+    }
+  }
+
+  /** Footstep: short thud sound */
+  playFootstep(surface?: string): void {
+    const ctx = this.ensureContext();
+    if (!ctx || !this.masterGain) return;
+    const now = ctx.currentTime;
+
+    const isHard = surface === 'stone' || surface === 'concrete';
+    const baseFreq = isHard ? 200 : 120;
+    const vol = isHard ? 0.03 : 0.025;
+
+    // Short noise burst simulating foot impact
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(baseFreq, now);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.4, now + 0.04);
+    gain.gain.setValueAtTime(vol, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    gain.connect(this.masterGain!);
+    osc.connect(gain);
+    osc.start(now);
+    osc.stop(now + 0.06);
+
+    // Add a tiny noise component for texture
+    const noiseOsc = ctx.createOscillator();
+    const noiseGain = ctx.createGain();
+    noiseOsc.type = 'triangle';
+    noiseOsc.frequency.setValueAtTime(baseFreq * 2.5, now);
+    noiseOsc.frequency.exponentialRampToValueAtTime(baseFreq * 0.8, now + 0.03);
+    noiseGain.gain.setValueAtTime(vol * 0.5, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    noiseGain.connect(this.masterGain!);
+    noiseOsc.connect(noiseGain);
+    noiseOsc.start(now);
+    noiseOsc.stop(now + 0.05);
+  }
+
+  /** Walking on grass/dirt (softer) */
+  playFootstepGrass(): void {
+    this.playFootstep('dirt');
+  }
+
+  // ---- City Ambience ----
+
+  /** Start background city ambience (distant traffic, hum) */
+  startCityAmbience(): void {
+    if (!this.enabled || this.cityAmbienceSource) return;
+    const ctx = this.ensureContext();
+    if (!ctx || !this.ambienceGain) return;
+
+    const sampleRate = ctx.sampleRate;
+    const duration = 8;
+    const buffer = ctx.createBuffer(1, sampleRate * duration, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    // Layered filtered noise: low rumble + mid texture
+    let b0 = 0, b1 = 0;
+    for (let i = 0; i < data.length; i++) {
+      const white = Math.random() * 2 - 1;
+      // Very low frequency rumble (like distant engines)
+      b0 = 0.008 * white + 0.99 * b0;
+      // Mid-frequency texture (like distant voices, activity)
+      b1 = 0.015 * white + 0.97 * b1;
+      data[i] = b0 * 0.12 + b1 * 0.04;
+    }
+
+    this.cityAmbienceSource = ctx.createBufferSource();
+    this.cityAmbienceSource.buffer = buffer;
+    this.cityAmbienceSource.loop = true;
+
+    this.cityAmbienceGain = ctx.createGain();
+    this.cityAmbienceGain.gain.value = 0.25;
+    this.cityAmbienceGain.connect(this.ambienceGain!);
+
+    this.cityAmbienceSource.connect(this.cityAmbienceGain);
+    this.cityAmbienceSource.start();
+  }
+
+  stopCityAmbience(): void {
+    if (this.cityAmbienceSource) {
+      try { this.cityAmbienceSource.stop(); } catch { /* already stopped */ }
+      this.cityAmbienceSource = null;
+    }
+    this.cityAmbienceGain = null;
+  }
+
+  // ---- Scheduled Random City Sounds ----
+
+  /** Start scheduling random city sounds (horns, bells, etc.) */
+  startCitySounds(): void {
+    this.scheduleCitySound();
+  }
+
+  stopCitySounds(): void {
+    if (this.citySoundTimeout) {
+      clearTimeout(this.citySoundTimeout);
+      this.citySoundTimeout = null;
+    }
+  }
+
+  private scheduleCitySound(): void {
+    if (this.citySoundTimeout) clearTimeout(this.citySoundTimeout);
+    const delay = 3000 + Math.random() * 8000;
+    this.citySoundTimeout = setTimeout(() => {
+      if (!this.enabled) return;
+      const r = Math.random();
+      if (r < 0.4) {
+        this.playCarHorn();
+      } else if (r < 0.65) {
+        this.playBicycleBell();
+      }
+      // else: silence (just ambient hum)
+      this.scheduleCitySound();
+    }, delay);
+  }
+
   // ---- Ambient Soundscapes ----
 
   setWeatherSound(weather: string): void {
@@ -134,6 +300,7 @@ export class AudioManager {
       try { this.rainNoise.stop(); } catch { /* already stopped */ }
       this.rainNoise = null;
     }
+    // Note: city ambience and city sounds are persistent, not stopped by weather changes
   }
 
   private startRainNoise(intensity: number): void {
@@ -417,6 +584,8 @@ export class AudioManager {
 
   dispose(): void {
     this.stopAmbience();
+    this.stopCityAmbience();
+    this.stopCitySounds();
     if (this.ctx) {
       this.ctx.close();
       this.ctx = null;

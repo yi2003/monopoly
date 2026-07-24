@@ -51,6 +51,17 @@ export type ColorGroup =
   | 'plum'
   | 'green'
   | 'blue'
+  // Outer ring groups
+  | 'outer_amber'
+  | 'outer_mint'
+  | 'outer_coral'
+  | 'outer_lime'
+  | 'outer_violet'
+  | 'outer_rose'
+  | 'outer_sky'
+  | 'outer_ruby'
+  | 'outer_copper'
+  | 'outer_navy'
   | 'railway'
   | 'utility';
 
@@ -83,9 +94,10 @@ export interface Player {
   autoPilot: boolean; // human player enabled auto-play
 
   cash: number;
-  position: number; // tile index 0-71
-  innerCityRing: number; // 0=ground, 1=outer, 2=middle, 3=inner
+  position: number; // tile index 0-119
+  innerCityRing: number; // 0=on ground ring, 1=outer, 2=middle, 3=inner
   innerCitySector: number; // 0-7
+  groundRing: 'inner' | 'outer'; // which ground ring (when innerCityRing === 0)
 
   properties: number[]; // tile indices owned
   houses: Record<number, number>; // tileIndex -> house count (0-5)
@@ -111,7 +123,7 @@ export interface BaseTile {
   name: string;
   nameCN: string;
   type: TileType;
-  ring: 'ground' | 'inner';
+  ring: 'ground-inner' | 'ground-outer' | 'inner';
 }
 
 export interface PropertyTile extends BaseTile {
@@ -297,6 +309,7 @@ export interface ClientToServerEvents {
   takeHighSpeedRail: (targetTheme: ThemeId) => void;
   enterInnerCity: (sector: number) => void;
   exitInnerCity: () => void;
+  transferRing: (toRing: 'inner' | 'outer') => void;
   drawChanceCard: () => void;
   drawCommunityCard: () => void;
   chat: (message: string) => void;

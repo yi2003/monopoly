@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { useUIStore } from '../../store/uiStore';
 import { getSocket } from '../../network/socket';
-import { STOCK_TRADE_FEE, MIN_STOCK_FEE } from '@monopoly/shared';
+import { useI18n } from '../../i18n/useI18n';
 
 const PAGE_SIZE = 5;
 
@@ -12,6 +11,7 @@ export default function StockModal() {
   const players = useGameStore(s => s.players);
   const playerId = useGameStore(s => s.playerId);
   const toggleStockPanel = useGameStore(s => s.toggleStockPanel);
+  const { t, localName } = useI18n();
 
   const [page, setPage] = useState(0);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
@@ -50,22 +50,22 @@ export default function StockModal() {
   return (
     <div className="modal-overlay" onClick={toggleStockPanel}>
       <div className="modal stock-modal" onClick={e => e.stopPropagation()}>
-        <h2>📈 股票市场</h2>
+        <h2>{t('stock.title')}</h2>
 
         <div className="stock-cash">
-          现金: <strong>${player.cash.toLocaleString()}</strong>
+          {t('stock.cash')}: <strong>${player.cash.toLocaleString()}</strong>
           {' | '}
-          持仓: {player.stocks.length > 0
+          {t('stock.holdings')}: {player.stocks.length > 0
             ? player.stocks.map(s => `${s.symbol}×${s.shares}`).join(', ')
-            : '无'}
+            : t('stock.noHoldings')}
         </div>
 
         <div className="stock-list">
           <div className="stock-header">
-            <span>股票</span>
-            <span>价格</span>
-            <span>涨跌</span>
-            <span>操作</span>
+            <span>{t('stock.symbol')}</span>
+            <span>{t('stock.price')}</span>
+            <span>{t('stock.change')}</span>
+            <span>{t('stock.action')}</span>
           </div>
           {pageStocks.map(stock => {
             const prev = stock.priceHistory[stock.priceHistory.length - 2] || stock.price;
@@ -78,8 +78,8 @@ export default function StockModal() {
               <div key={stock.symbol} className="stock-row">
                 <div className="stock-name">
                   <strong>{stock.symbol}</strong>
-                  <small>{stock.nameCN}</small>
-                  {myHolding && <span className="holding-badge">{myHolding.shares}股</span>}
+                  <small>{localName(stock)}</small>
+                  {myHolding && <span className="holding-badge">{t('stock.holdingFormat', { shares: myHolding.shares })}</span>}
                 </div>
                 <div className={`stock-price ${up ? 'up' : 'down'}`}>
                   ${stock.price}
@@ -92,7 +92,7 @@ export default function StockModal() {
                     className="btn btn-xs btn-primary"
                     onClick={() => setSelectedSymbol(stock.symbol)}
                   >
-                    交易
+                    {t('stock.trade')}
                   </button>
                 </div>
               </div>
@@ -100,7 +100,6 @@ export default function StockModal() {
           })}
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="pagination">
             <button disabled={page === 0} onClick={() => setPage(p => p - 1)}>◀</button>
@@ -109,11 +108,10 @@ export default function StockModal() {
           </div>
         )}
 
-        {/* Trade panel */}
         {selectedStock && (
           <div className="trade-panel">
-            <h4>交易 {selectedStock.symbol} (${selectedStock.price})</h4>
-            {holding && <p>持仓: {holding.shares}股 · 均价: ${holding.avgCost.toFixed(1)}</p>}
+            <h4>{t('stock.tradeTitle')} {selectedStock.symbol} (${selectedStock.price})</h4>
+            {holding && <p>{t('stock.holding')}: {holding.shares}{t('stock.shares')} · {t('stock.avgCost')}: ${holding.avgCost.toFixed(1)}</p>}
             <div className="trade-controls">
               <input
                 type="number"
@@ -122,24 +120,24 @@ export default function StockModal() {
                 value={shares}
                 onChange={e => setShares(Math.max(1, parseInt(e.target.value) || 1))}
               />
-              <span>股</span>
+              <span>{t('stock.shares')}</span>
               <button className="btn btn-sm btn-success" onClick={() => handleBuy(selectedStock.symbol)}>
-                买入 (${(selectedStock.price * shares).toLocaleString()})
+                {t('stock.buy')} (${(selectedStock.price * shares).toLocaleString()})
               </button>
               {holding && holding.shares > 0 && (
                 <button className="btn btn-sm btn-danger" onClick={() => handleSell(selectedStock.symbol)}>
-                  卖出
+                  {t('stock.sell')}
                 </button>
               )}
               <button className="btn btn-sm btn-ghost" onClick={() => setSelectedSymbol(null)}>
-                取消
+                {t('stock.cancel')}
               </button>
             </div>
-            <small>手续费: 3% (最低$5)</small>
+            <small>{t('stock.fee')}</small>
           </div>
         )}
 
-        <button className="btn btn-ghost" onClick={toggleStockPanel}>关闭</button>
+        <button className="btn btn-ghost" onClick={toggleStockPanel}>{t('build.close')}</button>
       </div>
     </div>
   );
