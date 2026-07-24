@@ -1,5 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useGameStore } from '../../store/gameStore';
+
+const CATEGORY_ICONS: Record<string, string> = {
+  rent: '💰',
+  buy: '✅',
+  sell: '💸',
+  dividend: '📈',
+  bankrupt: '💀',
+  victory: '🏆',
+  jail: '🔒',
+  card: '🃏',
+  info: '📢',
+};
 
 const CATEGORY_COLORS: Record<string, string> = {
   rent: '#E53935',
@@ -15,56 +27,66 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export default function EventToast() {
   const logs = useGameStore(s => s.logs);
-  const [currentLog, setCurrentLog] = useState<any>(null);
-  const [queue, setQueue] = useState<any[]>([]);
-  const [visible, setVisible] = useState(false);
+  const [current, setCurrent] = useState<{ message: string; type: string } | null>(null);
+  const shownIds = useRef<Set<number>>(new Set());
+  const queueRef = useRef<{ message: string; type: string }[]>([]);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Track last log ID to detect new entries
-  const [lastLogId, setLastLogId] = useState(-1);
-
+  // Detect new log entries by watching the logs array
   useEffect(() => {
     if (logs.length === 0) return;
-    const latest = logs[logs.length - 1];
-    if (latest.id > lastLogId && lastLogId >= 0) {
-      setQueue(q => [...q, latest]);
-    }
-    setLastLogId(latest.id);
-  }, [logs.length]);
 
+    for (let i = logs.length - 1; i >= 0; i--) {
+      const log = logs[i];
+      if (!shownIds.current.has(log.id)) {
+        shownIds.current.add(log.id);
+        queueRef.current.push({ message: log.message, type: log.type });
+      }
+    }
+
+    // Show next if nothing is currently displayed
+    if (!current && queueRef.current.length > 0) {
+      const next = queueRef.current.shift()!;
+      setCurrent(next);
+    }
+  }, [logs]);
+
+  // Auto-dismiss and show next in queue
   useEffect(() => {
-    if (queue.length > 0 && !visible) {
-      const next = queue[0];
-      setCurrentLog(next);
-      setQueue(q => q.slice(1));
-      setVisible(true);
+    if (!current) return;
 
-      const timer = setTimeout(() => {
-        setVisible(false);
-        setCurrentLog(null);
-      }, 2800);
+    timerRef.current = setTimeout(() => {
+      setCurrent(null);
+    }, 3000);
 
-      return () => clearTimeout(timer);
-    }
-  }, [queue, visible]);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [current]);
 
-  if (!visible || !currentLog) return null;
+  // When current dismisses, check queue for more
+  useEffect(() => {
+    if (current) return; // still showing something
+    if (queueRef.current.length === 0) return;
 
-  const bgColor = CATEGORY_COLORS[currentLog.type] || CATEGORY_COLORS.info;
+    // Small delay between toasts
+    const t = setTimeout(() => {
+      const next = queueRef.current.shift()!;
+      setCurrent(next);
+    }, 300);
+
+    return () => clearTimeout(t);
+  }, [current]);
+
+  if (!current) return null;
+
+  const bgColor = CATEGORY_COLORS[current.type] || CATEGORY_COLORS.info;
+  const icon = CATEGORY_ICONS[current.type] || '📢';
 
   return (
-    <div className={`event-toast ${visible ? 'slide-in' : ''}`} style={{ borderLeftColor: bgColor }}>
-      <div className="event-toast-icon">
-        {currentLog.type === 'rent' && '💰'}
-        {currentLog.type === 'buy' && '✅'}
-        {currentLog.type === 'sell' && '💸'}
-        {currentLog.type === 'dividend' && '📈'}
-        {currentLog.type === 'bankrupt' && '💀'}
-        {currentLog.type === 'victory' && '🏆'}
-        {currentLog.type === 'jail' && '🔒'}
-        {currentLog.type === 'card' && '🃏'}
-        {currentLog.type === 'info' && '📢'}
-      </div>
-      <div className="event-toast-text">{currentLog.message}</div>
+    <div className="event-toast" style={{ borderLeftColor: bgColor }}>
+      <div className="event-toast-icon">{icon}</div>
+      <div className="event-toast-text">{current.message}</div>
     </div>
   );
 }
