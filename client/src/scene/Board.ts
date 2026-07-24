@@ -4,6 +4,8 @@
 
 import * as THREE from 'three';
 import type { GameState } from '@monopoly/shared';
+import { getModelClone } from './ModelLoader';
+import { TREE_MODEL_URL } from './CityBuilder';
 import {
   GROUP_COLORS, ALL_PROPERTIES, ALL_RAILWAYS, ALL_UTILITIES,
   TILE_W, TILE_D, CORNER_SIZE, INNER_BOARD_HALF, OUTER_BOARD_HALF,
@@ -321,21 +323,12 @@ export class Board {
       tileGroup.add(splash);
     }
 
-    // Property: small decorative tree
-    if (propDef && ![1, 3, 6, 8, 9, 10, 13, 14, 15, 16, 18, 20, 21, 22, 23, 25, 27, 28, 30, 31, 32, 33, 34, 37, 39, 40, 43, 44, 45, 47].includes(index)) {
-      // Only add trees to some properties to avoid clutter — let's do all properties
-    }
+    // Tree placeholder — actual GLB tree planted after preload
     if (propDef) {
-      // Small tree decoration
-      const trunkGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.35, 8);
-      const trunk = new THREE.Mesh(trunkGeo, new THREE.MeshStandardMaterial({ color: '#795548', roughness: 0.6 }));
-      trunk.position.set(TILE_W / 2 - 0.4, 0.35, TILE_D / 2 - 0.7);
-      tileGroup.add(trunk);
-      const leavesGeo = new THREE.ConeGeometry(0.2, 0.4, 8);
-      const leaves = new THREE.Mesh(leavesGeo, new THREE.MeshStandardMaterial({ color: '#4CAF50', roughness: 0.5 }));
-      leaves.position.set(TILE_W / 2 - 0.4, 0.6, TILE_D / 2 - 0.7);
-      leaves.castShadow = true;
-      tileGroup.add(leaves);
+      const placeholder = new THREE.Group();
+      placeholder.name = 'tree-placeholder';
+      placeholder.position.set(TILE_W / 2 - 0.4, 0, TILE_D / 2 - 0.7);
+      tileGroup.add(placeholder);
     }
 
     // Go To Jail: police badge
@@ -358,6 +351,21 @@ export class Board {
 
     this.group.add(tileGroup);
     this.tileMeshes.set(index, tileGroup);
+  }
+
+  /** Replace tree placeholders with actual GLB models (call after preload) */
+  plantTrees(): void {
+    for (const [idx, tileGroup] of this.tileMeshes) {
+      const placeholder = tileGroup.getObjectByName('tree-placeholder');
+      if (!placeholder) continue;
+      const tree = getModelClone(TREE_MODEL_URL);
+      if (!tree) continue;
+      tree.scale.setScalar(0.35 + Math.random() * 0.15);
+      tree.position.copy(placeholder.position);
+      tree.rotation.y = Math.random() * Math.PI * 2;
+      tileGroup.add(tree);
+      tileGroup.remove(placeholder);
+    }
   }
 
   update(_state: GameState): void {

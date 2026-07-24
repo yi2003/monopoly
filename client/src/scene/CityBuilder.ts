@@ -133,7 +133,10 @@ function clamp(v: number, lo: number, hi: number): number {
 export const SHOP_MODEL_URLS = [
   '/models/corner-store-01.glb',
   '/models/convenience-store-01.glb',
+  '/models/street-tree-01.glb',
 ] as const;
+
+export const TREE_MODEL_URL = '/models/street-tree-01.glb';
 
 /** Mapping from building type to GLB model URL */
 const TYPE_MODEL_URL: Partial<Record<BuildingType, string>> = {

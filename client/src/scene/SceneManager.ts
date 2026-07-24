@@ -131,6 +131,7 @@ export class SceneManager {
     // Procedural city
     this.cityBuilder = new CityBuilder(this.scene);
     await preloadModels([...SHOP_MODEL_URLS]);
+    this.board.plantTrees();
     this.cityBuilder.build();
     this.nightGlow.registerAll(this.cityBuilder.nightGlowMaterials);
     this.nightGlow.autoRegisterFromScene(this.scene);
