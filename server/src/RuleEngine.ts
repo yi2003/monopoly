@@ -77,7 +77,7 @@ export class RuleEngine {
 
   // ---- Landing on tile ----
 
-  processLanding(position: number): {
+  processLanding(position: number, extraRentMultiplier = 1): {
     phase: 'buying' | 'stock' | 'wheel' | 'debt' | 'awaitEnd';
     rentAmount: number;
     rentTarget: string | null;
@@ -114,7 +114,7 @@ export class RuleEngine {
         if (owner && owner.id !== player.id) {
           const railwayCount = owner.properties.filter(p => getRailwayDef(p) !== undefined).length;
           const theme = THEMES[this.state.config.theme];
-          rentAmount = calcRailwayRent(owner, railwayCount, theme);
+          rentAmount = Math.round(calcRailwayRent(owner, railwayCount, theme) * extraRentMultiplier);
           rentTarget = owner.id;
           player.cash -= rentAmount;
           owner.cash += rentAmount;
@@ -128,7 +128,7 @@ export class RuleEngine {
         if (owner && owner.id !== player.id) {
           const utilityCount = owner.properties.filter(p => getUtilityDef(p) !== undefined).length;
           const diceSum = this.state.dice?.total || 0;
-          rentAmount = calcUtilityRent(utilityCount, diceSum);
+          rentAmount = Math.round(calcUtilityRent(utilityCount, diceSum) * extraRentMultiplier);
           rentTarget = owner.id;
           player.cash -= rentAmount;
           owner.cash += rentAmount;

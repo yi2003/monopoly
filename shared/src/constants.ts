@@ -559,7 +559,7 @@ export const MAX_HOUSES = 5;
 export const HOUSE_HOTEL_THRESHOLD = 5; // 5 houses = hotel
 export const STOCK_TRADE_FEE = 0.03; // 3%
 export const MIN_STOCK_FEE = 5;
-export const QUIZ_TRIGGER_CHANCE = 0; // disabled — was 0.12
+export const QUIZ_TRIGGER_CHANCE = 0.12; // 12% chance at turn start
 
 // ---- Room Codes ----
 

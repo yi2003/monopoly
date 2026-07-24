@@ -334,6 +334,15 @@ export class GameManager {
     this.state.quizQuestion = null;
     this.state.lastCardDrawn = null;
 
+    // Check for quiz trigger at turn start
+    if (QUIZ_TRIGGER_CHANCE > 0 && Math.random() < QUIZ_TRIGGER_CHANCE) {
+      const questions = QUIZ_QUESTIONS;
+      const q = questions[Math.floor(Math.random() * questions.length)];
+      this.state.quizActive = true;
+      this.state.quizQuestion = q;
+      this.addLog(`知识问答！`, 'info');
+    }
+
     // Weather change check
     this.state.weatherTimer--;
     if (this.state.weatherTimer <= 0) {
@@ -449,7 +458,8 @@ export class GameManager {
       case 'moveToNearest': {
         const nearest = findNearestTile(player.position, effect.tileType);
         player.position = nearest;
-        const landing = this.engine.processLanding(nearest);
+        const payMultiplier = effect.payMultiplier || 1;
+        const landing = this.engine.processLanding(nearest, payMultiplier);
         this.state.phase = landing.phase === 'buying' ? 'buying' : 'awaitEnd';
         break;
       }
