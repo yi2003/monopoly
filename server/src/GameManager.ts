@@ -628,7 +628,7 @@ export class GameManager {
   buyStock(symbol: string, shares: number): { success: boolean; error?: string } {
     const err = executeBuyStock(this.state, this.currentPlayer.id, symbol, shares);
     if (err) return { success: false, error: err };
-    this.addLog(`${this.currentPlayer.name} 买入 ${symbol} ×${shares}`, 'buy');
+    // Private: only log for the trading player, not broadcast as public event
     this.emitChange();
     return { success: true };
   }
@@ -636,7 +636,7 @@ export class GameManager {
   sellStock(symbol: string, shares: number): { success: boolean; error?: string } {
     const err = executeSellStock(this.state, this.currentPlayer.id, symbol, shares);
     if (err) return { success: false, error: err };
-    this.addLog(`${this.currentPlayer.name} 卖出 ${symbol} ×${shares}`, 'sell');
+    // Private: only log for the trading player, not broadcast as public event
     this.emitChange();
     return { success: true };
   }
