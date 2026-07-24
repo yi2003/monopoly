@@ -360,8 +360,9 @@ export class Board {
       if (!placeholder) continue;
       const tree = getModelClone(TREE_MODEL_URL);
       if (!tree) continue;
-      tree.scale.setScalar(0.35 + Math.random() * 0.15);
+      tree.scale.setScalar(0.5 + Math.random() * 0.2);
       tree.position.copy(placeholder.position);
+      tree.position.y = 0.15; // raise so trunk is visible above ground
       tree.rotation.y = Math.random() * Math.PI * 2;
       tileGroup.add(tree);
       tileGroup.remove(placeholder);
