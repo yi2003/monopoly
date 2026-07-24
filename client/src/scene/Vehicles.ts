@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { ThemeId } from '@monopoly/shared';
 import { audioManager } from '../audio/AudioManager';
 
-type VehicleType = 'car' | 'bus' | 'truck' | 'bicycle';
+type VehicleType = 'car' | 'bus' | 'truck' | 'container_truck' | 'bicycle';
 
 interface VehicleData {
   group: THREE.Group;
@@ -53,10 +53,13 @@ export class Vehicles {
     const baseCount = Math.floor(paths.length * 4 * this.density);
 
     for (let i = 0; i < baseCount; i++) {
-      const path = paths[i % paths.length];
+      const pathIdx = i % paths.length;
+      const path = paths[pathIdx];
       if (path.length < 2) continue;
 
-      const vtype = this.randomVehicleType(path);
+      // Outer ring roads (first 4 paths): bias toward trucks
+      const isOuterRing = pathIdx < 4;
+      const vtype = isOuterRing ? this.randomOuterVehicle() : this.randomVehicleType(path);
       const color = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
 
       const group = this.createVehicle(vtype, color);
@@ -77,6 +80,37 @@ export class Vehicles {
         hornCooldown: 8 + Math.random() * 25,
       });
     }
+
+    // Extra vehicles on outer ring roads (first 4 paths)
+    const outerPaths = paths.slice(0, 4);
+    const extraCount = Math.floor(outerPaths.length * 5 * this.density);
+    for (let i = 0; i < extraCount; i++) {
+      const path = outerPaths[i % outerPaths.length];
+      if (path.length < 2) continue;
+      const vtype = this.randomOuterVehicle();
+      const color = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
+      const group = this.createVehicle(vtype, color);
+      const startT = Math.random();
+      const [pos] = this.samplePath(path, startT);
+      group.position.copy(pos);
+      group.position.y = 0.05;
+      this.group.add(group);
+      this.vehicles.push({
+        group, vehicleType: vtype, path: [...path], pathIndex: 0,
+        pathT: startT, speed: this.getSpeed(vtype),
+        direction: Math.random() < 0.5 ? 0 : 1,
+        hornCooldown: 8 + Math.random() * 25,
+      });
+    }
+  }
+
+  /** Outer ring: mostly trucks and container trucks */
+  private randomOuterVehicle(): VehicleType {
+    const r = Math.random();
+    if (r < 0.30) return 'container_truck';
+    if (r < 0.60) return 'truck';
+    if (r < 0.80) return 'car';
+    return 'bus';
   }
 
   private randomVehicleType(path: THREE.Vector3[]): VehicleType {
@@ -95,6 +129,7 @@ export class Vehicles {
       case 'car': return 1.6 + Math.random() * 0.8;
       case 'bus': return 1.1 + Math.random() * 0.5;
       case 'truck': return 1.0 + Math.random() * 0.4;
+      case 'container_truck': return 0.8 + Math.random() * 0.3;
     }
   }
 
@@ -103,6 +138,7 @@ export class Vehicles {
       case 'car': return this.createCar(color);
       case 'bus': return this.createBus(color);
       case 'truck': return this.createTruck(color);
+      case 'container_truck': return this.createContainerTruck();
       case 'bicycle': return this.createBicycle(color);
     }
   }
@@ -234,6 +270,64 @@ export class Vehicles {
         const wheel = new THREE.Mesh(wheelGeo, new THREE.MeshStandardMaterial({ color: '#212121', roughness: 0.8 }));
         wheel.rotation.z = Math.PI / 2;
         wheel.position.set(s * 0.55, 0.22, (w === 0 ? 1.0 : -1.0));
+        wheel.castShadow = true;
+        group.add(wheel);
+      }
+    }
+
+    return group;
+  }
+
+  private createContainerTruck(): THREE.Group {
+    const group = new THREE.Group();
+    const containerColors = ['#E53935', '#1E88E5', '#43A047', '#FB8C00', '#FDD835', '#1565C0', '#6D4C41'];
+
+    // Cab (same as truck)
+    const cabGeo = new THREE.BoxGeometry(1.0, 0.8, 1.2);
+    const cab = new THREE.Mesh(cabGeo, new THREE.MeshStandardMaterial({
+      color: CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)], roughness: 0.3, metalness: 0.2,
+    }));
+    cab.position.set(0, 0.55, 1.5);
+    cab.castShadow = true;
+    group.add(cab);
+
+    // Shipping container (long corrugated box)
+    const containerColor = containerColors[Math.floor(Math.random() * containerColors.length)];
+    const containerGeo = new THREE.BoxGeometry(1.15, 1.1, 3.0);
+    const container = new THREE.Mesh(containerGeo, new THREE.MeshStandardMaterial({
+      color: containerColor, roughness: 0.5, metalness: 0.6,
+    }));
+    container.position.set(0, 0.7, -0.6);
+    container.castShadow = true;
+    group.add(container);
+
+    // Container ribbing (horizontal ridges)
+    for (let r = 0; r < 6; r++) {
+      const ribGeo = new THREE.BoxGeometry(1.18, 0.04, 0.06);
+      const rib = new THREE.Mesh(ribGeo, new THREE.MeshStandardMaterial({
+        color: '#616161', roughness: 0.3, metalness: 0.5,
+      }));
+      rib.position.set(0, 0.7 + (r - 2.5) * 0.18, -0.6);
+      group.add(rib);
+    }
+
+    // Container door lines (vertical)
+    for (let d = -1; d <= 1; d += 2) {
+      const doorGeo = new THREE.BoxGeometry(0.02, 1.05, 3.0);
+      const door = new THREE.Mesh(doorGeo, new THREE.MeshStandardMaterial({
+        color: '#424242', roughness: 0.3, metalness: 0.4,
+      }));
+      door.position.set(d * 0.4, 0.7, -0.6);
+      group.add(door);
+    }
+
+    // 6 wheels (3 axles)
+    for (let w = 0; w < 3; w++) {
+      for (let s = -1; s <= 1; s += 2) {
+        const wheelGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.15, 12);
+        const wheel = new THREE.Mesh(wheelGeo, new THREE.MeshStandardMaterial({ color: '#212121', roughness: 0.8 }));
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(s * 0.6, 0.22, 1.1 - w * 1.3);
         wheel.castShadow = true;
         group.add(wheel);
       }
