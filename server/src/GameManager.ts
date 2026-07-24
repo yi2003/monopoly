@@ -420,16 +420,18 @@ export class GameManager {
     if (this.currentPlayer.status !== 'jailed') return { success: false };
     const dice = rollDice();
     this.state.dice = dice;
-    if (dice.isDoubles) {
+    // Single die: 1/3 chance to escape (rolling 5 or 6)
+    const escaped = dice.die1 >= 5;
+    if (escaped) {
       this.currentPlayer.jailTurns = 0;
       this.currentPlayer.status = 'active';
       this.currentPlayer.consecutiveDoubles = 0;
       this.state.phase = 'rolling';
-      this.addLog(`🎲 ${this.currentPlayer.name} 掷出对子，越狱成功！`, 'info');
+      this.addLog(`🎲 ${this.currentPlayer.name} 掷出 ${dice.die1} 点，越狱成功！`, 'info');
       this.emitEvent({ kind: 'jail_out', playerId: this.currentPlayer.id, method: 'doubles' });
     } else {
       this.currentPlayer.jailTurns++;
-      this.addLog(`🔒 ${this.currentPlayer.name} 未能掷出对子出狱（${this.currentPlayer.jailTurns}/3回合）`, 'info');
+      this.addLog(`🔒 ${this.currentPlayer.name} 掷出 ${dice.die1} 点，未能出狱（${this.currentPlayer.jailTurns}/3回合）`, 'info');
       if (this.currentPlayer.jailTurns >= 3) {
         this.currentPlayer.cash -= JAIL_FINE;
         this.currentPlayer.jailTurns = 0;

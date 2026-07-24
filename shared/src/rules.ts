@@ -330,13 +330,12 @@ export interface DiceResult {
 }
 
 export function rollDice(): DiceResult {
-  const die1 = Math.floor(Math.random() * 6) + 1;
-  const die2 = Math.floor(Math.random() * 6) + 1;
+  const value = Math.floor(Math.random() * 6) + 1;
   return {
-    die1,
-    die2,
-    total: die1 + die2,
-    isDoubles: die1 === die2,
+    die1: value,
+    die2: 0,
+    total: value,
+    isDoubles: false,
   };
 }
 
