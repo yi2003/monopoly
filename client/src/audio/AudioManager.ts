@@ -25,21 +25,33 @@ export class AudioManager {
     try {
       this.ctx = new AudioContext();
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = 0.3;
+      this.masterGain.gain.value = 0.4;
       this.masterGain.connect(this.ctx.destination);
 
       this.ambienceGain = this.ctx.createGain();
       this.ambienceGain.gain.value = 0;
       this.ambienceGain.connect(this.masterGain);
+
+      // Resume on user interaction (browsers suspend AudioContext until click)
+      const resume = () => {
+        this.ctx?.resume();
+        document.removeEventListener('click', resume);
+        document.removeEventListener('keydown', resume);
+      };
+      document.addEventListener('click', resume);
+      document.addEventListener('keydown', resume);
+
       this.initialized = true;
     } catch {
-      // Audio not available
       this.enabled = false;
     }
   }
 
   private ensureContext(): AudioContext | null {
     this.init();
+    if (this.ctx?.state === 'suspended') {
+      this.ctx.resume();
+    }
     return this.ctx;
   }
 
@@ -139,35 +151,34 @@ export class AudioManager {
     if (!ctx || !this.masterGain) return;
     const now = ctx.currentTime;
 
-    const isHard = surface === 'stone' || surface === 'concrete';
-    const baseFreq = isHard ? 200 : 120;
-    const vol = isHard ? 0.03 : 0.025;
+    const baseFreq = 150;
+    const vol = 0.06;
 
-    // Short noise burst simulating foot impact
+    // Short thud: low frequency burst
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(baseFreq, now);
-    osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.4, now + 0.04);
+    osc.frequency.exponentialRampToValueAtTime(60, now + 0.06);
     gain.gain.setValueAtTime(vol, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
     gain.connect(this.masterGain!);
     osc.connect(gain);
     osc.start(now);
-    osc.stop(now + 0.06);
+    osc.stop(now + 0.09);
 
-    // Add a tiny noise component for texture
-    const noiseOsc = ctx.createOscillator();
-    const noiseGain = ctx.createGain();
-    noiseOsc.type = 'triangle';
-    noiseOsc.frequency.setValueAtTime(baseFreq * 2.5, now);
-    noiseOsc.frequency.exponentialRampToValueAtTime(baseFreq * 0.8, now + 0.03);
-    noiseGain.gain.setValueAtTime(vol * 0.5, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-    noiseGain.connect(this.masterGain!);
-    noiseOsc.connect(noiseGain);
-    noiseOsc.start(now);
-    noiseOsc.stop(now + 0.05);
+    // Click component for texture
+    const clickOsc = ctx.createOscillator();
+    const clickGain = ctx.createGain();
+    clickOsc.type = 'square';
+    clickOsc.frequency.setValueAtTime(400, now);
+    clickOsc.frequency.exponentialRampToValueAtTime(100, now + 0.03);
+    clickGain.gain.setValueAtTime(vol * 0.3, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    clickGain.connect(this.masterGain!);
+    clickOsc.connect(clickGain);
+    clickOsc.start(now);
+    clickOsc.stop(now + 0.05);
   }
 
   /** Walking on grass/dirt (softer) */
