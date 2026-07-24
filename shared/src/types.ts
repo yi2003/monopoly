@@ -255,6 +255,19 @@ export interface QuizQuestion {
   category: string;
 }
 
+// ---- Game Event Notification (for card popups) ----
+
+export type GameEvent =
+  | { kind: 'rent'; playerId: string; targetId: string; amount: number; tileIndex: number; tileName: string; tileNameCN: string }
+  | { kind: 'tax'; playerId: string; amount: number; isLuxury: boolean }
+  | { kind: 'go_salary'; playerId: string; amount: number }
+  | { kind: 'jail_in'; playerId: string; reason: 'goto_jail' | 'three_doubles' | 'wheel' | 'card' }
+  | { kind: 'jail_out'; playerId: string; method: 'pay_fine' | 'use_card' | 'doubles' | 'forced' }
+  | { kind: 'dividend'; playerId: string; symbol: string; stockName: string; stockNameCN: string; shares: number; amount: number }
+  | { kind: 'weather'; from: string; to: string }
+  | { kind: 'maintenance'; playerId: string; amount: number; rate: number }
+  | { kind: 'game_over'; winnerId: string; winnerName: string };
+
 export interface GameState {
   config: GameConfig;
   phase: GamePhase;
@@ -278,6 +291,7 @@ export interface GameState {
   quizQuestion: QuizQuestion | null;
   wheelResult: number | null; // sector index
   lastCardDrawn: { type: CardType; card: Card } | null;
+  gameEvent: GameEvent | null;
   createdAt: number;
 }
 

@@ -141,6 +141,11 @@ export function connectSocket(): Socket {
           penalty: '税费倍率惩罚',
         });
       }
+
+      // Check for generic game event (rent, tax, go_salary, jail, dividend, weather, maintenance)
+      if (liveState?.gameEvent && liveState.gameEvent.kind !== 'game_over') {
+        uiStore().setGameEvent(liveState.gameEvent);
+      }
     };
 
     if (delay > 0) {
@@ -150,7 +155,9 @@ export function connectSocket(): Socket {
     }
 
     // Check for game over
-    if (state.phase === 'ended' && state.winner) {
+    if (state.gameEvent?.kind === 'game_over') {
+      uiStore().openModal('GameOver');
+    } else if (state.phase === 'ended' && state.winner) {
       uiStore().openModal('GameOver');
     }
 

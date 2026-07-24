@@ -2,10 +2,9 @@
 // StockMarket — Price fluctuations & dividends
 // ============================================================
 
-import type { Player } from '@monopoly/shared';
+import type { Player, GameState, GameEvent } from '@monopoly/shared';
 import { STOCKS, STOCK_TRADE_FEE, MIN_STOCK_FEE } from '@monopoly/shared';
 import { getEffectiveConfig } from '@monopoly/shared';
-import type { GameState } from '@monopoly/shared';
 
 export function updateStockPrices(state: GameState): void {
   const eff = getEffectiveConfig(state.config.theme, state.config.difficulty);
@@ -29,7 +28,8 @@ export function updateStockPrices(state: GameState): void {
   }
 }
 
-export function processDividends(state: GameState): void {
+export function processDividends(state: GameState): GameEvent[] {
+  const events: GameEvent[] = [];
   const config = state.config;
   // Probability varies by theme
   const dividendChance = config.theme === 'shanghai' ? 0.18 : 0.12;
@@ -40,7 +40,7 @@ export function processDividends(state: GameState): void {
     state.players.some(p => p.stocks.some(h => h.symbol === s.symbol)),
   );
 
-  if (eligibleStocks.length === 0) return;
+  if (eligibleStocks.length === 0) return events;
 
   const stock = eligibleStocks[Math.floor(Math.random() * eligibleStocks.length)];
 
@@ -59,8 +59,19 @@ export function processDividends(state: GameState): void {
         message: `${player.name} 获得 ${stock.nameCN} 分红 $${dividend} (${holding.shares}股)`,
         type: 'dividend',
       });
+      events.push({
+        kind: 'dividend',
+        playerId: player.id,
+        symbol: stock.symbol,
+        stockName: stock.name,
+        stockNameCN: stock.nameCN,
+        shares: holding.shares,
+        amount: dividend,
+      });
     }
   }
+
+  return events;
 }
 
 export function executeBuyStock(

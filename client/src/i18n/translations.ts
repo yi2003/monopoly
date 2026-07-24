@@ -202,6 +202,15 @@ export const translations = {
     'lang.switch': '中文',
     'lang.label': '🌐 语言',
 
+    // Game Over
+    'gameOver.title': '🎉 游戏结束',
+    'gameOver.rounds': '总回合数',
+    'gameOver.players': '存活玩家',
+    'gameOver.finalCash': '最终现金',
+    'gameOver.properties': '拥有地产',
+    'gameOver.standings': '🏅 最终排名',
+    'gameOver.backToLobby': '🔄 返回大厅',
+
     // Bot names
     'bot.names': '小明,小红,小刚,小丽,阿福,财神',
   },
@@ -380,6 +389,15 @@ export const translations = {
 
     'lang.switch': 'English',
     'lang.label': '🌐 Language',
+
+    // Game Over
+    'gameOver.title': '🎉 Game Over',
+    'gameOver.rounds': 'Total Rounds',
+    'gameOver.players': 'Players',
+    'gameOver.finalCash': 'Final Cash',
+    'gameOver.properties': 'Properties',
+    'gameOver.standings': '🏅 Final Standings',
+    'gameOver.backToLobby': '🔄 Back to Lobby',
 
     'bot.names': 'Alice,Bob,Charlie,Diana,Eve,Frank',
   },

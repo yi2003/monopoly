@@ -304,6 +304,7 @@ export class SceneManager {
     this.weatherEffects.update(dt);
 
     // Update NPCs
+    this.pedestrians.setNightFactor(this.dayNightCycle.nightFactor);
     this.pedestrians.update(dt);
     this.vehicles.update(dt);
 

@@ -2,7 +2,7 @@
 // GameManager — Authoritative game state & turn machine
 // ============================================================
 
-import type { GameState, GameConfig, Player, ThemeId, DifficultyId } from '@monopoly/shared';
+import type { GameState, GameConfig, Player, ThemeId, DifficultyId, GameEvent } from '@monopoly/shared';
 import {
   createTiles, CHANCE_CARDS, COMMUNITY_CHEST_CARDS,
   SHANGHAI_EXTRA_CHANCE_CARDS, SHANGHAI_EXTRA_COMMUNITY_CHEST_CARDS,
@@ -60,6 +60,7 @@ export class GameManager {
       quizQuestion: null,
       wheelResult: null,
       lastCardDrawn: null,
+      gameEvent: null,
       createdAt: Date.now(),
     };
   }
@@ -171,6 +172,7 @@ export class GameManager {
     if (result.passedGo) {
       const eff = getEffectiveConfig(this.state.config.theme, this.state.config.difficulty);
       this.addLog(`💰 ${this.currentPlayer.name} 经过起点，银行发放工资 $${eff.goSalary}`, 'info');
+      this.emitEvent({ kind: 'go_salary', playerId: this.currentPlayer.id, amount: eff.goSalary });
     }
 
     // Track consecutive doubles
@@ -191,6 +193,7 @@ export class GameManager {
         this.currentPlayer.status = 'jailed';
         this.currentPlayer.consecutiveDoubles = 0;
         this.addLog(`${this.currentPlayer.name} 连续三次掷出对子，被送进监狱！`, 'jail');
+        this.emitEvent({ kind: 'jail_in', playerId: this.currentPlayer.id, reason: 'three_doubles' });
         this.state.phase = 'awaitEnd';
       } else {
         this.addLog(`${this.currentPlayer.name} 掷出对子 (${dice.die1}+${dice.die2})，再掷一次！`, 'info');
@@ -202,6 +205,11 @@ export class GameManager {
 
     // Process landing
     const landing = this.engine.processLanding(result.newPosition);
+
+    // Forward gameEvent from landing (rent, tax, jail_in from goto_jail)
+    if (landing.gameEvent) {
+      this.state.gameEvent = landing.gameEvent;
+    }
 
     if (landing.cardType) {
       this.drawCard(landing.cardType);
@@ -271,6 +279,7 @@ export class GameManager {
         this.state.winner = winner.id;
         this.state.phase = 'ended';
         this.addLog(`${winner.name} 获胜！`, 'victory');
+        this.emitEvent({ kind: 'game_over', winnerId: winner.id, winnerName: winner.name });
         this.emitChange();
         return;
       }
@@ -282,6 +291,7 @@ export class GameManager {
       this.state.winner = winner.id;
       this.state.phase = 'ended';
       this.addLog(`${winner.name} 获胜！`, 'victory');
+      this.emitEvent({ kind: 'game_over', winnerId: winner.id, winnerName: winner.name });
       this.emitChange();
       return;
     }
@@ -294,6 +304,7 @@ export class GameManager {
         this.currentPlayer.cash -= drain;
         if (drain > 0) {
           this.addLog(`🔧 ${this.currentPlayer.name} → 银行 资产维护费 $${drain}（${Math.round(eff.drainPct * 100)}%）`, 'info');
+          this.emitEvent({ kind: 'maintenance', playerId: this.currentPlayer.id, amount: drain, rate: Math.round(eff.drainPct * 100) });
         }
       }
     }
@@ -302,7 +313,12 @@ export class GameManager {
     updateStockPrices(this.state);
 
     // Process dividends
-    processDividends(this.state);
+    const dividendEvents = processDividends(this.state);
+    if (dividendEvents.length > 0) {
+      // Show dividend event for the current player if they received one
+      const myEvent = dividendEvents.find(e => e.kind === 'dividend' && e.playerId === this.currentPlayer.id);
+      if (myEvent) this.state.gameEvent = myEvent;
+    }
 
     // Advance to next player
     this.advanceTurn();
@@ -335,6 +351,8 @@ export class GameManager {
     this.state.quizActive = false;
     this.state.quizQuestion = null;
     this.state.lastCardDrawn = null;
+    this.state.wheelResult = null;
+    this.state.gameEvent = null;
 
     // Check for quiz trigger at turn start
     if (QUIZ_TRIGGER_CHANCE > 0 && Math.random() < QUIZ_TRIGGER_CHANCE) {
@@ -348,8 +366,12 @@ export class GameManager {
     // Weather change check
     this.state.weatherTimer--;
     if (this.state.weatherTimer <= 0) {
+      const oldWeather = this.state.weather;
       this.state.weather = this.rollWeather();
       this.state.weatherTimer = 25 + Math.floor(Math.random() * 20);
+      if (oldWeather !== this.state.weather) {
+        this.emitEvent({ kind: 'weather', from: oldWeather, to: this.state.weather });
+      }
     }
 
     // Day/night progression
@@ -375,6 +397,7 @@ export class GameManager {
     this.currentPlayer.jailTurns = 0;
     this.currentPlayer.status = 'active';
     this.addLog(`🔓 ${this.currentPlayer.name} 向银行缴纳 $${JAIL_FINE} 保释出狱`, 'info');
+    this.emitEvent({ kind: 'jail_out', playerId: this.currentPlayer.id, method: 'pay_fine' });
     this.emitChange();
     return { success: true };
   }
@@ -386,6 +409,7 @@ export class GameManager {
     this.currentPlayer.jailTurns = 0;
     this.currentPlayer.status = 'active';
     this.addLog(`🃏 ${this.currentPlayer.name} 使用出狱卡出狱`, 'info');
+    this.emitEvent({ kind: 'jail_out', playerId: this.currentPlayer.id, method: 'use_card' });
     this.emitChange();
     return { success: true };
   }
@@ -400,6 +424,7 @@ export class GameManager {
       this.currentPlayer.consecutiveDoubles = 0;
       this.state.phase = 'rolling';
       this.addLog(`🎲 ${this.currentPlayer.name} 掷出对子 [${dice.die1}][${dice.die2}]，越狱成功！`, 'info');
+      this.emitEvent({ kind: 'jail_out', playerId: this.currentPlayer.id, method: 'doubles' });
     } else {
       this.currentPlayer.jailTurns++;
       this.addLog(`🔒 ${this.currentPlayer.name} 掷出 [${dice.die1}][${dice.die2}]，未能出狱（${this.currentPlayer.jailTurns}/3回合）`, 'info');
@@ -408,6 +433,7 @@ export class GameManager {
         this.currentPlayer.jailTurns = 0;
         this.currentPlayer.status = 'active';
         this.addLog(`${this.currentPlayer.name} 关押3回，强制付 $${JAIL_FINE} 出狱`);
+        this.emitEvent({ kind: 'jail_out', playerId: this.currentPlayer.id, method: 'forced' });
       }
     }
     this.state.phase = 'awaitEnd';
@@ -489,6 +515,7 @@ export class GameManager {
         player.position = CORNER_JAIL;
         player.jailTurns = 1;
         player.status = 'jailed';
+        this.emitEvent({ kind: 'jail_in', playerId: player.id, reason: 'card' });
         break;
       }
 
@@ -580,6 +607,7 @@ export class GameManager {
         player.position = CORNER_JAIL;
         player.jailTurns = 1;
         player.status = 'jailed';
+        this.emitEvent({ kind: 'jail_in', playerId: player.id, reason: 'wheel' });
         break;
       case 'moveToGO':
         player.position = CORNER_GO;
@@ -868,6 +896,10 @@ export class GameManager {
     if (this.state.logs.length > 50) {
       this.state.logs.shift();
     }
+  }
+
+  private emitEvent(event: GameEvent): void {
+    this.state.gameEvent = event;
   }
 
   private rollWeather(): 'clear' | 'rain' | 'snow' | 'fog' | 'storm' {

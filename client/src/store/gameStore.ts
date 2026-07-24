@@ -70,6 +70,7 @@ const defaultGameState: GameState = {
   quizQuestion: null,
   wheelResult: null,
   lastCardDrawn: null,
+  gameEvent: null,
   createdAt: Date.now(),
 };
 

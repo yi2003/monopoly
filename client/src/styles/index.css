@@ -512,6 +512,77 @@ html, body, #root {
   font-size: 14px; font-weight: 600;
 }
 
+/* ---- Event Card ---- */
+
+.event-card-overlay {
+  position: fixed; inset: 0; z-index: 190;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.35);
+  cursor: pointer;
+  opacity: 0; transition: opacity 0.3s ease-out;
+}
+.event-card-overlay.visible { opacity: 1; }
+
+.event-card {
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px; padding: 28px 32px;
+  text-align: center;
+  max-width: 360px; width: 85%;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  position: relative;
+  overflow: hidden;
+  animation: eventCardIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.event-card-color-bar {
+  position: absolute; top: 0; left: 0; right: 0; height: 4px;
+}
+
+.event-card-icon { font-size: 54px; margin-bottom: 8px; animation: popIn 0.4s ease-out 0.1s both; }
+
+.event-card-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+
+.event-card-desc { font-size: 14px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.5; }
+
+.event-card-amount { font-size: 34px; font-weight: 800; margin-bottom: 2px; }
+.event-card-amount.positive { color: var(--accent-green); }
+.event-card-amount.negative { color: var(--accent-red); }
+
+.event-card-detail { font-size: 12px; color: var(--text-secondary); }
+
+@keyframes eventCardIn {
+  from { transform: scale(0.8) translateY(20px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* ---- Game Over Modal ---- */
+
+.gameover-modal { max-width: 480px; text-align: center; }
+.gameover-trophy { font-size: 72px; animation: popIn 0.6s ease-out; margin-bottom: 8px; }
+.gameover-winner { font-size: 26px; font-weight: 800; color: var(--accent-yellow); margin-bottom: 12px; }
+.gameover-stats {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  margin: 16px 0;
+}
+.gameover-stat {
+  background: rgba(255,255,255,0.05); padding: 14px; border-radius: 10px;
+}
+.gameover-stat-label { font-size: 12px; color: var(--text-secondary); }
+.gameover-stat-value { font-size: 20px; font-weight: 700; margin-top: 4px; color: var(--accent-yellow); }
+
+.gameover-standings { margin-top: 16px; text-align: left; }
+.gameover-standings h3 { font-size: 15px; margin-bottom: 8px; text-align: center; }
+.gameover-standing-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; margin-bottom: 4px;
+  background: rgba(255,255,255,0.03); border-radius: 8px;
+  border-left: 4px solid;
+}
+.gameover-rank { font-weight: 700; font-size: 14px; color: var(--text-secondary); min-width: 28px; }
+.gameover-pname { flex: 1; font-size: 14px; }
+.gameover-pcash { font-weight: 600; font-size: 14px; color: var(--accent-yellow); }
+
 /* ---- Game Canvas ---- */
 
 .game-canvas {

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { GameEvent } from '@monopoly/shared';
 
 interface UIStore {
   // Language
@@ -26,6 +27,10 @@ interface UIStore {
   // Dice timing
   diceRolledAt: number;
 
+  // Event card
+  gameEvent: GameEvent | null;
+  showEventCard: boolean;
+
   // Toast
   toasts: { id: number; message: string; type: string }[];
 
@@ -37,6 +42,7 @@ interface UIStore {
   setQuizData: (data: any) => void;
   setQuizResult: (result: 'correct' | 'wrong' | null, amount?: number) => void;
   markDiceRolled: () => void;
+  setGameEvent: (event: GameEvent | null) => void;
   addToast: (message: string, type?: string) => void;
   removeToast: (id: number) => void;
 }
@@ -60,6 +66,8 @@ export const useUIStore = create<UIStore>((set) => ({
   showBankruptcyModal: false,
   showGameOverModal: false,
 
+  gameEvent: null,
+  showEventCard: false,
   lastCardDrawn: null,
   wheelResult: null,
   quizData: null,
@@ -70,6 +78,19 @@ export const useUIStore = create<UIStore>((set) => ({
 
   openModal: (modal) => set({ [`show${modal}Modal`]: true } as any),
   closeModal: (modal) => set({ [`show${modal}Modal`]: false } as any),
+
+  setGameEvent: (event) => {
+    if (event) {
+      set({ gameEvent: event, showEventCard: true });
+      // Auto-dismiss after 3.5s
+      setTimeout(() => {
+        set(s => s.showEventCard ? { showEventCard: false } : {});
+        setTimeout(() => set({ gameEvent: null }), 400);
+      }, 3500);
+    } else {
+      set({ gameEvent: null, showEventCard: false });
+    }
+  },
 
   setCardDrawn: (card) => set({ lastCardDrawn: card, showCardModal: true }),
   setWheelResult: (index) => set({ wheelResult: index, showWheelModal: index !== null }),

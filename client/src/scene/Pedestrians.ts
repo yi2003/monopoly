@@ -15,6 +15,7 @@ interface PedestrianData {
   walkPhase: number;
   paired: boolean;
   pairOffset: number;
+  nightTolerance: number; // 0-1, hides when nightFactor > this value
 }
 
 const THEME_COLORS: Record<ThemeId, string[]> = {
@@ -44,6 +45,13 @@ export class Pedestrians {
 
   setDensity(factor: number): void {
     this.density = Math.max(0, factor);
+  }
+
+  /** Day: show all. Night: hide pedestrians whose tolerance < nightFactor. */
+  setNightFactor(nightFactor: number): void {
+    for (const ped of this.pedestrians) {
+      ped.group.visible = nightFactor <= ped.nightTolerance;
+    }
   }
 
   /** Define sidewalk walk zones (called after CityBuilder generates roads) */
@@ -103,6 +111,7 @@ export class Pedestrians {
       walkPhase: Math.random() * Math.PI * 2,
       paired: Math.random() < 0.25,
       pairOffset: (Math.random() - 0.5) * 0.8,
+      nightTolerance: 0.25 + Math.random() * 0.65, // 0.25–0.90, higher = stays out later
     });
   }
 

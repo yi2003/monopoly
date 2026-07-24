@@ -2,7 +2,7 @@
 // RuleEngine — Server-side validation of all player actions
 // ============================================================
 
-import type { GameState, Player, PropertyTile } from '@monopoly/shared';
+import type { GameState, Player, PropertyTile, GameEvent } from '@monopoly/shared';
 import {
   getPropertyDef, getRailwayDef, getUtilityDef,
   calcPropertyRent, calcRailwayRent, calcUtilityRent,
@@ -82,6 +82,7 @@ export class RuleEngine {
     rentAmount: number;
     rentTarget: string | null;
     cardType: 'chance' | 'community_chest' | null;
+    gameEvent?: GameEvent;
   } {
     const tile = this.state.tiles[position];
     const player = this.currentPlayer;
@@ -101,6 +102,10 @@ export class RuleEngine {
           player.cash -= rentAmount;
           owner.cash += rentAmount;
           this.addLog(`💸 ${player.name} → ${owner.name} 租金 $${rentAmount}`, 'rent');
+          return {
+            phase: 'awaitEnd', rentAmount, rentTarget, cardType: null,
+            gameEvent: { kind: 'rent', playerId: player.id, targetId: owner.id, amount: rentAmount, tileIndex: position, tileName: tile.name, tileNameCN: tile.nameCN },
+          };
         } else if (!owner) {
           if (player.cash >= (tile as PropertyTile).price) {
             return { phase: 'buying', rentAmount: 0, rentTarget: null, cardType: null };
@@ -119,6 +124,10 @@ export class RuleEngine {
           player.cash -= rentAmount;
           owner.cash += rentAmount;
           this.addLog(`🚂 ${player.name} → ${owner.name} 铁路费 $${rentAmount}（${railwayCount}条铁路）`, 'rent');
+          return {
+            phase: 'awaitEnd', rentAmount, rentTarget, cardType: null,
+            gameEvent: { kind: 'rent', playerId: player.id, targetId: owner.id, amount: rentAmount, tileIndex: position, tileName: tile.name, tileNameCN: tile.nameCN },
+          };
         }
         break;
       }
@@ -133,6 +142,10 @@ export class RuleEngine {
           player.cash -= rentAmount;
           owner.cash += rentAmount;
           this.addLog(`🔌 ${player.name} → ${owner.name} 公共事业费 $${rentAmount}（骰子${diceSum}×${utilityCount}处）`, 'rent');
+          return {
+            phase: 'awaitEnd', rentAmount, rentTarget, cardType: null,
+            gameEvent: { kind: 'rent', playerId: player.id, targetId: owner.id, amount: rentAmount, tileIndex: position, tileName: tile.name, tileNameCN: tile.nameCN },
+          };
         }
         break;
       }
@@ -141,7 +154,10 @@ export class RuleEngine {
         const taxAmount = Math.round(tile.amount * this.effConfig.taxMultiplier);
         player.cash -= taxAmount;
         this.addLog(`🏛️ ${player.name} → 银行 缴纳税费 $${taxAmount}`, 'info');
-        break;
+        return {
+          phase: 'awaitEnd', rentAmount: taxAmount, rentTarget: null, cardType: null,
+          gameEvent: { kind: 'tax', playerId: player.id, amount: taxAmount, isLuxury: tile.isLuxury },
+        };
       }
 
       case 'chance': {
@@ -167,7 +183,10 @@ export class RuleEngine {
         player.jailTurns = 1;
         player.status = 'jailed';
         this.addLog(`${player.name} 被送进监狱！`, 'jail');
-        break;
+        return {
+          phase: 'awaitEnd', rentAmount: 0, rentTarget: null, cardType: null,
+          gameEvent: { kind: 'jail_in', playerId: player.id, reason: 'goto_jail' },
+        };
       }
 
       // Inner city tiles
