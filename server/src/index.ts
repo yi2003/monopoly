@@ -12,13 +12,20 @@ import { createRoom, joinRoom, leaveRoom, getRoom, canStartGame } from './GameRo
 import { GameManager } from './GameManager';
 import { generatePlayerId, generateRoomCode } from './utils/random';
 
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+const allowedOrigins = [
+  CLIENT_URL,
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+];
+
 const app = express();
-app.use(cors());
+app.use(cors({ origin: allowedOrigins }));
 
 const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: {
-    origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
   },
   pingInterval: 10000,
