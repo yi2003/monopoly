@@ -1,28 +1,152 @@
 // ============================================================
-// Pedestrians — Animated NPC pedestrians on sidewalks
+// Pedestrians — Opus5-style detailed NPCs with outfit system
 // ============================================================
 
 import * as THREE from 'three';
 import type { ThemeId } from '@monopoly/shared';
+import { Rng } from '../util/rng';
+import { boxMesh, cylMesh } from '../util/geom';
+
+// ---- Outfit colour palettes (from opus5) ----
+
+const OUTFIT_COLORS: Record<string, string[]> = {
+  overcoat: ['#2a2a28', '#3a3028', '#1a2030', '#4a3a28'],
+  fedora: ['#2a2a28', '#3a3028'],
+  dress40s: ['#6a2030', '#2a4060', '#4a3a20', '#5a2040'],
+  uniform: ['#2a3a2a', '#3a3a40'],
+  apron: ['#e0e0d8', '#c8c0b0'],
+  mod: ['#e04080', '#20a0c0', '#e0c020', '#8040c0'],
+  suit60s: ['#2a2a30', '#3a4050', '#4a3020'],
+  dress60s: ['#e06080', '#40c0c0', '#e0a040'],
+  leather: ['#1a1a1a', '#2a1a10'],
+  power: ['#1a1a1a', '#e0e0e0', '#2a2040'],
+  punk: ['#101010', '#e02040', '#80ff40'],
+  aerobics: ['#ff40a0', '#40e0ff', '#e0ff40'],
+  denim: ['#304878', '#3a5088'],
+  suit80s: ['#1a1a28', '#3a2040', '#e8e0d0'],
+  casual00s: ['#2a4a6a', '#4a3a2a', '#e04030', '#1a1a1a'],
+  suit00s: ['#2a2a30', '#3a3a40'],
+  hoodie: ['#1a3040', '#3a2030', '#2a4a2a'],
+  tourist: ['#e0e0e0', '#c04030', '#4080c0'],
+  athleisure: ['#1a1a1a', '#e0e0e0', '#40a070', '#c04080'],
+  tech: ['#2a2a2a', '#3a4050', '#e8e8e8'],
+  delivery: ['#e04020', '#2040a0', '#e0a020'],
+  casual25: ['#3a3a3a', '#6a8070', '#c0b0a0'],
+  softsuit: ['#c0e8e0', '#e0e0ff', '#80ffe0'],
+  techwear: ['#1a1a1a', '#2a3040'],
+  // Shanghai-themed
+  shanghai_casual: ['#2a3040', '#4a3a30', '#c04030', '#1a1a2a'],
+  shanghai_formal: ['#1a1a28', '#3a3a48', '#e8e0d0', '#2a2a38'],
+  shanghai_youth: ['#ff4080', '#40a0ff', '#40e040', '#202020'],
+  // Tokyo-themed
+  tokyo_casual: ['#212121', '#37474F', '#455A64', '#546E7A', '#263238'],
+  tokyo_formal: ['#1a1a1a', '#2a3040', '#3a3a40', '#e0e0e0'],
+  tokyo_youth: ['#ff4080', '#00bcd4', '#ff9800', '#9c27b0', '#212121'],
+};
+
+// Theme → outfit pools
+const THEME_OUTFITS: Record<ThemeId, string[]> = {
+  classic: ['overcoat', 'casual00s', 'suit00s', 'hoodie', 'tourist', 'tech', 'athleisure', 'casual25', 'denim'],
+  shanghai: ['shanghai_casual', 'shanghai_formal', 'shanghai_youth', 'tech', 'athleisure', 'casual25'],
+  tokyo: ['tokyo_casual', 'tokyo_formal', 'tokyo_youth', 'tech', 'casual25', 'softsuit'],
+};
+
+// ---- Pedestrian data ----
 
 interface PedestrianData {
   group: THREE.Group;
-  target: THREE.Vector3;
   startPos: THREE.Vector3;
+  target: THREE.Vector3;
   speed: number;
-  t: number; // lerp progress 0→1
-  direction: number; // 0=forward, 1=backward (returns to start)
+  t: number;
+  direction: number; // 0=forward, 1=backward
   walkPhase: number;
   paired: boolean;
   pairOffset: number;
-  nightTolerance: number; // 0-1, hides when nightFactor > this value
+  nightTolerance: number;
 }
 
-const THEME_COLORS: Record<ThemeId, string[]> = {
-  classic: ['#E53935', '#1E88E5', '#43A047', '#FB8C00', '#8E24AA', '#00ACC1'],
-  shanghai: ['#D32F2F', '#C62828', '#F57C00', '#388E3C', '#1976D2'],
-  tokyo: ['#212121', '#37474F', '#455A64', '#546E7A', '#263238'],
-};
+// ---- Helpers ----
+
+function skinMat(rng: Rng): THREE.MeshStandardMaterial {
+  const tones = ['#e0b090', '#c09070', '#8a6040', '#5a3a28', '#f0c8a8', '#d0a080'];
+  return new THREE.MeshStandardMaterial({ color: rng.pick(tones), roughness: 0.85, metalness: 0 });
+}
+
+function clothMat(color: string): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0.05 });
+}
+
+function makeHumanoid(outfit: string, theme: ThemeId, seed: string): THREE.Group {
+  const rng = new Rng(seed);
+  const g = new THREE.Group();
+  const colors = OUTFIT_COLORS[outfit] || OUTFIT_COLORS.casual25;
+  const cloth = clothMat(rng.pick(colors));
+  const skin = skinMat(rng);
+  const dark = clothMat('#1a1a1a');
+
+  const torsoH = 0.4;
+  const hipY = 0.4;
+  const shoulderY = 0.42 + torsoH * 0.35;
+  const legLen = 0.4;
+
+  // Legs — pivot from hip (y = hipY)
+  const legLPivot = new THREE.Group();
+  legLPivot.position.set(-0.08, hipY, 0);
+  legLPivot.name = 'legL';
+  const legLMesh = boxMesh(0.1, legLen, 0.12, cloth, 0, -legLen, 0);
+  legLPivot.add(legLMesh);
+  g.add(legLPivot);
+
+  const legRPivot = new THREE.Group();
+  legRPivot.position.set(0.08, hipY, 0);
+  legRPivot.name = 'legR';
+  const legRMesh = boxMesh(0.1, legLen, 0.12, cloth, 0, -legLen, 0);
+  legRPivot.add(legRMesh);
+  g.add(legRPivot);
+
+  // torso
+  g.add(boxMesh(0.28, torsoH, 0.18, cloth, 0, hipY, 0));
+
+  // head
+  g.add(cylMesh(0.1, 0.1, 0.16, skin, 0, hipY + torsoH, 0, 8));
+
+  // Arms — pivot from shoulder (y = shoulderY)
+  const armLen = 0.3;
+  const armLPivot = new THREE.Group();
+  armLPivot.position.set(-0.19, shoulderY, 0);
+  armLPivot.name = 'armL';
+  const armLMesh = boxMesh(0.07, armLen, 0.07, cloth, 0, -armLen, 0);
+  armLPivot.add(armLMesh);
+  g.add(armLPivot);
+
+  const armRPivot = new THREE.Group();
+  armRPivot.position.set(0.19, shoulderY, 0);
+  armRPivot.name = 'armR';
+  const armRMesh = boxMesh(0.07, armLen, 0.07, cloth, 0, -armLen, 0);
+  armRPivot.add(armRMesh);
+  g.add(armRPivot);
+
+  // fedora/hat (classic)
+  if (outfit === 'overcoat' && rng.bool(0.5)) {
+    g.add(cylMesh(0.14, 0.14, 0.06, dark, 0, hipY + torsoH + 0.16, 0, 10));
+    g.add(cylMesh(0.17, 0.17, 0.02, dark, 0, hipY + torsoH + 0.16, 0, 10));
+  }
+
+  // backpack / delivery bag
+  if (outfit === 'delivery' || (outfit === 'athleisure' && rng.bool(0.2))) {
+    g.add(boxMesh(0.2, 0.25, 0.12, clothMat('#e04020'), 0, 0.55, -0.14));
+  }
+
+  // slight size variation
+  const s = rng.f(0.92, 1.08);
+  g.scale.set(s, s, s);
+
+  g.userData.limbs = { legL: legLPivot, legR: legRPivot, armL: armLPivot, armR: armRPivot };
+  g.userData.phase = rng.f(0, Math.PI * 2);
+
+  return g;
+}
 
 export class Pedestrians {
   private scene: THREE.Scene;
@@ -47,155 +171,65 @@ export class Pedestrians {
     this.density = Math.max(0, factor);
   }
 
-  /** Day: show all. Night: hide pedestrians whose tolerance < nightFactor. */
   setNightFactor(nightFactor: number): void {
     for (const ped of this.pedestrians) {
       ped.group.visible = nightFactor <= ped.nightTolerance;
     }
   }
 
-  /** Define sidewalk walk zones (called after CityBuilder generates roads) */
   setWalkZones(zones: { start: THREE.Vector3; end: THREE.Vector3 }[]): void {
     this.walkZones = zones;
     this.spawnInitial();
   }
 
   private spawnInitial(): void {
-    // Clear existing
     this.clear();
-
     if (this.walkZones.length === 0) return;
 
-    const colors = THEME_COLORS[this.theme] || THEME_COLORS.classic;
+    const outfits = THEME_OUTFITS[this.theme] || THEME_OUTFITS.classic;
+    const rng = new Rng(`peds-${this.theme}`);
     const baseCount = Math.floor(this.walkZones.length * 8 * this.density);
 
     for (let i = 0; i < baseCount; i++) {
       const zone = this.walkZones[i % this.walkZones.length];
-      const color = colors[Math.floor(Math.random() * colors.length)];
-      const paired = Math.random() < 0.25;
-      this.createPedestrian(zone, color, paired);
-      if (paired) {
-        // Create a pair
-        this.createPedestrian(zone, colors[Math.floor(Math.random() * colors.length)], false);
-      }
+      const outfit = rng.pick(outfits);
+      const mesh = makeHumanoid(outfit, this.theme, `p-${this.theme}-${i}`);
+
+      const goForward = rng.bool(0.5);
+      const start = zone.start.clone();
+      const end = zone.end.clone();
+      const t = goForward ? rng.next() : 1;
+      const pos = start.clone().lerp(end, t);
+
+      mesh.position.copy(pos);
+      mesh.position.y = 0.15;
+
+      this.group.add(mesh);
+      this.pedestrians.push({
+        group: mesh,
+        startPos: start,
+        target: end,
+        speed: (0.3 + rng.f(0, 0.5)),
+        t,
+        direction: goForward ? 0 : 1,
+        walkPhase: rng.f(0, Math.PI * 2),
+        paired: rng.bool(0.25),
+        pairOffset: rng.j(0.8),
+        nightTolerance: 0.2 + rng.f(0, 0.7),
+      });
     }
-  }
-
-  private createPedestrian(
-    zone: { start: THREE.Vector3; end: THREE.Vector3 },
-    color: string,
-    _paired: boolean,
-  ): void {
-    const group = this.createHumanoid(color);
-    const goForward = Math.random() < 0.5;
-
-    const start = zone.start.clone();
-    const end = zone.end.clone();
-    const t = goForward ? Math.random() : 1; // start mid-path or at far end
-    const pos = start.clone().lerp(end, t);
-
-    group.position.copy(pos);
-    group.position.y = 0.15;
-
-    // Face the walking direction
-    const dir = goForward
-      ? end.clone().sub(start).normalize()
-      : start.clone().sub(end).normalize();
-    group.lookAt(pos.clone().add(dir));
-
-    this.group.add(group);
-    this.pedestrians.push({
-      group,
-      target: end.clone(), // always far end (direction handles reverse)
-      startPos: start.clone(),
-      speed: 0.3 + Math.random() * 0.5,
-      t,
-      direction: goForward ? 0 : 1,
-      walkPhase: Math.random() * Math.PI * 2,
-      paired: Math.random() < 0.25,
-      pairOffset: (Math.random() - 0.5) * 0.8,
-      nightTolerance: 0.25 + Math.random() * 0.65, // 0.25–0.90, higher = stays out later
-    });
-  }
-
-  private createHumanoid(color: string): THREE.Group {
-    const group = new THREE.Group();
-    const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.6 });
-    const headMat = new THREE.MeshStandardMaterial({ color: '#FFDAB9', roughness: 0.5 });
-    const pantsMat = new THREE.MeshStandardMaterial({ color: '#37474F', roughness: 0.7 });
-    const shoeMat = new THREE.MeshStandardMaterial({ color: '#212121', roughness: 0.8 });
-
-    // Body (torso)
-    const bodyGeo = new THREE.CylinderGeometry(0.12, 0.14, 0.4, 8);
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = 0.55;
-    group.add(body);
-
-    // Head
-    const headGeo = new THREE.SphereGeometry(0.1, 8, 8);
-    const head = new THREE.Mesh(headGeo, headMat);
-    head.position.y = 0.85;
-    group.add(head);
-
-    // Legs (animated)
-    for (let s = -1; s <= 1; s += 2) {
-      // Upper leg
-      const upperLegGeo = new THREE.CylinderGeometry(0.05, 0.06, 0.25, 6);
-      const upperLeg = new THREE.Mesh(upperLegGeo, pantsMat);
-      upperLeg.position.set(s * 0.08, 0.25, 0);
-      upperLeg.castShadow = true;
-      upperLeg.name = s === -1 ? 'legL' : 'legR';
-      group.add(upperLeg);
-
-      // Lower leg + shoe
-      const lowerGroup = new THREE.Group();
-      lowerGroup.position.y = -0.25;
-      const lowerLegGeo = new THREE.CylinderGeometry(0.04, 0.05, 0.22, 6);
-      const lowerLeg = new THREE.Mesh(lowerLegGeo, pantsMat);
-      lowerLeg.position.y = -0.11;
-      lowerGroup.add(lowerLeg);
-
-      const shoeGeo = new THREE.BoxGeometry(0.06, 0.05, 0.1);
-      const shoe = new THREE.Mesh(shoeGeo, shoeMat);
-      shoe.position.y = -0.24;
-      shoe.position.z = 0.03;
-      lowerGroup.add(shoe);
-
-      upperLeg.add(lowerGroup);
-    }
-
-    // Arms
-    for (let s = -1; s <= 1; s += 2) {
-      const upperArmGeo = new THREE.CylinderGeometry(0.035, 0.04, 0.3, 6);
-      const upperArm = new THREE.Mesh(upperArmGeo, bodyMat);
-      upperArm.position.set(s * 0.17, 0.65, 0);
-      upperArm.name = s === -1 ? 'armL' : 'armR';
-      group.add(upperArm);
-
-      const lowerGroup = new THREE.Group();
-      lowerGroup.position.y = -0.3;
-      const lowerArmGeo = new THREE.CylinderGeometry(0.03, 0.035, 0.25, 6);
-      const lowerArm = new THREE.Mesh(lowerArmGeo, bodyMat);
-      lowerArm.position.y = -0.125;
-      lowerGroup.add(lowerArm);
-      upperArm.add(lowerGroup);
-    }
-
-    group.scale.setScalar(0.7 + Math.random() * 0.3); // slight height variation
-    return group;
   }
 
   update(dt: number): void {
     for (const ped of this.pedestrians) {
-      // Move along path
       const fromPos = ped.direction === 0 ? ped.startPos : ped.target;
       const toPos = ped.direction === 0 ? ped.target : ped.startPos;
 
-      ped.t += dt * ped.speed / fromPos.distanceTo(toPos);
+      ped.t += dt * ped.speed / Math.max(0.001, fromPos.distanceTo(toPos));
 
       if (ped.t >= 1) {
         ped.t = 0;
-        ped.direction = 1 - ped.direction; // reverse
+        ped.direction = 1 - ped.direction;
       }
 
       const pos = fromPos.clone().lerp(toPos, ped.t);
@@ -205,23 +239,19 @@ export class Pedestrians {
       // Face movement direction
       const dir = toPos.clone().sub(fromPos).normalize();
       if (dir.lengthSq() > 0.001) {
-        const angle = Math.atan2(dir.x, dir.z);
-        ped.group.rotation.y = angle;
+        ped.group.rotation.y = Math.atan2(dir.x, dir.z);
       }
 
-      // Walk animation — swing legs
+      // Walk animation — limb swing (opus5-style)
       ped.walkPhase += dt * ped.speed * 8;
-      const swingAngle = Math.sin(ped.walkPhase) * 0.4;
-
-      const legL = ped.group.getObjectByName('legL');
-      const legR = ped.group.getObjectByName('legR');
-      const armL = ped.group.getObjectByName('armL');
-      const armR = ped.group.getObjectByName('armR');
-
-      if (legL) legL.rotation.x = swingAngle;
-      if (legR) legR.rotation.x = -swingAngle;
-      if (armL) armL.rotation.x = -swingAngle * 0.7;
-      if (armR) armR.rotation.x = swingAngle * 0.7;
+      const swing = Math.sin(ped.walkPhase + ped.group.userData.phase) * 0.45;
+      const { legL, legR, armL, armR } = ped.group.userData.limbs || {};
+      if (legL) {
+        legL.rotation.x = swing;
+        legR.rotation.x = -swing;
+        armL.rotation.x = -swing * 0.7;
+        armR.rotation.x = swing * 0.7;
+      }
     }
   }
 
