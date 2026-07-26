@@ -5,10 +5,10 @@
 import * as THREE from 'three';
 import type { WeatherType } from '@monopoly/shared';
 
-const RAIN_COUNT = 1100;
-const SNOW_COUNT = 550;
-const RAIN_AREA = 80; // coverage area half-size
-const RAIN_HEIGHT = 60;
+const RAIN_COUNT = 5000;
+const SNOW_COUNT = 2500;
+const RAIN_AREA = 100;
+const RAIN_HEIGHT = 70;
 
 export class WeatherEffects {
   private scene: THREE.Scene;
@@ -113,13 +113,13 @@ export class WeatherEffects {
 
   private createRain(): void {
     const positions = new Float32Array(RAIN_COUNT * 3);
-    const velocities = new Float32Array(RAIN_COUNT); // stored in userData for update
+    const velocities = new Float32Array(RAIN_COUNT);
 
     for (let i = 0; i < RAIN_COUNT; i++) {
       positions[i * 3] = (Math.random() - 0.5) * RAIN_AREA * 2;
       positions[i * 3 + 1] = Math.random() * RAIN_HEIGHT;
       positions[i * 3 + 2] = (Math.random() - 0.5) * RAIN_AREA * 2;
-      velocities[i] = 15 + Math.random() * 25; // fall speed
+      velocities[i] = 18 + Math.random() * 30;
     }
 
     const geo = new THREE.BufferGeometry();
@@ -128,9 +128,9 @@ export class WeatherEffects {
 
     const mat = new THREE.PointsMaterial({
       color: '#8899CC',
-      size: 0.15,
+      size: 0.25,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.6,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
@@ -177,12 +177,17 @@ export class WeatherEffects {
   }
 
   update(dt: number): void {
+    const time = Date.now() * 0.001;
+
     // Update rain
     if (this.rainSystem) {
       const positions = (this.rainSystem.geometry.attributes.position as THREE.BufferAttribute).array as Float32Array;
       const velocities = this.rainSystem.geometry.userData.velocities as Float32Array;
       for (let i = 0; i < RAIN_COUNT; i++) {
         positions[i * 3 + 1] -= velocities[i] * dt;
+        // Wind drift
+        positions[i * 3] -= (4 + Math.sin(i * 0.1 + time) * 2) * dt;
+        positions[i * 3 + 2] -= (2 + Math.cos(i * 0.1 + time) * 1) * dt;
         if (positions[i * 3 + 1] < 0) {
           positions[i * 3 + 1] = RAIN_HEIGHT;
           positions[i * 3] = (Math.random() - 0.5) * RAIN_AREA * 2;
@@ -198,8 +203,9 @@ export class WeatherEffects {
       const velocities = this.snowSystem.geometry.userData.velocities as Float32Array;
       for (let i = 0; i < SNOW_COUNT; i++) {
         positions[i * 3 + 1] -= velocities[i] * dt;
-        // Horizontal sway
-        positions[i * 3] += Math.sin(Date.now() * 0.001 + i) * 0.3 * dt;
+        // Gentle swaying
+        positions[i * 3] += Math.sin(time * 2 + i * 0.7) * 0.8 * dt;
+        positions[i * 3 + 2] += Math.cos(time * 1.5 + i * 0.5) * 0.5 * dt;
         if (positions[i * 3 + 1] < 0) {
           positions[i * 3 + 1] = RAIN_HEIGHT;
           positions[i * 3] = (Math.random() - 0.5) * RAIN_AREA * 2;
@@ -209,27 +215,44 @@ export class WeatherEffects {
       this.snowSystem.geometry.attributes.position.needsUpdate = true;
     }
 
+    // Weather lighting — darken sky during rain/snow/storm
+    if (this.currentWeather !== 'clear' && this.currentWeather !== 'fog') {
+      const sun = this.scene.userData.sun as THREE.DirectionalLight;
+      const darken = this.currentWeather === 'storm' ? 0.35 : this.currentWeather === 'rain' ? 0.55 : 0.75;
+      if (sun && sun.intensity > 0.1) {
+        sun.intensity *= darken;
+      }
+      const amb = this.scene.userData.ambient as THREE.AmbientLight;
+      if (amb) {
+        amb.intensity *= this.currentWeather === 'storm' ? 0.5 : 0.75;
+      }
+    }
+
+    // Fog for foggy weather
+    if (this.currentWeather === 'fog' && this.scene.fog instanceof THREE.Fog) {
+      this.scene.fog.near = 8;
+      this.scene.fog.far = 60;
+    }
+
     // Update lightning
     if (this.currentWeather === 'storm' && this.lightningLight) {
       this.lightningCooldown -= dt;
       if (this.lightningCooldown <= 0 && this.lightningLight.intensity < 0.1) {
-        // Strike!
-        this.lightningLight.intensity = 3 + Math.random() * 5;
+        this.lightningLight.intensity = 6 + Math.random() * 8;
         this.lightningLight.position.set(
-          (Math.random() - 0.5) * 100,
+          (Math.random() - 0.5) * 120,
           40 + Math.random() * 30,
-          (Math.random() - 0.5) * 100,
+          (Math.random() - 0.5) * 120,
         );
-        this.lightningTimer = 0.08 + Math.random() * 0.15;
+        this.lightningTimer = 0.08 + Math.random() * 0.12;
       }
       if (this.lightningTimer > 0) {
         this.lightningTimer -= dt;
         if (this.lightningTimer <= 0) {
           this.lightningLight.intensity = 0;
-          this.lightningCooldown = 3 + Math.random() * 7;
+          this.lightningCooldown = 2 + Math.random() * 5;
         } else {
-          // Flicker
-          this.lightningLight.intensity *= 0.7;
+          this.lightningLight.intensity *= 0.6;
         }
       }
     }
