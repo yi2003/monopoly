@@ -30,8 +30,18 @@ app.use(cors({ origin: allowedOrigins }));
 app.get('/health', (_req, res) => res.send('OK'));
 
 // Serve static client files if they exist (production)
-const clientDist = path.resolve('client/dist');
-if (fs.existsSync(clientDist)) {
+const possibleDirs = [
+  path.resolve('client/dist'),
+  path.resolve('dist'),
+  path.resolve('/app/client/dist'),
+];
+let clientDist = '';
+for (const d of possibleDirs) {
+  const testPath = path.join(d, 'index.html');
+  if (fs.existsSync(testPath)) { clientDist = d; break; }
+}
+console.log(`CLIENT_DIST: ${clientDist || 'NOT FOUND, tried: ' + possibleDirs.join(', ')}`);
+if (clientDist) {
   app.use(express.static(clientDist));
   app.get('*', (_req, res, next) => {
     const indexPath = path.join(clientDist, 'index.html');
@@ -432,8 +442,8 @@ app.get('/health', (_req, res) => {
 
 // ---- Start ----
 
-const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, '0.0.0.0', () => {
+const PORT = parseInt(process.env.PORT || '3001', 10);
+httpServer.listen(PORT, () => {
   console.log(`🏠 家庭大富翁 Server running on port ${PORT}`);
   console.log(`   Socket.IO ready for connections`);
 });
