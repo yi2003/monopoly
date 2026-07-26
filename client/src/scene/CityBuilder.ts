@@ -1857,11 +1857,17 @@ function makeFacade(style: FacadeStyle, seed: string, floors: number, rng: Rng, 
 }
 
 function frontMat(map: THREE.CanvasTexture): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ map, roughness: 0.75, metalness: 0.08 });
+  return new THREE.MeshStandardMaterial({
+    map, roughness: 0.75, metalness: 0.08,
+    emissive: new THREE.Color('#ffe8c0'), emissiveIntensity: 0.04,
+  });
 }
 
 function sideMat(map: THREE.CanvasTexture): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ map, roughness: 0.82, metalness: 0.06 });
+  return new THREE.MeshStandardMaterial({
+    map, roughness: 0.82, metalness: 0.06,
+    emissive: new THREE.Color('#ffe8c0'), emissiveIntensity: 0.03,
+  });
 }
 
 function addRoofDetails(
