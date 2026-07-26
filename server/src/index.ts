@@ -4,6 +4,8 @@
 
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents, Player } from '@monopoly/shared';
@@ -23,6 +25,17 @@ const allowedOrigins = [
 
 const app = express();
 app.use(cors({ origin: allowedOrigins }));
+
+// Serve static client files if they exist (production)
+const clientDist = path.resolve('client/dist');
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get('*', (_req, res, next) => {
+    const indexPath = path.join(clientDist, 'index.html');
+    if (fs.existsSync(indexPath)) res.sendFile(indexPath);
+    else next();
+  });
+}
 
 const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
