@@ -4,8 +4,6 @@
 
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents, Player } from '@monopoly/shared';
@@ -14,12 +12,7 @@ import { createRoom, joinRoom, leaveRoom, getRoom, canStartGame } from './GameRo
 import { GameManager } from './GameManager';
 import { generatePlayerId, generateRoomCode } from './utils/random';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const CLIENT_DIST = path.join(__dirname, '../../client/dist');
-
-const PORT = process.env.PORT || 3001;
-const CLIENT_URL = process.env.CLIENT_URL || (PORT === 3001 ? 'http://localhost:3000' : '*');
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 const allowedOrigins = [
   CLIENT_URL,
   'http://localhost:3000',
@@ -30,12 +23,6 @@ const allowedOrigins = [
 
 const app = express();
 app.use(cors({ origin: allowedOrigins }));
-
-// Serve static client files (for production)
-app.use(express.static(CLIENT_DIST));
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(CLIENT_DIST, 'index.html'));
-});
 
 const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
