@@ -43,14 +43,17 @@ The entire city transforms when you switch eras — buildings, vehicles, pedestr
 
 ## 📸 Screenshots
 
-> Press `Win+Shift+S` during gameplay to capture, save to `screenshots/` folder, then uncomment and update paths below.
+### 1945 — POSTWAR
+![1945](./screenshots/1945.png)
 
-<!--
-![1945 POSTWAR](./screenshots/1945.png)
-![1985 NEON DECADE](./screenshots/1985.png)
-![2025 NOW](./screenshots/2025.png)
-![2055 HORIZON](./screenshots/2055.png)
--->
+### 1985 — NEON DECADE
+![1985](./screenshots/1985.png)
+
+### 2025 — NOW
+![2025](./screenshots/2025.png)
+
+### 2055 — HORIZON
+![2055](./screenshots/2055.png)
 
 ## 🚀 Quick Start
 
