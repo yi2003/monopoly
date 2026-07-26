@@ -1049,7 +1049,15 @@ export class CityBuilder {
   }
 
   private buildTokyoLandmarks(): void {
+    const eraId = this.era;
     const cx = 0, cz = 0;
+
+    if (eraId === '2055') {
+      // Futuristic floating crystal pagoda
+      this.buildFuturisticTokyo(cx, cz);
+      return;
+    }
+
     const group = new THREE.Group();
     group.name = 'tokyo_tower';
 
@@ -1130,6 +1138,75 @@ export class CityBuilder {
     this.propGroup.add(group);
     this.nightGlowMaterials.push(redMat, glassMat);
 
+    this.addPagoda(6, -8);
+    this.addPagoda(-6, 8);
+    this.addToriiGate(0, 10);
+  }
+
+  /** 2055: Futuristic floating tower for Tokyo theme */
+  private buildFuturisticTokyo(cx: number, cz: number): void {
+    const group = new THREE.Group();
+    group.name = 'futuristic_tokyo';
+
+    const crystalMat = new THREE.MeshStandardMaterial({
+      color: '#c0ffe0', roughness: 0.1, metalness: 0.3, transparent: true, opacity: 0.7,
+    });
+    const bioMat = new THREE.MeshStandardMaterial({
+      color: '#40ffe0', emissive: '#40ffe0', emissiveIntensity: 0.6, roughness: 0.2,
+    });
+    const ringMat = new THREE.MeshStandardMaterial({
+      color: '#80ffc0', emissive: '#80ffc0', emissiveIntensity: 0.8, roughness: 0.1, transparent: true, opacity: 0.5,
+    });
+
+    const floatH = 2;
+
+    // Central crystal pillar
+    const pillarGeo = new THREE.CylinderGeometry(0.3, 0.8, 20, 12);
+    const pillar = new THREE.Mesh(pillarGeo, crystalMat);
+    pillar.position.y = floatH + 10;
+    group.add(pillar);
+
+    // 4 floating crystal shards orbiting
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2;
+      const r = 2.5;
+      const shardGeo = new THREE.CylinderGeometry(0.05, 0.2, 8 + i * 2, 8);
+      const shard = new THREE.Mesh(shardGeo, crystalMat);
+      shard.position.set(Math.cos(angle) * r, floatH + 5 + i * 2, Math.sin(angle) * r);
+      shard.rotation.z = 0.25;
+      shard.rotation.x = 0.15;
+      group.add(shard);
+    }
+
+    // Biolume rings at different heights
+    for (let r = 0; r < 5; r++) {
+      const ringGeo = new THREE.TorusGeometry(2 + r * 0.3, 0.06, 8, 24);
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.y = floatH + 2 + r * 4;
+      ring.rotation.x = Math.PI / 2 + r * 0.4;
+      group.add(ring);
+    }
+
+    // Top glow orb
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 16), bioMat);
+    orb.position.y = floatH + 21;
+    group.add(orb);
+
+    // Hover disc
+    const discGeo = new THREE.CylinderGeometry(2.5, 3, 0.2, 24);
+    const discMat = new THREE.MeshStandardMaterial({
+      color: '#40ffe0', emissive: '#40ffe0', emissiveIntensity: 0.4, roughness: 0.3, transparent: true, opacity: 0.35,
+    });
+    const disc = new THREE.Mesh(discGeo, discMat);
+    disc.position.y = 0.1;
+    group.add(disc);
+
+    this.nightGlowMaterials.push(bioMat, ringMat, discMat, orb.material as THREE.MeshStandardMaterial);
+
+    group.position.set(cx, 0.15, cz);
+    this.propGroup.add(group);
+
+    // Futuristic pagodas
     this.addPagoda(6, -8);
     this.addPagoda(-6, 8);
     this.addToriiGate(0, 10);
