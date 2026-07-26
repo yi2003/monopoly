@@ -528,6 +528,23 @@ export class CityBuilder {
       this.nightGlowMaterials.push(sfMat);
     }
 
+    // --- Window glow overlay (night only) ---
+    const windowH = H - storeH;
+    if (floors >= 2) {
+      const glowColor = eb.windowWarmth > 0.3 ? '#ffe0a0' : '#a0c8ff';
+      const glowPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(W * 0.92, windowH * 0.9),
+        new THREE.MeshStandardMaterial({
+          color: glowColor, emissive: glowColor, emissiveIntensity: 0.08,
+          roughness: 1, metalness: 0, transparent: true, opacity: 0.15,
+          depthWrite: false,
+        }),
+      );
+      glowPlane.position.set(0, storeH + windowH / 2, D / 2 + 0.02);
+      group.add(glowPlane);
+      this.nightGlowMaterials.push(glowPlane.material as THREE.MeshStandardMaterial);
+    }
+
     // --- Cornice (era-aware) ---
     if (eb.cornice && (facadeStyle === 'brick' || facadeStyle === 'stone')) {
       group.add(boxMesh(W * 1.06, 0.15, D * 1.06, SHARED.dark, 0, H, 0));
@@ -1857,17 +1874,11 @@ function makeFacade(style: FacadeStyle, seed: string, floors: number, rng: Rng, 
 }
 
 function frontMat(map: THREE.CanvasTexture): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
-    map, roughness: 0.75, metalness: 0.08,
-    emissive: new THREE.Color('#ffe8c0'), emissiveIntensity: 0.04,
-  });
+  return new THREE.MeshStandardMaterial({ map, roughness: 0.75, metalness: 0.08 });
 }
 
 function sideMat(map: THREE.CanvasTexture): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
-    map, roughness: 0.82, metalness: 0.06,
-    emissive: new THREE.Color('#ffe8c0'), emissiveIntensity: 0.03,
-  });
+  return new THREE.MeshStandardMaterial({ map, roughness: 0.82, metalness: 0.06 });
 }
 
 function addRoofDetails(
