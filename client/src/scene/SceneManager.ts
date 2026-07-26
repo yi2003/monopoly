@@ -57,6 +57,7 @@ export class SceneManager {
   private prevDayTime = 0.3;
   private prevDiceVal: string | null = null; // "die1,die2" for comparison
   private initialized = false;
+  private initialBuildDone = false;
   private groundMat!: THREE.MeshStandardMaterial;
 
   // Road paths for vehicles (computed from city layout)
@@ -131,20 +132,14 @@ export class SceneManager {
     // Night glow manager
     this.nightGlow = new NightGlow();
 
-    // Procedural city
+    // Procedural city (deferred build — wait for era from game state)
     this.cityBuilder = new CityBuilder(this.scene);
     await preloadModels([...PRELOAD_MODEL_URLS]);
     this.board.plantTrees();
-    this.cityBuilder.build();
-    this.nightGlow.registerAll(this.cityBuilder.nightGlowMaterials);
-    this.nightGlow.autoRegisterFromScene(this.scene);
 
     // Pedestrians & Vehicles
     this.pedestrians = new Pedestrians(this.scene);
     this.vehicles = new Vehicles(this.scene);
-
-    // Compute road paths and walk zones from board + city layout
-    this.computePaths();
 
     // Camera controller
     this.cameraController = new CameraController(this.camera, this.renderer.domElement);
@@ -362,12 +357,48 @@ export class SceneManager {
   // ---- State sync ----
 
   updateState(state: GameState): void {
+    const isFirstState = !this.initialBuildDone;
     this.gameState = state;
     this.board.update(state);
     this.characters.updateState(state);
     this.houses.updateState(state);
     this.effects.updateState(state);
     this.cameraController.setGameState(state);
+
+    // ── Deferred initial build — only after we have the real era ──
+    if (!this.initialBuildDone) {
+      this.initialBuildDone = true;
+      // Set era BEFORE building so everything uses correct era from frame 1
+      this.cityBuilder.setTheme(state.config.theme);
+      this.cityBuilder.setEra(state.config.era);
+      this.pedestrians.setTheme(state.config.theme);
+      this.pedestrians.setEra(state.config.era);
+      this.vehicles.setTheme(state.config.theme);
+      this.vehicles.setEra(state.config.era);
+      this.dayNightCycle.setEra(state.config.era);
+
+      // Build city with real era
+      this.cityBuilder.build();
+      this.nightGlow.registerAll(this.cityBuilder.nightGlowMaterials);
+      this.nightGlow.autoRegisterFromScene(this.scene);
+      this.computePaths();
+      this.cityBuilder.registerColliders(
+        (center, halfSize) => this.roamCollision.addBox(center, halfSize),
+      );
+
+      // Apply era to board and ground
+      const eraDef = getEra(state.config.era);
+      this.post.setGrade(eraDef.palette.grade, true);
+      this.post.setBloomStrength(eraDef.palette.bloom);
+      this.board.setEra(state.config.era);
+      const groundColors: Record<string, string> = {
+        '1945': '#3a4a28', '1985': '#2a3a28', '2025': '#3a7d3a', '2055': '#1a3830',
+      };
+      this.groundMat.color.set(groundColors[state.config.era] || '#3a7d3a');
+      return;
+    }
+
+    // ── Subsequent updates ──
 
     // Sync day/night cycle from server
     if (state.dayTime !== this.prevDayTime) {
@@ -402,15 +433,14 @@ export class SceneManager {
     this.dayNightCycle.setEra(state.config.era);
 
     // Apply era film grade & bloom to post-processing
-    const eraDef = getEra(state.config.era);
-    const isFirstState = !this.gameState;
-    if (eraChanged || isFirstState) {
-      this.post.setGrade(eraDef.palette.grade, isFirstState);
+    if (eraChanged) {
+      const eraDef = getEra(state.config.era);
+      this.post.setGrade(eraDef.palette.grade, false);
       this.post.setBloomStrength(eraDef.palette.bloom);
     }
 
     // Apply era to board base/frame/slabs and ground plane
-    if (eraChanged || isFirstState) {
+    if (eraChanged) {
       this.board.setEra(state.config.era);
       const groundColors: Record<string, string> = {
         '1945': '#3a4a28', '1985': '#2a3a28', '2025': '#3a7d3a', '2055': '#1a3830',
