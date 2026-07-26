@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install"
+buildCommand = "npm install && npm run build -w shared && npm run build -w client"
 
 [deploy]
 startCommand = "npm run start -w server"
