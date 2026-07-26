@@ -43,20 +43,7 @@ The entire city transforms when you switch eras — buildings, vehicles, pedestr
 
 ## 📸 Screenshots
 
-<!-- Add era screenshots here. Suggested: -->
-<!-- 
-### 1945 — POSTWAR
-![1945](./screenshots/1945.png)
-
-### 1985 — NEON DECADE  
-![1985](./screenshots/1985.png)
-
-### 2025 — NOW
-![2025](./screenshots/2025.png)
-
-### 2055 — HORIZON
-![2055](./screenshots/2055.png)
--->
+![Game Screenshot](./screenshots/game-screenshot.png)
 
 ## 🚀 Quick Start
 
