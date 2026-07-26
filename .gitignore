@@ -1,6 +1,7 @@
 node_modules/
-dist/
 .vite/
 *.log
 .DS_Store
 Thumbs.db
+# Exception for pre-built client
+!client/dist/
