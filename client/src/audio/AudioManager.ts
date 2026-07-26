@@ -25,7 +25,7 @@ export class AudioManager {
     try {
       this.ctx = new AudioContext();
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = 0.4;
+      this.masterGain.gain.value = 0.65;
       this.masterGain.connect(this.ctx.destination);
 
       this.ambienceGain = this.ctx.createGain();
@@ -152,7 +152,7 @@ export class AudioManager {
     const now = ctx.currentTime;
 
     const baseFreq = 150;
-    const vol = 0.06;
+    const vol = 0.18;
 
     // Short thud: low frequency burst
     const osc = ctx.createOscillator();
