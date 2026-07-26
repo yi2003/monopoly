@@ -1100,21 +1100,76 @@ export class CityBuilder {
       }
     }
 
-    // ── Horizontal braces connecting legs ──
-    for (let h = 0; h < 10; h++) {
-      const t = (h + 0.5) / 10;
-      const y = 2.3 + t * legH;
-      const hw = baseW + (topW - baseW) * t;
+    // ── Center shaft visible through lattice ──
+    const shaftGeo = new THREE.CylinderGeometry(0.25, 0.5, legH, 8);
+    const shaft = new THREE.Mesh(shaftGeo, new THREE.MeshStandardMaterial({ color: '#424242', roughness: 0.5, metalness: 0.3 }));
+    shaft.position.y = 2.3 + legH / 2;
+    group.add(shaft);
 
-      for (const [x1, z1, x2, z2] of [[-hw, -hw, hw, -hw], [hw, -hw, hw, hw], [hw, hw, -hw, hw], [-hw, hw, -hw, -hw]]) {
-        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
-        const len = Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2);
-        const ang = Math.atan2(x2 - x1, z2 - z1);
-        const geo = new THREE.BoxGeometry(len, 0.15, 0.12);
-        const mesh = new THREE.Mesh(geo, h % 2 === 0 ? redMat : whiteMat);
-        mesh.position.set(mx, y, mz);
-        mesh.rotation.y = ang;
-        group.add(mesh);
+    // ── Lattice: horizontal braces + diagonal crosses between each floor ──
+    const FLOORS = 12;
+    for (let f = 0; f < FLOORS; f++) {
+      const tBot = f / FLOORS;
+      const tTop = (f + 1) / FLOORS;
+      const yBot = 2.3 + tBot * legH;
+      const yTop = 2.3 + tTop * legH;
+      const yMid = (yBot + yTop) / 2;
+      const wBot = baseW + (topW - baseW) * tBot;
+      const wTop = baseW + (topW - baseW) * tTop;
+
+      // Horizontal braces at top and bottom of each bay
+      for (const y of [yBot, yTop]) {
+        const t = (y - 2.3) / legH;
+        const hw = baseW + (topW - baseW) * t;
+        for (const [x1, z1, x2, z2] of [[-hw, -hw, hw, -hw], [hw, -hw, hw, hw], [hw, hw, -hw, hw], [-hw, hw, -hw, -hw]]) {
+          const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
+          const len = Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2);
+          const ang = Math.atan2(x2 - x1, z2 - z1);
+          const geo = new THREE.BoxGeometry(len, 0.12, 0.1);
+          const mesh = new THREE.Mesh(geo, f % 2 === 0 ? redMat : whiteMat);
+          mesh.position.set(mx, y, mz);
+          mesh.rotation.y = ang;
+          group.add(mesh);
+        }
+      }
+
+      // Diagonal X-braces in each bay on all 4 faces
+      for (const [cx1, cz1, cx2, cz2] of [[-1, -1, 1, -1], [1, -1, 1, 1], [1, 1, -1, 1], [-1, 1, -1, -1]]) {
+        const xBot1 = cx1 * wBot, zBot1 = cz1 * wBot;
+        const xBot2 = cx2 * wBot, zBot2 = cz2 * wBot;
+        const xTop1 = cx1 * wTop, zTop1 = cz1 * wTop;
+        const xTop2 = cx2 * wTop, zTop2 = cz2 * wTop;
+
+        // Diagonal 1: bottom-left to top-right
+        const d1 = Math.sqrt((xTop2 - xBot1) ** 2 + (zTop2 - zBot1) ** 2 + (yTop - yBot) ** 2);
+        if (d1 > 0.5) {
+          const md1x = (xBot1 + xTop2) / 2, md1z = (zBot1 + zTop2) / 2;
+          const d1h = Math.sqrt((xTop2 - xBot1) ** 2 + (zTop2 - zBot1) ** 2);
+          const d1angY = Math.atan2(xTop2 - xBot1, zTop2 - zBot1);
+          const d1angX = -Math.atan2(yTop - yBot, d1h);
+          const d1Geo = new THREE.CylinderGeometry(0.05, 0.05, d1, 6);
+          const d1Mesh = new THREE.Mesh(d1Geo, redMat);
+          d1Mesh.position.set(md1x, yMid, md1z);
+          d1Mesh.rotation.z = Math.PI / 2;
+          d1Mesh.rotation.y = d1angY;
+          d1Mesh.rotateX(d1angX);
+          group.add(d1Mesh);
+        }
+        // Diagonal 2: bottom-right to top-left
+        const d2 = Math.sqrt((xTop1 - xBot2) ** 2 + (zTop1 - zBot2) ** 2 + (yTop - yBot) ** 2);
+        if (d2 > 0.5) {
+          const md2x = (xBot2 + xTop1) / 2, md2z = (zBot2 + zTop1) / 2;
+          const d2h = Math.sqrt((xTop1 - xBot2) ** 2 + (zTop1 - zBot2) ** 2);
+          const d2angY = Math.atan2(xTop1 - xBot2, zTop1 - zBot2);
+          const d2angX = -Math.atan2(yTop - yBot, d2h);
+          const d2Geo = new THREE.CylinderGeometry(0.05, 0.05, d2, 6);
+          const d2Mesh = new THREE.Mesh(d2Geo, redMat);
+          d2Mesh.position.set(md2x, yMid, md2z);
+          d2Mesh.rotation.z = Math.PI / 2;
+          d2Mesh.rotation.y = d2angY;
+          d2Mesh.rotateX(d2angX);
+          group.add(d2Mesh);
+        }
       }
     }
 
