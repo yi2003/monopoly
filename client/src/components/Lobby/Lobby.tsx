@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { getSocket } from '../../network/socket';
-import { THEMES, DIFFICULTIES, PLAYER_COLORS, PLAYER_COLOR_NAMES, MAX_PLAYERS } from '@monopoly/shared';
-import type { ThemeId, DifficultyId } from '@monopoly/shared';
+import { THEMES, DIFFICULTIES, PLAYER_COLORS, PLAYER_COLOR_NAMES, MAX_PLAYERS, ERAS, ERA_IDS, ERA_NAMES } from '@monopoly/shared';
+import type { ThemeId, DifficultyId, EraId } from '@monopoly/shared';
 import { useI18n } from '../../i18n/useI18n';
 
 const BOT_COLORS = ['#FB8C00', '#8E24AA', '#00ACC1', '#E91E63', '#FF6F00', '#5C6BC0'];
@@ -22,6 +22,7 @@ export default function Lobby() {
   });
   const [playerColor, setPlayerColor] = useState(PLAYER_COLORS[0]);
   const [theme, setTheme] = useState<ThemeId>('classic');
+  const [era, setEra] = useState<EraId>('2025');
   const [difficulty, setDifficulty] = useState<DifficultyId>('normal');
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState('');
@@ -40,7 +41,7 @@ export default function Lobby() {
     if (!playerName.trim()) { setError(t('lobby.nameRequired')); return; }
     if (playerName.length > 12) { setError(t('lobby.nameTooLong')); return; }
     setError('');
-    socket?.emit('createRoom', { playerName: playerName.trim(), playerColor, theme, difficulty });
+    socket?.emit('createRoom', { playerName: playerName.trim(), playerColor, theme, era, difficulty });
     setScreen('menu');
   };
 
@@ -137,6 +138,23 @@ export default function Lobby() {
                 ))}
               </div>
 
+              <label>⏳ 时代 Era</label>
+              <div className="option-row">
+                {ERA_IDS.map((eraId) => {
+                  const eraDef = ERAS[eraId];
+                  return (
+                    <button
+                      key={eraId}
+                      className={`btn btn-sm ${era === eraId ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => setEra(eraId)}
+                      title={eraDef.tagline}
+                    >
+                      {ERA_NAMES[eraId]}
+                    </button>
+                  );
+                })}
+              </div>
+
               <label>{t('lobby.difficulty')}</label>
               <div className="option-row">
                 {(Object.entries(DIFFICULTIES) as [DifficultyId, any][]).map(([id, d]) => (
@@ -221,7 +239,7 @@ export default function Lobby() {
         <div className="room-header">
           <h1>{t('lobby.roomTitle')}: <span className="room-code">{roomCode}</span></h1>
           <div className="room-config">
-            {localName(THEMES[theme])} · {localName(DIFFICULTIES[difficulty])}
+            {localName(THEMES[theme])} · {ERA_NAMES[era]} · {localName(DIFFICULTIES[difficulty])}
           </div>
         </div>
 

@@ -3,6 +3,9 @@
 // ============================================================
 
 import * as THREE from 'three';
+import type { EraId } from '@monopoly/shared';
+import { getEra } from '@monopoly/shared';
+import type { EraPalette } from '@monopoly/shared';
 
 interface SkyKeyframe {
   t: number; // 0-1 position in cycle
@@ -108,6 +111,7 @@ export class DayNightCycle {
   private ambient: THREE.AmbientLight;
   private hemi: THREE.HemisphereLight;
   private skyDome: THREE.Mesh | null = null;
+  private era: EraId = '2025';
 
   // Current values exposed for other systems
   nightFactor = 0; // 0=day, 1=night
@@ -187,6 +191,10 @@ export class DayNightCycle {
     };
   }
 
+  setEra(era: EraId): void {
+    this.era = era;
+  }
+
   setDayTime(dayTime: number): void {
     this.dayTime = dayTime % 1;
   }
@@ -210,36 +218,60 @@ export class DayNightCycle {
     const localT = range > 0 ? (this.dayTime - a.t) / range : 0;
     const kf = this.lerpKeyframes(a, b, localT);
 
+    // Blend era palette into keyframe colors
+    const eraDef = getEra(this.era);
+    const ep = eraDef.palette;
+    const eraBlend = 0.55; // how strongly the era palette tints the scene
+
+    const eraSkyTop = new THREE.Color(ep.skyZenith);
+    const eraSkyBottom = new THREE.Color(ep.skyHorizon);
+    const eraFog = new THREE.Color(ep.fog);
+    const eraAmbient = new THREE.Color(ep.ambient);
+    const eraSun = new THREE.Color(ep.sunColor);
+    const eraHemiSky = new THREE.Color(ep.hemiSky);
+    const eraHemiGround = new THREE.Color(ep.hemiGround);
+
+    const skyTop = kf.skyTop.clone().lerp(eraSkyTop, eraBlend);
+    const skyBottom = kf.skyBottom.clone().lerp(eraSkyBottom, eraBlend);
+    const fog = kf.fog.clone().lerp(eraFog, eraBlend);
+    const ambientColor = kf.ambientColor.clone().lerp(eraAmbient, eraBlend);
+    const sunColor = kf.sunColor.clone().lerp(eraSun, eraBlend);
+    const hemiSky = kf.hemiSkyColor.clone().lerp(eraHemiSky, eraBlend);
+    const hemiGround = kf.hemiGroundColor.clone().lerp(eraHemiGround, eraBlend);
+
     // Apply to scene
     if (this.scene.background instanceof THREE.Color) {
-      this.scene.background.copy(kf.skyTop);
+      this.scene.background.copy(skyTop);
     }
     if (this.scene.fog instanceof THREE.Fog) {
-      this.scene.fog.color.copy(kf.fog);
-      this.scene.fog.near = kf.fogNear;
-      this.scene.fog.far = kf.fogFar;
+      // Blend era fog more strongly than other channels for "dirty air" effect
+      const fogColor = kf.fog.clone().lerp(eraFog, 0.75);
+      this.scene.fog.color.copy(fogColor);
+      // Era fogDensity pulls fog closer (0.018 = mild 1945 haze, 0.007 = clear 2055 air)
+      const densityMul = 1 - ep.fogDensity * 15;
+      this.scene.fog.near = Math.max(15, kf.fogNear * densityMul);
+      this.scene.fog.far = Math.max(50, kf.fogFar * densityMul);
     }
 
-    this.ambient.intensity = kf.ambientIntensity;
-    this.ambient.color.copy(kf.ambientColor);
+    this.ambient.intensity = kf.ambientIntensity * ep.ambientIntensity / 0.45;
+    this.ambient.color.copy(ambientColor);
 
     this.hemi.intensity = kf.hemiIntensity;
-    this.hemi.color.copy(kf.hemiSkyColor);
-    this.hemi.groundColor.copy(kf.hemiGroundColor);
+    this.hemi.color.copy(hemiSky);
+    this.hemi.groundColor.copy(hemiGround);
 
-    this.sun.intensity = kf.sunIntensity;
-    this.sun.color.copy(kf.sunColor);
+    this.sun.intensity = kf.sunIntensity * ep.sunIntensity;
+    this.sun.color.copy(sunColor);
     this.sun.position.set(50, kf.sunY, 30);
 
     // Update sky dome shader
     if (this.skyDome) {
       const mat = this.skyDome.material as THREE.ShaderMaterial;
-      mat.uniforms.topColor.value.copy(kf.skyTop);
-      mat.uniforms.bottomColor.value.copy(kf.skyBottom);
+      mat.uniforms.topColor.value.copy(skyTop);
+      mat.uniforms.bottomColor.value.copy(skyBottom);
     }
 
     // Compute night factor for other systems (0=day, 1=night)
-    // Night peaks at t=0 and t=1, day peaks at t=0.5
     this.nightFactor = 1 - Math.sin(this.dayTime * Math.PI);
   }
 

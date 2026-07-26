@@ -2,7 +2,7 @@
 // GameRoom — Room lifecycle management
 // ============================================================
 
-import type { Player, GameConfig, ThemeId, DifficultyId } from '@monopoly/shared';
+import type { Player, GameConfig, ThemeId, DifficultyId, EraId } from '@monopoly/shared';
 import { PLAYER_COLORS, MAX_PLAYERS, MIN_PLAYERS_TO_START } from '@monopoly/shared';
 import { generatePlayerId } from './utils/random';
 
@@ -21,6 +21,7 @@ export function createRoom(
   hostName: string,
   hostColor: string,
   theme: ThemeId,
+  era: EraId,
   difficulty: DifficultyId,
 ): RoomState {
   const host: Player = {
@@ -55,6 +56,7 @@ export function createRoom(
     players: [host],
     config: {
       theme,
+      era,
       difficulty,
       maxPlayers: MAX_PLAYERS,
       turnLimit: 0,

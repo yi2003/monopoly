@@ -17,6 +17,7 @@ export type GamePhase =
 
 export type ThemeId = 'classic' | 'shanghai' | 'tokyo';
 export type DifficultyId = 'easy' | 'normal' | 'hard' | 'extreme';
+export type EraId = '1945' | '1985' | '2025' | '2055';
 
 export type TileType =
   | 'property'
@@ -207,6 +208,7 @@ export interface Stock {
 
 export interface GameConfig {
   theme: ThemeId;
+  era: EraId;
   difficulty: DifficultyId;
   maxPlayers: number;
   turnLimit: number; // 0 = unlimited
@@ -299,7 +301,7 @@ export interface GameState {
 // ---- Socket Events (client -> server) ----
 
 export interface ClientToServerEvents {
-  createRoom: (data: { playerName: string; playerColor: string; theme: ThemeId; difficulty: DifficultyId }) => void;
+  createRoom: (data: { playerName: string; playerColor: string; theme: ThemeId; era: EraId; difficulty: DifficultyId }) => void;
   joinRoom: (data: { roomCode: string; playerName: string; playerColor: string; asSpectator?: boolean }) => void;
   leaveRoom: () => void;
   addBot: (data: { name: string; color: string }) => void;

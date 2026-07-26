@@ -4,20 +4,24 @@
 // ============================================================
 
 import * as THREE from 'three';
-import type { ThemeId } from '@monopoly/shared';
+import type { ThemeId, EraId } from '@monopoly/shared';
 import {
   ALL_PROPERTIES,
   TILE_W, TILE_D,
   INNER_BOARD_HALF, OUTER_BOARD_HALF, OUTER_RING_OFFSET,
   getGroundTilePosition, isCornerIndex,
+  ERAS, getEra,
 } from '@monopoly/shared';
+import type { EraDef } from '@monopoly/shared';
 import { Rng } from '../util/rng';
 import { boxGeo, boxMesh, cylMesh } from '../util/geom';
 import {
-  brickFacade, glassFacade, midcenturyFacade,
+  brickFacade, glassFacade, midcenturyFacade, bioFacade,
   storefrontTex,
 } from '../textures/surfaces';
 import type { ShopDef } from '../textures/surfaces';
+import { billboardTex } from '../textures/signs';
+import type { AdDef } from '../textures/signs';
 
 // ---- Configuration ----
 
@@ -210,6 +214,8 @@ export class CityBuilder {
   private roadGroup: THREE.Group;
   private propGroup: THREE.Group;
   private theme: ThemeId = 'classic';
+  private era: EraId = '2025';
+  private hasBuilt = false;
 
   nightGlowMaterials: THREE.MeshStandardMaterial[] = [];
 
@@ -233,6 +239,20 @@ export class CityBuilder {
     this.theme = theme;
   }
 
+  setEra(era: EraId): boolean {
+    if (this.era === era) return false;
+    this.era = era;
+    if (this.hasBuilt) {
+      this.clearAndRebuild();
+      return true; // caller needs to re-register colliders & glow
+    }
+    return false;
+  }
+
+  private getEraDef(): EraDef {
+    return getEra(this.era);
+  }
+
   build(): void {
     this.buildRingRoadSurfaces();
     this.buildInnerRing();
@@ -240,15 +260,49 @@ export class CityBuilder {
     this.buildStreetProps();
     this.buildInnerCityRoads();
     this.buildLandmarks();
+    this.buildSkyline();
+    this.hasBuilt = true;
+  }
+
+  /** Dispose all building/road/prop children and re-build with current era */
+  private clearAndRebuild(): void {
+    const groups = [this.buildingGroup, this.roadGroup, this.propGroup];
+    for (const g of groups) {
+      g.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach(m => m.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      });
+      while (g.children.length > 0) {
+        g.remove(g.children[0]);
+      }
+    }
+    this.nightGlowMaterials = [];
+    this.build();
   }
 
   // ---- Ring Road Surfaces ----
 
   private buildRingRoadSurfaces(): void {
-    const roadMat = new THREE.MeshStandardMaterial({ color: '#3D3D3D', roughness: 0.95 });
+    // Era-responsive road & sidewalk colours
+    const roadColors: Record<string, string> = {
+      '1945': '#2a2a26', '1985': '#2e2e2c', '2025': '#383838', '2055': '#1a2828',
+    };
+    const sidewalkColors: Record<string, string> = {
+      '1945': '#7a7468', '1985': '#8a7e78', '2025': '#c0b8b0', '2055': '#4a6058',
+    };
+    const roadColor = roadColors[this.era] || '#3D3D3D';
+    const sidewalkColor = sidewalkColors[this.era] || '#C8C0B8';
+
+    const roadMat = new THREE.MeshStandardMaterial({ color: roadColor, roughness: 0.95 });
     const laneMat = new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.5, emissive: '#FFD700', emissiveIntensity: 0.1 });
     const curbMat = new THREE.MeshStandardMaterial({ color: '#BDBDBD', roughness: 0.7 });
-    const sidewalkMat = new THREE.MeshStandardMaterial({ color: '#C8C0B8', roughness: 0.85 });
+    const sidewalkMat = new THREE.MeshStandardMaterial({ color: sidewalkColor, roughness: 0.85 });
 
     const roadCenterOffset = TILE_D / 2 + SIDEWALK_WIDTH + BUILDING_SETBACK + 2.0 + ROAD_WIDTH / 2;
     const roadExtend = 50;
@@ -401,22 +455,31 @@ export class CityBuilder {
     const dirX = Math.sin(tileRot);
     const dirZ = Math.cos(tileRot);
 
-    // --- Dimensions (scaled for monopoly board proportions) ---
-    const floors = Math.max(2,
+    const rng = new Rng(`${seed}:bldg`);
+    const eraDef = this.getEraDef();
+    const eb = eraDef.buildings;
+
+    // --- Dimensions (scaled for monopoly board proportions, era-modulated) ---
+    const baseFloors = Math.max(2,
       style.floors[0] + Math.floor(seededRandom(seed + 10) * (style.floors[1] - style.floors[0] + 1)) + btConfig.floorsAdd
     );
+    const floors = Math.max(2, Math.min(
+      eb.maxFloors,
+      Math.round(baseFloors * eb.heightMul)
+    ));
     const floorH = 0.9;
     const storeH = btConfig.groundFloorHeight > 1.0 ? 1.2 : 0.9;
     const H = storeH + (floors - 1) * floorH;
     const W = propJitter(2.4, seed + 20, 0.6) * btConfig.widthMul * 0.96;
     const D = propJitter(2.0, seed + 30, 0.6) * btConfig.depthMul * 0.92;
 
-    const rng = new Rng(`${seed}:bldg`);
-    const eraId = this.theme;
-
     // --- Make facade texture ---
-    const facadeMap = makeFacade(style.facadeStyle, `${seed}-f`, floors, rng, eraId);
-    const sideMap = makeFacade(style.facadeStyle, `${seed}-s`, floors, rng, eraId, true);
+    // Use era style weights to influence facade selection
+    const styleWeight = eb.styles;
+    const facadeStyle = this.pickEraFacadeStyle(style.facadeStyle, styleWeight, rng);
+    const eraOverrides: EraFacadeOverrides = { soot: eb.soot, windowLit: eb.windowLit, windowWarmth: eb.windowWarmth };
+    const facadeMap = makeFacade(facadeStyle, `${seed}-f`, floors, rng, this.era, false, eraOverrides);
+    const sideMap = makeFacade(facadeStyle, `${seed}-s`, floors, rng, this.era, true, eraOverrides);
 
     // --- Main mass: multi-material box ---
     const geo = boxGeo(W, H, D);
@@ -439,11 +502,12 @@ export class CityBuilder {
     const isShop = btConfig.type !== 'residential';
 
     if (isShop) {
-      const shopEntries = SHOP_NAMES[btConfig.type];
-      const shopDef: ShopDef = shopEntries && shopEntries.length > 0
-        ? shopEntries[seed % shopEntries.length]
+      // Prefer era shops, fall back to hardcoded shop names
+      const eraShops = eraDef.shops;
+      const shopDef: ShopDef = (eraShops && eraShops.length > 0)
+        ? eraShops[seed % eraShops.length]
         : { name: btConfig.label.toUpperCase(), kind: btConfig.shopStyle, color: btConfig.accentColor };
-      const sfTex = storefrontTex(shopDef, eraId, `${seed}`);
+      const sfTex = storefrontTex(shopDef, this.era, `${seed}`);
       const sfMat = new THREE.MeshStandardMaterial({
         map: sfTex, roughness: 0.55, metalness: 0.15,
         emissive: new THREE.Color(shopDef.color), emissiveIntensity: 0.08,
@@ -464,36 +528,50 @@ export class CityBuilder {
       this.nightGlowMaterials.push(sfMat);
     }
 
-    // --- Cornice (scaled down) ---
-    if (style.hasCornice && (style.facadeStyle === 'brick' || style.facadeStyle === 'stone')) {
+    // --- Cornice (era-aware) ---
+    if (eb.cornice && (facadeStyle === 'brick' || facadeStyle === 'stone')) {
       group.add(boxMesh(W * 1.06, 0.15, D * 1.06, SHARED.dark, 0, H, 0));
       group.add(boxMesh(W * 1.02, 0.08, D * 1.02, mat('#c8b8a0', 0.7, 0.05), 0, H + 0.12, 0));
     }
 
-    // --- Roof details ---
-    addRoofDetails(group, W, D, H, style, rng, this.nightGlowMaterials);
+    // --- Roof details (era-aware) ---
+    addRoofDetails(group, W, D, H, style, rng, this.nightGlowMaterials, eb);
 
-    // --- Fire escape ---
-    if (style.hasFireEscape && rng.bool(0.7) && style.facadeStyle !== 'glass') {
+    // --- Fire escape (era-aware) ---
+    if (eb.fireEscapes && rng.bool(0.7) && facadeStyle !== 'glass') {
       addFireEscape(group, W, D, H, storeH, floorH, floors, rng);
     }
 
-    // --- Green roof ---
-    if (style.hasGreenRoof && rng.bool(0.55)) {
+    // --- Green roof (more common in future eras) ---
+    const eraYear = eraDef.year;
+    const greenRoofChance = eraYear >= 2025 ? 0.55 : (eraYear >= 1985 ? 0.15 : 0.05);
+    if (rng.bool(greenRoofChance)) {
       const greenery = boxMesh(W * 0.85, 0.15 + rng.f(0, 0.3), D * 0.85, SHARED.green, 0, H, 0);
       group.add(greenery);
     }
 
-    // --- Neon strip accent on glass buildings ---
-    if (style.facadeStyle === 'glass' && floors >= 8) {
-      const col = rng.pick(['#ff40a0', '#40e0ff', '#e0ff40', '#40ffc0']);
+    // --- Neon strip accent on glass buildings (era-aware) ---
+    if (facadeStyle === 'glass' && floors >= (eraYear >= 1985 ? 7 : 10)) {
+      const neonColors = eraYear >= 2025
+        ? ['#ff40a0', '#40e0ff', '#e0ff40', '#40ffc0']
+        : eraYear >= 1985
+          ? ['#ff40a0', '#40e0ff', '#e0ff40', '#e02080']
+          : ['#ffaa40', '#ff6040'];
+      const col = rng.pick(neonColors);
+      const neonIntensity = eraYear === 1985 ? 2.2 : (eraYear >= 2025 ? 1.6 : 1.0);
       const neon = new THREE.Mesh(
         new THREE.BoxGeometry(W * 0.95, 0.05, 0.05),
-        new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 2.2, roughness: 0.3 }),
+        new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: neonIntensity, roughness: 0.3 }),
       );
       neon.position.set(0, storeH + 0.05, D / 2 + 0.03);
       group.add(neon);
       this.nightGlowMaterials.push(neon.material as THREE.MeshStandardMaterial);
+    }
+
+    // --- Billboard / rooftop ad (era-aware) ---
+    if (rng.bool(0.15) && eraDef.ads.length > 0) {
+      const ad = eraDef.ads[seed % eraDef.ads.length];
+      this.addBuildingAd(group, W, D, H, storeH, ad);
     }
 
     // --- Orient so local +Z faces the street ---
@@ -525,6 +603,8 @@ export class CityBuilder {
     this.buildMailboxes();
     this.buildTrashCans();
     this.buildBenches();
+    this.buildTramRails();
+    this.buildEraTrees();
   }
 
   private buildLampPosts(): void {
@@ -545,23 +625,101 @@ export class CityBuilder {
   private createLampPost(tileX: number, tileZ: number, tileRot: number, side: string): void {
     const group = new THREE.Group();
     const offset = side === 'outer' ? -(TILE_D / 2 + SIDEWALK_WIDTH) : (TILE_D / 2 + SIDEWALK_WIDTH);
+    const eraDef = this.getEraDef();
+    const lampStyle = eraDef.street.lampStyle;
+    const eraId = eraDef.id;
 
-    const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 2.2, 8);
-    const poleMat = new THREE.MeshStandardMaterial({ color: '#424242', roughness: 0.3, metalness: 0.5 });
-    const pole = new THREE.Mesh(poleGeo, poleMat);
-    pole.position.y = 1.1;
-    pole.castShadow = true;
-    group.add(pole);
+    // ── Opus5-style lamp geometries per style ──
+    if (lampStyle === 'gas-electric') {
+      // Ornate post with glass housing
+      const poleGeo = new THREE.CylinderGeometry(0.07, 0.1, 2.5, 8);
+      const poleMat = new THREE.MeshStandardMaterial({ color: '#3a3a30', roughness: 0.3, metalness: 0.7 });
+      const pole = new THREE.Mesh(poleGeo, poleMat);
+      pole.position.y = 1.25;
+      pole.castShadow = true;
+      group.add(pole);
 
-    const housingGeo = new THREE.BoxGeometry(0.35, 0.3, 0.25);
-    const housingMat = new THREE.MeshStandardMaterial({
-      color: '#E0E0E0', roughness: 0.3,
-      emissive: '#FFE082', emissiveIntensity: 0.4,
-    });
-    const housing = new THREE.Mesh(housingGeo, housingMat);
-    housing.position.y = 2.3;
-    group.add(housing);
-    this.nightGlowMaterials.push(housingMat);
+      const baseGeo = new THREE.CylinderGeometry(0.12, 0.14, 0.3, 8);
+      group.add(new THREE.Mesh(baseGeo, poleMat)).position.y = 0.15;
+
+      const capGeo = new THREE.BoxGeometry(0.6, 0.12, 0.6);
+      group.add(new THREE.Mesh(capGeo, poleMat)).position.y = 2.55;
+
+      const glassMat = new THREE.MeshStandardMaterial({
+        color: '#ffe0a0', emissive: '#ffe0a0', emissiveIntensity: 1.8,
+        transparent: true, opacity: 0.9, roughness: 0.2,
+      });
+      const glassGeo = new THREE.CylinderGeometry(0.22, 0.18, 0.5, 8);
+      const glass = new THREE.Mesh(glassGeo, glassMat);
+      glass.position.y = 2.8;
+      group.add(glass);
+      this.nightGlowMaterials.push(glassMat);
+    } else if (lampStyle === 'cobra' || lampStyle === 'sodium') {
+      // Curved arm reaching over street
+      const poleGeo = new THREE.CylinderGeometry(0.06, 0.1, 2.8, 8);
+      const poleMat = new THREE.MeshStandardMaterial({ color: '#5a6a70', roughness: 0.3, metalness: 0.7 });
+      const pole = new THREE.Mesh(poleGeo, poleMat);
+      pole.position.y = 1.4;
+      pole.castShadow = true;
+      group.add(pole);
+
+      const armGeo = new THREE.BoxGeometry(1.8, 0.06, 0.06);
+      const arm = new THREE.Mesh(armGeo, poleMat);
+      arm.position.set(0.8, 2.8, 0);
+      group.add(arm);
+
+      const col = lampStyle === 'sodium' ? '#ffaa40' : '#e8f0ff';
+      const headMat = new THREE.MeshStandardMaterial({
+        color: col, emissive: col, emissiveIntensity: 1.5, roughness: 0.3,
+      });
+      const headGeo = new THREE.BoxGeometry(0.5, 0.15, 0.3);
+      const head = new THREE.Mesh(headGeo, headMat);
+      head.position.set(1.6, 2.7, 0);
+      group.add(head);
+      this.nightGlowMaterials.push(headMat);
+    } else if (lampStyle === 'biolume') {
+      // Thin bio-pole with glowing orb
+      const poleGeo = new THREE.CylinderGeometry(0.05, 0.08, 3.5, 8);
+      const bioMat = new THREE.MeshStandardMaterial({
+        color: '#20c8a0', emissive: '#20c8a0', emissiveIntensity: 0.6, roughness: 0.4,
+      });
+      const pole = new THREE.Mesh(poleGeo, bioMat);
+      pole.position.y = 1.75;
+      group.add(pole);
+      this.nightGlowMaterials.push(bioMat);
+
+      const orbGeo = new THREE.SphereGeometry(0.3, 12, 12);
+      const orbMat = new THREE.MeshStandardMaterial({
+        color: '#80ffe0', emissive: '#40ffe0', emissiveIntensity: 2.2,
+        transparent: true, opacity: 0.85, roughness: 0.2,
+      });
+      const orb = new THREE.Mesh(orbGeo, orbMat);
+      orb.position.y = 3.7;
+      group.add(orb);
+      this.nightGlowMaterials.push(orbMat);
+    } else {
+      // modern / led
+      const poleGeo = new THREE.CylinderGeometry(0.06, 0.09, 2.8, 8);
+      const poleMat = new THREE.MeshStandardMaterial({ color: '#3a4048', roughness: 0.3, metalness: 0.7 });
+      const pole = new THREE.Mesh(poleGeo, poleMat);
+      pole.position.y = 1.4;
+      pole.castShadow = true;
+      group.add(pole);
+
+      const armGeo = new THREE.BoxGeometry(1.5, 0.05, 0.05);
+      const arm = new THREE.Mesh(armGeo, poleMat);
+      arm.position.set(0.6, 2.8, 0);
+      group.add(arm);
+
+      const headMat = new THREE.MeshStandardMaterial({
+        color: '#e8f4ff', emissive: '#c0e0ff', emissiveIntensity: 1.8, roughness: 0.3,
+      });
+      const headGeo = new THREE.BoxGeometry(0.6, 0.1, 0.25);
+      const head = new THREE.Mesh(headGeo, headMat);
+      head.position.set(1.3, 2.75, 0);
+      group.add(head);
+      this.nightGlowMaterials.push(headMat);
+    }
 
     const dirX = Math.sin(tileRot);
     const dirZ = Math.cos(tileRot);
@@ -570,12 +728,14 @@ export class CityBuilder {
   }
 
   private buildFireHydrants(): void {
+    const eraId = this.era;
     for (let i = 0; i < 48; i++) {
       if (i % 5 !== 1) continue;
       const { x, z, isCorner } = getTileBoardPos(i);
       if (isCorner) continue;
+      const hydrantColor = eraId === '2055' ? '#20c8a0' : '#c03020';
       const hydrantGeo = new THREE.CylinderGeometry(0.1, 0.12, 0.5, 8);
-      const hydrantMat = new THREE.MeshStandardMaterial({ color: '#E53935', roughness: 0.4 });
+      const hydrantMat = new THREE.MeshStandardMaterial({ color: hydrantColor, roughness: 0.4 });
       const hydrant = new THREE.Mesh(hydrantGeo, hydrantMat);
       hydrant.position.set(x, 0.25, z + (i % 2 === 0 ? TILE_D / 2 + SIDEWALK_WIDTH - 0.5 : -(TILE_D / 2 + SIDEWALK_WIDTH - 0.5)));
       hydrant.castShadow = true;
@@ -584,12 +744,14 @@ export class CityBuilder {
   }
 
   private buildMailboxes(): void {
+    const eraId = this.era;
     for (let i = 0; i < 48; i++) {
       if (i % 7 !== 3) continue;
       const { x, z, isCorner } = getTileBoardPos(i);
       if (isCorner) continue;
       const boxGeo = new THREE.BoxGeometry(0.25, 0.6, 0.25);
-      const boxMat = new THREE.MeshStandardMaterial({ color: '#1565C0', roughness: 0.4 });
+      const boxColor = eraId === '2055' ? '#1a5a40' : '#1a3a7a';
+      const boxMat = new THREE.MeshStandardMaterial({ color: boxColor, roughness: 0.4 });
       const box = new THREE.Mesh(boxGeo, boxMat);
       box.position.set(x + (i % 2 === 0 ? TILE_D / 2 + SIDEWALK_WIDTH - 0.8 : -(TILE_D / 2 + SIDEWALK_WIDTH - 0.8)), 0.3, z);
       box.castShadow = true;
@@ -598,35 +760,47 @@ export class CityBuilder {
   }
 
   private buildTrashCans(): void {
+    const eraId = this.era;
     for (let i = 0; i < 48; i++) {
       if (i % 6 !== 2) continue;
       const { x, z, isCorner } = getTileBoardPos(i);
       if (isCorner) continue;
-      const canGeo = new THREE.CylinderGeometry(0.18, 0.15, 0.7, 8);
-      const canMat = new THREE.MeshStandardMaterial({ color: '#4CAF50', roughness: 0.5 });
-      const can = new THREE.Mesh(canGeo, canMat);
-      can.position.set(x + (i % 3 === 0 ? TILE_D / 2 + SIDEWALK_WIDTH - 0.5 : -(TILE_D / 2 + SIDEWALK_WIDTH - 0.5)), 0.35, z + 0.5);
+      const px = x + (i % 3 === 0 ? TILE_D / 2 + SIDEWALK_WIDTH - 0.5 : -(TILE_D / 2 + SIDEWALK_WIDTH - 0.5));
+      let can: THREE.Mesh;
+      if (eraId === '2055') {
+        can = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.15, 0.6, 8),
+          new THREE.MeshStandardMaterial({ color: '#20c8a0', roughness: 0.4 }));
+      } else if (eraId === '1945') {
+        can = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.6, 8),
+          new THREE.MeshStandardMaterial({ color: '#2a2a28', roughness: 0.5, metalness: 0.7 }));
+      } else {
+        can = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.15, 0.7, 8),
+          new THREE.MeshStandardMaterial({ color: '#4CAF50', roughness: 0.5 }));
+      }
+      can.position.set(px, 0.35, z + 0.5);
       can.castShadow = true;
-      can.name = 'trashCan';
       this.propGroup.add(can);
     }
   }
 
   private buildBenches(): void {
+    const eraId = this.era;
     for (let i = 0; i < 48; i++) {
       if (i % 8 !== 4) continue;
       const { x, z, rotation, isCorner } = getTileBoardPos(i);
       if (isCorner) continue;
       const grp = new THREE.Group();
       const seatGeo = new THREE.BoxGeometry(1.2, 0.1, 0.4);
-      const seatMat = new THREE.MeshStandardMaterial({ color: '#795548', roughness: 0.5 });
+      const seatColor = eraId === '2055' ? '#20c8a0' : eraId === '1945' ? '#5a3a20' : '#795548';
+      const seatMat = new THREE.MeshStandardMaterial({ color: seatColor, roughness: 0.5 });
       const seat = new THREE.Mesh(seatGeo, seatMat);
       seat.position.y = 0.3;
       seat.castShadow = true;
       grp.add(seat);
       for (let l = -1; l <= 1; l += 2) {
         const legGeo = new THREE.BoxGeometry(0.08, 0.3, 0.35);
-        const legMat = new THREE.MeshStandardMaterial({ color: '#5D4037', roughness: 0.5 });
+        const legColor = eraId === '2055' ? '#1a4030' : '#5D4037';
+        const legMat = new THREE.MeshStandardMaterial({ color: legColor, roughness: 0.5 });
         const leg = new THREE.Mesh(legGeo, legMat);
         leg.position.set(l * 0.5, 0.15, 0);
         leg.castShadow = true;
@@ -1094,6 +1268,146 @@ export class CityBuilder {
     this.propGroup.add(group);
   }
 
+  // ---- Skyline (distant silhouette ring) ----
+
+  private buildSkyline(): void {
+    const eraDef = this.getEraDef();
+    const skylineGroup = new THREE.Group();
+    skylineGroup.name = 'skyline';
+    const rng = new Rng(`skyline-${eraDef.id}`);
+
+    const color = eraDef.id === '2055' ? '#0a2018'
+      : eraDef.id === '1985' ? '#120818'
+      : eraDef.id === '1945' ? '#1a1410'
+      : '#101820';
+
+    const mat = new THREE.MeshStandardMaterial({
+      color,
+      roughness: 1,
+      metalness: 0.05,
+      emissive: eraDef.id === '2055' ? '#104030' : eraDef.id === '1985' ? '#201028' : '#0a1018',
+      emissiveIntensity: eraDef.id === '2055' || eraDef.id === '1985' ? 0.35 : 0.12,
+    });
+
+    const winColor = eraDef.buildings.windowWarmth > 0.4 ? '#ffc070' : '#a0c8ff';
+    const radius = 120;
+    const count = 36;
+    const hMul = eraDef.buildings.heightMul;
+
+    for (let i = 0; i < count; i++) {
+      const ang = (i / count) * Math.PI * 2 + rng.j(0.05);
+      const h = (8 + rng.f(0, 40) * hMul) * rng.f(0.7, 1.2);
+      const w = rng.f(4, 12);
+      const d = rng.f(4, 12);
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(Math.cos(ang) * radius, h / 2, Math.sin(ang) * radius);
+      mesh.rotation.y = -ang + Math.PI;
+      skylineGroup.add(mesh);
+
+      if (rng.bool(0.5)) {
+        const fleck = new THREE.Mesh(
+          new THREE.PlaneGeometry(w * 0.65, h * 0.55),
+          new THREE.MeshStandardMaterial({
+            color: winColor,
+            emissive: winColor,
+            emissiveIntensity: 0.7 + rng.f(0, 0.5),
+            roughness: 0.5,
+            transparent: true,
+            opacity: 0.4 + rng.f(0, 0.35),
+            depthWrite: false,
+          }),
+        );
+        const r = radius - d / 2 - 0.2;
+        fleck.position.set(Math.cos(ang) * r, h * 0.5, Math.sin(ang) * r);
+        fleck.lookAt(new THREE.Vector3(0, h * 0.5, 0));
+        skylineGroup.add(fleck);
+        this.nightGlowMaterials.push(fleck.material as THREE.MeshStandardMaterial);
+      }
+    }
+
+    this.propGroup.add(skylineGroup);
+  }
+
+  // ---- Tram rails (1945 only) ----
+
+  private buildTramRails(): void {
+    if (this.era !== '1945') return;
+    const railMat = new THREE.MeshStandardMaterial({ color: '#3a3a38', roughness: 0.4, metalness: 0.9 });
+    const roadCenterOffset = TILE_D / 2 + SIDEWALK_WIDTH + BUILDING_SETBACK + 2.0 + ROAD_WIDTH / 2;
+    const rings = [{ half: OUTER_BOARD_HALF }];
+
+    for (const ring of rings) {
+      const roadZ = ring.half + roadCenterOffset;
+      for (const dz of [-ROAD_WIDTH * 0.2, ROAD_WIDTH * 0.2]) {
+        // N/S rails
+        const railGeo = new THREE.BoxGeometry(ring.half * 2 + 50, 0.03, 0.06);
+        const rail1 = new THREE.Mesh(railGeo, railMat);
+        rail1.position.set(0, 0.05, -roadZ + dz);
+        this.roadGroup.add(rail1);
+        const rail2 = new THREE.Mesh(railGeo, railMat);
+        rail2.position.set(0, 0.05, roadZ + dz);
+        this.roadGroup.add(rail2);
+        // E/W rails
+        const rail3 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, ring.half * 2 + 50), railMat);
+        rail3.position.set(-roadZ + dz, 0.05, 0);
+        this.roadGroup.add(rail3);
+        const rail4 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, ring.half * 2 + 50), railMat);
+        rail4.position.set(roadZ + dz, 0.05, 0);
+        this.roadGroup.add(rail4);
+      }
+    }
+  }
+
+  // ---- Era trees ----
+
+  private buildEraTrees(): void {
+    const eraDef = this.getEraDef();
+    const treeAge = eraDef.id === '1945' ? 'mature'
+      : eraDef.id === '1985' ? 'sparse'
+      : eraDef.id === '2055' ? 'canopy'
+      : 'young';
+    const rng = new Rng(`trees-${eraDef.id}`);
+
+    for (let i = 0; i < 48; i++) {
+      if (i % 8 !== 2) continue;
+      const { x, z, rotation, isCorner } = getTileBoardPos(i);
+      if (isCorner) continue;
+
+      const density = treeAge === 'sparse' ? 0.4 : 0.85;
+      if (!rng.bool(density)) continue;
+
+      const h = treeAge === 'canopy' ? rng.f(4, 6) : treeAge === 'mature' ? rng.f(3.5, 5) : rng.f(2.5, 3.5);
+      const trunkR = treeAge === 'canopy' ? 0.14 : 0.08;
+      const treeGroup = new THREE.Group();
+
+      const trunkGeo = new THREE.CylinderGeometry(trunkR * 0.7, trunkR, h * 0.5, 6);
+      const trunkMat = new THREE.MeshStandardMaterial({ color: '#5a3a20', roughness: 0.85, metalness: 0.1 });
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+      trunk.position.y = h * 0.25;
+      trunk.castShadow = true;
+      treeGroup.add(trunk);
+
+      const canopyMat = treeAge === 'canopy'
+        ? new THREE.MeshStandardMaterial({ color: '#2a8a50', emissive: '#104020', emissiveIntensity: 0.15, roughness: 0.9 })
+        : new THREE.MeshStandardMaterial({ color: '#1a4a28', roughness: 0.9, metalness: 0.05 });
+
+      const layers = treeAge === 'sparse' ? 1 : treeAge === 'canopy' ? 3 : 2;
+      for (let l = 0; l < layers; l++) {
+        const r = (treeAge === 'canopy' ? 1.4 : 1.0) * (1 - l * 0.15) * rng.f(0.85, 1.1);
+        const foliage = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), canopyMat);
+        foliage.position.set(rng.j(0.15), h * 0.35 + l * 0.5, rng.j(0.15));
+        foliage.scale.y = 0.6;
+        foliage.castShadow = true;
+        treeGroup.add(foliage);
+      }
+
+      const dirX = Math.sin(rotation), dirZ = Math.cos(rotation);
+      const sidewalkOffset = (i < 48 ? 1 : -1) * (TILE_D / 2 + SIDEWALK_WIDTH / 2);
+      treeGroup.position.set(x + dirX * (TILE_D / 2 + SIDEWALK_WIDTH - 1.2), 0, z + dirZ * (TILE_D / 2 + SIDEWALK_WIDTH - 1.2));
+      this.propGroup.add(treeGroup);
+    }
+  }
+
   // ---- Quality mode ----
 
   setQuality(quality: 'performance' | 'balanced'): void {
@@ -1106,6 +1420,54 @@ export class CityBuilder {
         child.visible = true;
       }
     });
+  }
+
+  // ---- Era helpers ----
+
+  /** Pick a facade style blending property group style with era preferences */
+  private pickEraFacadeStyle(baseStyle: FacadeStyle, eraStyles: string[], rng: Rng): FacadeStyle {
+    // Map era style strings to FacadeStyle
+    const styleMap: Record<string, FacadeStyle> = {
+      brick: 'brick', limestone: 'stone', walkup: 'brick',
+      midcentury: 'midcentury', curtain: 'glass', postmodern: 'stone',
+      mirror: 'glass', glass: 'glass', 'brick-reno': 'brick',
+      podium: 'stone', 'mass-timber': 'midcentury', 'reno-green': 'stone',
+      bio: 'glass', crystal: 'glass', habitat: 'stone', spire: 'glass',
+    };
+    // Use era style weights: prefer era styles, fall back to property group style
+    const viable = eraStyles
+      .map(s => styleMap[s])
+      .filter((s): s is FacadeStyle => s !== undefined);
+    if (viable.length > 0 && rng.bool(0.6)) {
+      return rng.pick(viable);
+    }
+    return baseStyle;
+  }
+
+  /** Add a billboard/ad sign on a building */
+  private addBuildingAd(root: THREE.Group, W: number, _D: number, H: number, storeH: number, ad: { text: string; sub: string; style: string; color: string }): void {
+    const adTex = billboardTex(ad as AdDef, this.era, `${ad.text}-${Math.random()}`);
+    const billH = 1.2;
+    const billW = 2.0;
+    const adMat = new THREE.MeshStandardMaterial({
+      map: adTex, roughness: 0.4, metalness: 0.1,
+      emissive: new THREE.Color(ad.color), emissiveIntensity: 0.3,
+    });
+    const adMesh = new THREE.Mesh(new THREE.PlaneGeometry(billW, billH), adMat);
+    // Place on the roof or upper wall
+    const onRoof = Math.random() < 0.5;
+    const yPos = onRoof ? H + billH / 2 : storeH + (H - storeH) * 0.75;
+    adMesh.position.set(0, yPos, _D / 2 + 0.05);
+    root.add(adMesh);
+    this.nightGlowMaterials.push(adMat);
+
+    // Support poles
+    const poleMat = new THREE.MeshStandardMaterial({ color: '#424242', roughness: 0.3, metalness: 0.5 });
+    for (const sx of [-billW * 0.4, billW * 0.4]) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, billH * 0.3, 6), poleMat);
+      pole.position.set(sx, yPos - billH * 0.5, _D / 2 + 0.2);
+      root.add(pole);
+    }
   }
 
   // ---- Collision registration ----
@@ -1147,14 +1509,23 @@ export class CityBuilder {
 // Standalone helper functions — opus5-style building detail generators
 // ====================================================================
 
-function makeFacade(style: FacadeStyle, seed: string, floors: number, rng: Rng, eraId: string, isSide = false): THREE.CanvasTexture {
+interface EraFacadeOverrides {
+  soot: number;
+  windowLit: number;
+  windowWarmth: number;
+}
+
+function makeFacade(style: FacadeStyle, seed: string, floors: number, rng: Rng, eraId: string, isSide = false, eraOverrides?: EraFacadeOverrides): THREE.CanvasTexture {
   const bays = isSide ? rng.i(3, 5) : rng.i(4, 7);
+  const soot = eraOverrides?.soot ?? 0.2;
+  const windowLit = eraOverrides?.windowLit ?? (isSide ? 0.5 : 0.72);
+  const windowWarmth = eraOverrides?.windowWarmth ?? 0.55;
   const opts = {
     floors: Math.max(2, floors - 1),
     bays,
-    soot: 0.2,
-    lit: isSide ? 0.5 : 0.72,
-    warmth: 0.55,
+    soot,
+    lit: isSide ? windowLit * 0.7 : windowLit,
+    warmth: windowWarmth,
     eraId,
   };
   if (style === 'glass') {
@@ -1183,19 +1554,24 @@ function sideMat(map: THREE.CanvasTexture): THREE.MeshStandardMaterial {
 function addRoofDetails(
   root: THREE.Group, W: number, D: number, H: number,
   style: BuildingStyle, rng: Rng, glowMats: THREE.MeshStandardMaterial[],
+  eb?: { antennas: number; waterTower?: boolean; acUnits?: boolean },
 ): void {
   // Parapet / flat roof
   root.add(boxMesh(W * 0.98, 0.12, D * 0.98, SHARED.roof, 0, H, 0));
 
-  // Water tower (on older-style brick buildings) — scaled down
-  if (style.hasWaterTower && rng.bool(0.4)) {
+  const antennaChance = eb ? eb.antennas : 0.55;
+
+  // Water tower (more common in older eras)
+  const waterTowerChance = eb && eb.antennas !== undefined ? (antennaChance > 0.4 ? 0.4 : 0.05) : 0.4;
+  if (style.hasWaterTower && rng.bool(waterTowerChance)) {
     const tw = cylMesh(0.4, 0.4, 0.8, mat('#6a5040', 0.7, 0.2), rng.j(W * 0.2), H + 0.12, rng.j(D * 0.2), 10);
     root.add(tw);
     root.add(cylMesh(0.05, 0.05, 1.0, SHARED.metal, tw.position.x, H + 0.12, tw.position.z - 0.4, 6));
   }
 
-  // HVAC units — scaled down
-  if (style.hasAcUnits) {
+  // HVAC units — more common in modern eras
+  const acChance = eb && eb.antennas !== undefined ? (antennaChance < 0.3 ? 0.7 : 0.4) : 0.5;
+  if (rng.bool(acChance)) {
     const n = rng.i(1, 3);
     for (let i = 0; i < n; i++) {
       root.add(boxMesh(rng.f(0.4, 0.8), rng.f(0.3, 0.6), rng.f(0.4, 0.7), SHARED.metal,
@@ -1203,8 +1579,8 @@ function addRoofDetails(
     }
   }
 
-  // TV antenna — scaled down
-  if (style.hasAntenna && rng.bool(0.55)) {
+  // TV antenna — era-controlled probability
+  if (rng.bool(antennaChance)) {
     const ax = rng.j(W * 0.25), az = rng.j(D * 0.25);
     root.add(boxMesh(0.03, 1.2, 0.03, SHARED.metal, ax, H + 0.12, az));
     root.add(boxMesh(0.8, 0.03, 0.03, SHARED.metal, ax, H + 1.1, az));

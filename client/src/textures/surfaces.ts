@@ -325,19 +325,95 @@ export function storefrontTex(shop: ShopDef, eraId: string, seed: string): THREE
     x.fillRect(w * 0.44, glassY + glassH * 0.22, w * 0.12, glassH * 0.45);
 
     // sign text
-    x.fillStyle = '#f5f0e6';
+    const isNeon = eraId === '1985' || eraId === '2055';
+    const isPostwar = eraId === '1945';
+    x.fillStyle = isNeon ? '#ffffff' : '#f5f0e6';
     x.font = `bold ${Math.floor(h * 0.12)}px "Barlow Condensed", Impact, sans-serif`;
     x.textAlign = 'center';
     x.textBaseline = 'middle';
+    if (isNeon) {
+      x.shadowColor = shop.color;
+      x.shadowBlur = 18;
+    }
     x.fillText(shop.name, w / 2, h * 0.14);
+    x.shadowBlur = 0;
 
     // kind badge
     x.font = `500 ${Math.floor(h * 0.045)}px "JetBrains Mono", monospace`;
     x.fillStyle = 'rgba(255,255,255,0.55)';
     x.fillText(shop.kind.toUpperCase(), w / 2, h * 0.22);
 
+    // Poster clutter in window (1945 & 1985)
+    if (isPostwar || eraId === '1985') {
+      for (let i = 0; i < 3; i++) {
+        x.fillStyle = rng.pick(['#e04030', '#2080c0', '#e0c020', '#40a060']);
+        x.fillRect(rng.f(20, w * 0.35), glassY + rng.f(20, glassH * 0.5), 50, 70);
+      }
+    }
+
+    // Dirt / age on 1945 storefronts
+    if (isPostwar) {
+      splotches(x, w, h, { count: 15, color: 'rgba(20,10,5,0.15)', seed: rng.i(1, 999) });
+    }
+
     grain(x, w, h, 6, rng.i(1, 999));
   }, { aniso: 8 });
+}
+
+/** Era-specific board tile slab texture */
+export function tileSlabTex(eraId: string): THREE.CanvasTexture {
+  return tex(`tileSlab:${eraId}`, 512, 512, (x, w, h) => {
+    const rng = new Rng(`slab-${eraId}`);
+
+    if (eraId === '1945') {
+      // Worn, aged concrete with cracks and stains
+      x.fillStyle = '#b0a498';
+      x.fillRect(0, 0, w, h);
+      noiseLayer(x, w, h, { cells: 10, octaves: 4, alpha: 0.35, seed: rng.i(1, 999), dark: true });
+      splotches(x, w, h, { count: 35, color: 'rgba(40,30,20,0.25)', seed: rng.i(1, 999) });
+      cracks(x, w, h, { count: 10, seed: rng.i(1, 999), color: 'rgba(0,0,0,0.4)', maxLen: 100 });
+      drips(x, w, h, { count: 8, y0: 0, len: 200, color: 'rgba(20,10,5,0.12)', seed: rng.i(1, 999) });
+      grain(x, w, h, 14, rng.i(1, 999));
+    } else if (eraId === '1985') {
+      // Stained concrete with some wear
+      x.fillStyle = '#b8a898';
+      x.fillRect(0, 0, w, h);
+      noiseLayer(x, w, h, { cells: 8, octaves: 3, alpha: 0.28, seed: rng.i(1, 999) });
+      splotches(x, w, h, { count: 25, color: 'rgba(30,20,30,0.2)', seed: rng.i(1, 999) });
+      cracks(x, w, h, { count: 5, seed: rng.i(1, 999), color: 'rgba(0,0,0,0.25)', maxLen: 70 });
+      grain(x, w, h, 8, rng.i(1, 999));
+    } else if (eraId === '2055') {
+      // Clean living surface with subtle biolume grid
+      x.fillStyle = '#b8c8b8';
+      x.fillRect(0, 0, w, h);
+      noiseLayer(x, w, h, { cells: 6, octaves: 2, alpha: 0.1, seed: rng.i(1, 999), dark: false });
+      // Smart grid lines
+      x.strokeStyle = 'rgba(60,200,140,0.12)';
+      x.lineWidth = 1;
+      for (let i = 0; i <= w; i += 32) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, h); x.stroke(); }
+      for (let j = 0; j <= h; j += 32) { x.beginPath(); x.moveTo(0, j); x.lineTo(w, j); x.stroke(); }
+      // Biolume specks
+      for (let i = 0; i < 30; i++) {
+        x.fillStyle = `rgba(80,255,200,${0.03 + rng.f(0, 0.06)})`;
+        x.beginPath();
+        x.arc(rng.f(0, w), rng.f(0, h), rng.f(2, 15), 0, Math.PI * 2);
+        x.fill();
+      }
+      grain(x, w, h, 4, rng.i(1, 999));
+    } else {
+      // 2025: clean modern paver
+      x.fillStyle = '#d0c8c0';
+      x.fillRect(0, 0, w, h);
+      // Subtle paver grid
+      const cell = 64;
+      x.strokeStyle = 'rgba(0,0,0,0.08)';
+      x.lineWidth = 2;
+      for (let i = 0; i <= w; i += cell) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, h); x.stroke(); }
+      for (let j = 0; j <= h; j += cell) { x.beginPath(); x.moveTo(0, j); x.lineTo(w, j); x.stroke(); }
+      noiseLayer(x, w, h, { cells: 6, octaves: 2, alpha: 0.12, seed: rng.i(1, 999), dark: false });
+      grain(x, w, h, 5, rng.i(1, 999));
+    }
+  }, { repeat: [2, 2], aniso: 4 });
 }
 
 export function roadMarkingsCanvas(w: number, h: number, _eraId: string): THREE.CanvasTexture {

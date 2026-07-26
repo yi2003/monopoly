@@ -46,10 +46,10 @@ io.on('connection', (socket) => {
   // ---- Room Management ----
 
   socket.on('createRoom', (data) => {
-    const { playerName, playerColor, theme, difficulty } = data;
+    const { playerName, playerColor, theme, era, difficulty } = data;
     const code = generateRoomCode();
 
-    const room = createRoom(code, playerName, playerColor, theme, difficulty);
+    const room = createRoom(code, playerName, playerColor, theme, era || '2025', difficulty);
     const player = room.players[0];
 
     socket.join(code);

@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import type { GameState, CameraMode, QualityMode, WeatherType } from '@monopoly/shared';
-import { INNER_BOARD_HALF, TILE_D, OUTER_BOARD_HALF, OUTER_RING_OFFSET } from '@monopoly/shared';
+import { INNER_BOARD_HALF, TILE_D, OUTER_BOARD_HALF, OUTER_RING_OFFSET, getEra } from '@monopoly/shared';
 import { CameraController } from '../camera/CameraController';
 import { FirstPersonController } from '../roam/FirstPersonController';
 import { RoamCollision } from '../roam/RoamCollision';
@@ -20,6 +20,7 @@ import { Vehicles } from './Vehicles';
 import { NightGlow } from './NightGlow';
 import { Dice3D } from './Dice3D';
 import { SkyEnvironment } from './SkyEnvironment';
+import { PostProcessing } from './PostProcessing';
 import { preloadModels } from './ModelLoader';
 import { audioManager } from '../audio/AudioManager';
 
@@ -47,6 +48,7 @@ export class SceneManager {
   private nightGlow!: NightGlow;
   private dice3D!: Dice3D;
   private skyEnv!: SkyEnvironment;
+  private post!: PostProcessing;
 
   private gameState: GameState | null = null;
   private qualityMode: QualityMode = 'balanced';
@@ -55,6 +57,7 @@ export class SceneManager {
   private prevDayTime = 0.3;
   private prevDiceVal: string | null = null; // "die1,die2" for comparison
   private initialized = false;
+  private groundMat!: THREE.MeshStandardMaterial;
 
   // Road paths for vehicles (computed from city layout)
   private roadPaths: THREE.Vector3[][] = [];
@@ -76,7 +79,7 @@ export class SceneManager {
     this.renderer.shadowMap.enabled = quality === 'balanced';
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMappingExposure = 1.3;
     this.container.appendChild(this.renderer.domElement);
 
     // Scene
@@ -99,8 +102,8 @@ export class SceneManager {
 
     // Ground plane
     const groundGeo = new THREE.PlaneGeometry(400, 400);
-    const groundMat = new THREE.MeshStandardMaterial({ color: '#3a7d3a', roughness: 0.9 });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
+    this.groundMat = new THREE.MeshStandardMaterial({ color: '#3a7d3a', roughness: 0.9 });
+    const ground = new THREE.Mesh(groundGeo, this.groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.2;
     ground.receiveShadow = true;
@@ -176,6 +179,9 @@ export class SceneManager {
     // Sky environment (sun, moon, stars, clouds, birds)
     this.skyEnv = new SkyEnvironment(this.scene);
 
+    // Post-processing (film grade + bloom)
+    this.post = new PostProcessing(this.renderer, this.scene, this.camera);
+
     // Apply quality mode to city sub-systems
     this.cityBuilder.setQuality(quality);
     this.pedestrians.setDensity(quality === 'performance' ? 0.5 : 1.0);
@@ -189,13 +195,13 @@ export class SceneManager {
   }
 
   private setupLighting(): void {
-    const ambient = new THREE.AmbientLight('#ffffff', 0.4);
+    const ambient = new THREE.AmbientLight('#ffffff', 0.55);
     this.scene.add(ambient);
 
-    const hemi = new THREE.HemisphereLight('#87CEEB', '#3a7d3a', 0.6);
+    const hemi = new THREE.HemisphereLight('#87CEEB', '#3a7d3a', 0.75);
     this.scene.add(hemi);
 
-    const sun = new THREE.DirectionalLight('#ffffff', 1.0);
+    const sun = new THREE.DirectionalLight('#ffffff', 1.2);
     sun.position.set(50, 80, 30);
     sun.castShadow = this.qualityMode === 'balanced';
     if (sun.castShadow) {
@@ -347,7 +353,10 @@ export class SceneManager {
     // 3D dice animation
     this.dice3D.update(dt);
 
-    this.renderer.render(this.scene, this.camera);
+    // Update post-processing (grade transition, grain animation)
+    this.post.update(dt);
+
+    this.post.render();
   }
 
   // ---- State sync ----
@@ -383,10 +392,47 @@ export class SceneManager {
     }
     this.prevDiceVal = diceId;
 
-    // Sync theme for NPC and city visuals
+    // Sync theme and era for NPC and city visuals
     this.cityBuilder.setTheme(state.config.theme);
+    const eraChanged = this.cityBuilder.setEra(state.config.era);
     this.pedestrians.setTheme(state.config.theme);
+    this.pedestrians.setEra(state.config.era);
     this.vehicles.setTheme(state.config.theme);
+    this.vehicles.setEra(state.config.era);
+    this.dayNightCycle.setEra(state.config.era);
+
+    // Apply era film grade & bloom to post-processing
+    const eraDef = getEra(state.config.era);
+    const isFirstState = !this.gameState;
+    if (eraChanged || isFirstState) {
+      this.post.setGrade(eraDef.palette.grade, isFirstState);
+      this.post.setBloomStrength(eraDef.palette.bloom);
+    }
+
+    // Apply era to board base/frame/slabs and ground plane
+    if (eraChanged || isFirstState) {
+      this.board.setEra(state.config.era);
+      const groundColors: Record<string, string> = {
+        '1945': '#3a4a28', '1985': '#2a3a28', '2025': '#3a7d3a', '2055': '#1a3830',
+      };
+      this.groundMat.color.set(groundColors[state.config.era] || '#3a7d3a');
+    }
+
+    // If era triggered a city rebuild, re-register night glow & colliders
+    if (eraChanged) {
+      this.nightGlow.clear();
+      this.nightGlow.registerAll(this.cityBuilder.nightGlowMaterials);
+      this.nightGlow.autoRegisterFromScene(this.scene);
+      this.roamCollision.clear();
+      this.cityBuilder.registerColliders(
+        (center, halfSize) => this.roamCollision.addBox(center, halfSize),
+      );
+      // Rebuild vehicles & pedestrians with new era types
+      if (this.roadPaths.length > 0) {
+        this.vehicles.setRoadPaths(this.roadPaths);
+        this.pedestrians.rebuildWithEra();
+      }
+    }
   }
 
   // ---- Camera & Quality ----
@@ -420,6 +466,7 @@ export class SceneManager {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    this.post.resize(w, h);
   }
 
   getCanvas(): HTMLCanvasElement {
@@ -436,6 +483,7 @@ export class SceneManager {
     this.cityBuilder?.dispose();
     this.dice3D?.dispose();
     this.skyEnv?.dispose();
+    this.post?.dispose();
     this.pedestrians?.dispose();
     this.vehicles?.dispose();
     this.board?.dispose();

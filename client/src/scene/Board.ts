@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type { GameState } from '@monopoly/shared';
 import { getModelClone } from './ModelLoader';
 import { TREE_MODEL_URL } from './CityBuilder';
+import { tileSlabTex } from '../textures/surfaces';
 import {
   GROUP_COLORS, ALL_PROPERTIES, ALL_RAILWAYS, ALL_UTILITIES,
   TILE_W, TILE_D, CORNER_SIZE, INNER_BOARD_HALF, OUTER_BOARD_HALF,
@@ -19,6 +20,16 @@ export class Board {
   private tileMeshes: Map<number, THREE.Group> = new Map();
   private ownerRings: Map<number, THREE.Mesh> = new Map();
 
+  // Materials that change with era
+  private baseMat!: THREE.MeshStandardMaterial;
+  private frameMat!: THREE.MeshStandardMaterial;
+  private innerSlabMaterials: THREE.MeshStandardMaterial[] = [];
+  private outerSlabMaterials: THREE.MeshStandardMaterial[] = [];
+  private goldMaterials: THREE.MeshStandardMaterial[] = []; // trim, pillars, arena ring, etc.
+  private arenaMat!: THREE.MeshStandardMaterial;
+  private slabMeshes: { mesh: THREE.Mesh; isOuter: boolean }[] = [];
+  private currentEra = '2025';
+
   get boardGroup(): THREE.Group { return this.group; }
 
   constructor(scene: THREE.Scene) {
@@ -28,13 +39,67 @@ export class Board {
     this.build();
   }
 
+  setEra(era: string): void {
+    if (this.currentEra === era) return;
+    this.currentEra = era;
+    this.applyEraColors();
+  }
+
+  /** Era-responsive colors for board base, frame, tile slabs, and gold trim */
+  private applyEraColors(): void {
+    const eraColors: Record<string, { base: string; frame: string; innerSlab: string; outerSlab: string; gold: string; goldEmissive: string; arena: string }> = {
+      '1945':   { base: '#3d5a2a', frame: '#4a3028', innerSlab: '#b8a898', outerSlab: '#a09888', gold: '#8a7a3a', goldEmissive: '#4a3a10', arena: '#2a1a10' },
+      '1985':   { base: '#2a4a2a', frame: '#3a2828', innerSlab: '#c0b0a0', outerSlab: '#a89890', gold: '#daa520', goldEmissive: '#8040a0', arena: '#1a1028' },
+      '2025':   { base: '#2E7D32', frame: '#5D4037', innerSlab: '#D7CCC8', outerSlab: '#BDB5A8', gold: '#FFD700', goldEmissive: '#996600', arena: '#3E2723' },
+      '2055':   { base: '#1a3830', frame: '#1a2828', innerSlab: '#c8d8c8', outerSlab: '#b0c8b0', gold: '#80d0c0', goldEmissive: '#206050', arena: '#0a2018' },
+    };
+    const c = eraColors[this.currentEra] || eraColors['2025'];
+
+    this.baseMat.color.set(c.base);
+    this.frameMat.color.set(c.frame);
+    for (const m of this.innerSlabMaterials) m.color.set(c.innerSlab);
+    for (const m of this.outerSlabMaterials) m.color.set(c.outerSlab);
+    for (const m of this.goldMaterials) {
+      m.color.set(c.gold);
+      m.emissive.set(c.goldEmissive);
+    }
+    this.arenaMat.color.set(c.arena);
+
+    // Regenerate slab textures for new era
+    const newTex = tileSlabTex(this.currentEra);
+    for (const sm of this.innerSlabMaterials) {
+      sm.map = newTex;
+      sm.color.set('#ffffff'); // tint through texture only
+      sm.needsUpdate = true;
+    }
+    for (const sm of this.outerSlabMaterials) {
+      sm.map = newTex;
+      sm.color.set('#ffffff');
+      sm.needsUpdate = true;
+    }
+
+    // Shape variations per era
+    for (const { mesh, isOuter } of this.slabMeshes) {
+      if (this.currentEra === '1945') {
+        // Uneven/worn surface: slight random tilt and height
+        mesh.position.y = 0.05 + (Math.sin(mesh.position.x * 3.7) * Math.cos(mesh.position.z * 2.9)) * 0.06;
+        mesh.rotation.x = (Math.sin(mesh.position.z * 5.1)) * 0.015;
+        mesh.rotation.z = (Math.cos(mesh.position.x * 4.3)) * 0.015;
+      } else {
+        mesh.position.y = 0.05;
+        mesh.rotation.x = 0;
+        mesh.rotation.z = 0;
+      }
+    }
+  }
+
   private build(): void {
     const outerExtent = OUTER_BOARD_HALF + 3;
 
-    // Base platform (green base)
+    // Base platform
     const baseGeo = new THREE.BoxGeometry(outerExtent * 2 + 4, 1.5, outerExtent * 2 + 4);
-    const baseMat = new THREE.MeshStandardMaterial({ color: '#2E7D32', roughness: 0.6 });
-    const base = new THREE.Mesh(baseGeo, baseMat);
+    this.baseMat = new THREE.MeshStandardMaterial({ color: '#2E7D32', roughness: 0.6 });
+    const base = new THREE.Mesh(baseGeo, this.baseMat);
     base.position.y = -1.5;
     base.receiveShadow = true;
     base.castShadow = true;
@@ -42,8 +107,8 @@ export class Board {
 
     // Wooden border frame
     const frameGeo = new THREE.BoxGeometry(outerExtent * 2 + 2, 0.6, outerExtent * 2 + 2);
-    const frameMat = new THREE.MeshStandardMaterial({ color: '#5D4037', roughness: 0.4, metalness: 0.1 });
-    const frame = new THREE.Mesh(frameGeo, frameMat);
+    this.frameMat = new THREE.MeshStandardMaterial({ color: '#5D4037', roughness: 0.4, metalness: 0.1 });
+    const frame = new THREE.Mesh(frameGeo, this.frameMat);
     frame.position.y = -0.5;
     frame.receiveShadow = true;
     this.group.add(frame);
@@ -51,14 +116,15 @@ export class Board {
     // Gold trim
     const trimGeo = new THREE.BoxGeometry(outerExtent * 2 + 2.2, 0.1, outerExtent * 2 + 2.2);
     const trimMat = new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.3, metalness: 0.8, emissive: '#996600', emissiveIntensity: 0.3 });
+    this.goldMaterials.push(trimMat);
     const trim = new THREE.Mesh(trimGeo, trimMat);
     trim.position.y = -0.2;
     this.group.add(trim);
 
     // Center dice arena
     const arenaGeo = new THREE.CylinderGeometry(8, 8, 0.3, 48);
-    const arenaMat = new THREE.MeshStandardMaterial({ color: '#3E2723', roughness: 0.5 });
-    const arena = new THREE.Mesh(arenaGeo, arenaMat);
+    this.arenaMat = new THREE.MeshStandardMaterial({ color: '#3E2723', roughness: 0.5 });
+    const arena = new THREE.Mesh(arenaGeo, this.arenaMat);
     arena.position.y = 0.01;
     arena.receiveShadow = true;
     this.group.add(arena);
@@ -66,6 +132,7 @@ export class Board {
     // Gold ring around arena
     const ringGeo = new THREE.TorusGeometry(8.2, 0.3, 16, 48);
     const ringMat = new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.3, metalness: 0.8 });
+    this.goldMaterials.push(ringMat);
     const ring = new THREE.Mesh(ringGeo, ringMat);
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.2;
@@ -91,18 +158,20 @@ export class Board {
     const isCorner = isCornerIndex(index);
     const isOuter = index >= OUTER_RING_OFFSET;
 
-    // Concrete slab
+    // Era-textured slab
     const slabGeo = new THREE.BoxGeometry(
       isCorner ? CORNER_SIZE : TILE_W,
       0.3,
       isCorner ? CORNER_SIZE : TILE_D,
     );
-    const slabColor = isOuter ? '#BDB5A8' : '#D7CCC8';
-    const slabMat = new THREE.MeshStandardMaterial({ color: slabColor, roughness: 0.7 });
+    const slabTex = tileSlabTex(this.currentEra);
+    const slabMat = new THREE.MeshStandardMaterial({ map: slabTex, roughness: 0.75, color: '#ffffff' });
+    (isOuter ? this.outerSlabMaterials : this.innerSlabMaterials).push(slabMat);
     const slab = new THREE.Mesh(slabGeo, slabMat);
     slab.position.y = 0.05;
     slab.receiveShadow = true;
     slab.castShadow = true;
+    this.slabMeshes.push({ mesh: slab, isOuter });
     tileGroup.add(slab);
 
     // Color strip for properties
@@ -127,6 +196,7 @@ export class Board {
     if (ALL_RAILWAYS.some(r => r.index === index)) {
       const markerGeo = new THREE.CylinderGeometry(0.15, 0.2, 0.8, 8);
       const markerMat = new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.3, metalness: 0.7 });
+      this.goldMaterials.push(markerMat);
       const marker = new THREE.Mesh(markerGeo, markerMat);
       marker.position.set(0, 0.5, TILE_D / 2 - 0.6);
       tileGroup.add(marker);
@@ -344,6 +414,7 @@ export class Board {
     if (isCornerIndex(index)) {
       const cornerPillarGeo = new THREE.CylinderGeometry(0.35, 0.4, 1.0, 8);
       const cornerPillarMat = new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.3, metalness: 0.8 });
+      this.goldMaterials.push(cornerPillarMat);
       const pillar = new THREE.Mesh(cornerPillarGeo, cornerPillarMat);
       pillar.position.set(0, 0.6, 0);
       tileGroup.add(pillar);

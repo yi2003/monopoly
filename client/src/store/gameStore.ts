@@ -50,7 +50,7 @@ interface GameStore {
 }
 
 const defaultGameState: GameState = {
-  config: { theme: 'classic', difficulty: 'normal', maxPlayers: 6, turnLimit: 0, roomCode: '' },
+  config: { theme: 'classic', era: '2025', difficulty: 'normal', maxPlayers: 6, turnLimit: 0, roomCode: '' },
   phase: 'lobby',
   round: 0,
   currentPlayerIndex: 0,

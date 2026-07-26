@@ -3,7 +3,9 @@
 // ============================================================
 
 import * as THREE from 'three';
-import type { ThemeId } from '@monopoly/shared';
+import type { ThemeId, EraId } from '@monopoly/shared';
+import { getEra } from '@monopoly/shared';
+import type { EraDef } from '@monopoly/shared';
 import { Rng } from '../util/rng';
 import { boxMesh, cylMesh } from '../util/geom';
 
@@ -77,7 +79,7 @@ function clothMat(color: string): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0.05 });
 }
 
-function makeHumanoid(outfit: string, theme: ThemeId, seed: string): THREE.Group {
+function makeHumanoid(outfit: string, theme: ThemeId, seed: string, eraId: EraId = '2025'): THREE.Group {
   const rng = new Rng(seed);
   const g = new THREE.Group();
   const colors = OUTFIT_COLORS[outfit] || OUTFIT_COLORS.casual25;
@@ -127,15 +129,60 @@ function makeHumanoid(outfit: string, theme: ThemeId, seed: string): THREE.Group
   armRPivot.add(armRMesh);
   g.add(armRPivot);
 
-  // fedora/hat (classic)
-  if (outfit === 'overcoat' && rng.bool(0.5)) {
-    g.add(cylMesh(0.14, 0.14, 0.06, dark, 0, hipY + torsoH + 0.16, 0, 10));
-    g.add(cylMesh(0.17, 0.17, 0.02, dark, 0, hipY + torsoH + 0.16, 0, 10));
+  // --- Era-specific accessories ---
+  const headY = hipY + torsoH + 0.16;
+
+  // 1945: fedoras and hats
+  if (eraId === '1945' && (outfit === 'overcoat' || outfit === 'fedora' || rng.bool(0.4))) {
+    g.add(cylMesh(0.14, 0.14, 0.06, dark, 0, headY, 0, 10));
+    g.add(cylMesh(0.17, 0.17, 0.02, dark, 0, headY, 0, 10));
   }
 
-  // backpack / delivery bag
-  if (outfit === 'delivery' || (outfit === 'athleisure' && rng.bool(0.2))) {
+  // 1985: neon hair and punk accessories
+  if (eraId === '1985' && (outfit === 'punk' || outfit === 'aerobics' || rng.bool(0.15))) {
+    const hairColor = rng.pick(['#ff40a0', '#40e0ff', '#e0ff40', '#101010']);
+    g.add(boxMesh(0.2, 0.15, 0.18, clothMat(hairColor), 0, headY + 0.05, -0.02));
+  }
+
+  // 2025: masks, delivery bags
+  if (eraId === '2025' && (outfit === 'delivery' || (outfit === 'athleisure' && rng.bool(0.3)))) {
     g.add(boxMesh(0.2, 0.25, 0.12, clothMat('#e04020'), 0, 0.55, -0.14));
+  }
+  if (eraId === '2025' && rng.bool(0.2)) {
+    g.add(boxMesh(0.15, 0.06, 0.03, clothMat('#1a1a1a'), 0, headY - 0.02, 0.1));
+  }
+
+  // 2055: all pedestrians have futuristic glow/tech features
+  if (eraId === '2055') {
+    const glowColor = rng.pick(['#40ffe0', '#80ffc0', '#c0e8ff', '#a0d0ff']);
+    // Chest glow strip on everyone
+    g.add(boxMesh(0.22, 0.04, 0.04, new THREE.MeshStandardMaterial({
+      color: glowColor, roughness: 0.3, emissive: glowColor, emissiveIntensity: 0.8,
+    }), 0, hipY + torsoH * 0.6, 0.1));
+    // Visor/head gear
+    if (rng.bool(0.6)) {
+      g.add(boxMesh(0.18, 0.04, 0.04, new THREE.MeshStandardMaterial({
+        color: glowColor, roughness: 0.3, emissive: glowColor, emissiveIntensity: 1.0,
+      }), 0, headY + 0.03, 0.1));
+    }
+    // Shoulder pads / tech armor (some)
+    if (rng.bool(0.3)) {
+      g.add(boxMesh(0.26, 0.06, 0.06, new THREE.MeshStandardMaterial({
+        color: '#c0e8e0', roughness: 0.3, emissive: '#40ffe0', emissiveIntensity: 0.3,
+      }), 0, shoulderY - 0.10, -0.1));
+    }
+    // Hover drone companion (some)
+    if (rng.bool(0.25)) {
+      const drone = new THREE.Mesh(
+        new THREE.SphereGeometry(0.06, 6, 6),
+        new THREE.MeshStandardMaterial({
+          color: glowColor, roughness: 0.2, emissive: glowColor, emissiveIntensity: 1.5,
+        }),
+      );
+      drone.position.set(0, headY + 0.35, rng.j(0.1));
+      drone.name = 'drone';
+      g.add(drone);
+    }
   }
 
   // slight size variation
@@ -153,6 +200,7 @@ export class Pedestrians {
   private group: THREE.Group;
   private pedestrians: PedestrianData[] = [];
   private theme: ThemeId = 'classic';
+  private era: EraId = '2025';
   private density = 1.0;
   private walkZones: { start: THREE.Vector3; end: THREE.Vector3 }[] = [];
 
@@ -165,6 +213,10 @@ export class Pedestrians {
 
   setTheme(theme: ThemeId): void {
     this.theme = theme;
+  }
+
+  setEra(era: EraId): void {
+    this.era = era;
   }
 
   setDensity(factor: number): void {
@@ -182,18 +234,29 @@ export class Pedestrians {
     this.spawnInitial();
   }
 
+  /** Rebuild pedestrians when era changes (walk zones stay the same) */
+  rebuildWithEra(): void {
+    this.spawnInitial();
+  }
+
   private spawnInitial(): void {
     this.clear();
     if (this.walkZones.length === 0) return;
 
-    const outfits = THEME_OUTFITS[this.theme] || THEME_OUTFITS.classic;
-    const rng = new Rng(`peds-${this.theme}`);
-    const baseCount = Math.floor(this.walkZones.length * 8 * this.density);
+    const eraDef = getEra(this.era);
+    const themeOutfits = THEME_OUTFITS[this.theme] || THEME_OUTFITS.classic;
+    // Blend era outfits with theme outfits
+    const eraOutfits = eraDef.people.outfits;
+    const outfits = [...new Set([...eraOutfits, ...themeOutfits])];
+    const rng = new Rng(`peds-${this.theme}-${this.era}`);
+    const eraDensity = eraDef.people.density * this.density;
+    const baseCount = Math.floor(this.walkZones.length * 8 * eraDensity);
 
     for (let i = 0; i < baseCount; i++) {
       const zone = this.walkZones[i % this.walkZones.length];
-      const outfit = rng.pick(outfits);
-      const mesh = makeHumanoid(outfit, this.theme, `p-${this.theme}-${i}`);
+      // Bias toward era outfits
+      const outfit = rng.bool(0.7) ? rng.pick(eraOutfits) : rng.pick(outfits);
+      const mesh = makeHumanoid(outfit, this.theme, `p-${this.theme}-${this.era}-${i}`, this.era);
 
       const goForward = rng.bool(0.5);
       const start = zone.start.clone();
@@ -251,6 +314,13 @@ export class Pedestrians {
         legR.rotation.x = -swing;
         armL.rotation.x = -swing * 0.7;
         armR.rotation.x = swing * 0.7;
+      }
+
+      // Animate drone companions (2055)
+      const drone = ped.group.getObjectByName('drone');
+      if (drone) {
+        drone.position.y += Math.sin(ped.walkPhase * 1.7 + ped.group.userData.phase) * 0.003;
+        drone.rotation.y += dt * 1.5;
       }
     }
   }

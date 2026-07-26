@@ -180,6 +180,9 @@ export class CameraController {
             const pos = getCharacterTilePos(cp.position);
             this.fpsController.setFollowTarget(new THREE.Vector3(pos.x, 0, pos.z));
           }
+        } else {
+          // Bot turn: release follow so camera stays put
+          this.fpsController.clearFollowTarget();
         }
       }
       this.fpsController.update(dt, boardGroup);
@@ -209,7 +212,8 @@ export class CameraController {
     if (!this.gameState) { this.updateOrbit(); return; }
 
     const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
-    if (!currentPlayer || currentPlayer.isBot) { this.updateOrbit(); return; }
+    // Bot turn: don't switch camera — hold at current view
+    if (!currentPlayer || currentPlayer.isBot) return;
 
     // Get character position from the board
     const boardPos = getCharacterTilePos(currentPlayer.position);

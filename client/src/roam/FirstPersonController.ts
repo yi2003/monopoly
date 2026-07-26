@@ -245,6 +245,11 @@ export class FirstPersonController {
     this.followTarget = target.clone();
   }
 
+  clearFollowTarget(): void {
+    this.followTarget = null;
+    this.followYaw = null;
+  }
+
   /** Set target yaw for corner-turn rotation (radians) */
   setFollowYaw(yaw: number): void {
     this.followYaw = yaw;
