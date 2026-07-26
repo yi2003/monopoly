@@ -31,9 +31,9 @@ app.get('/health', (_req, res) => res.send('OK'));
 
 // Serve static client files if they exist (production)
 const possibleDirs = [
-  path.resolve('client/dist'),
+  path.resolve('../client/dist'),  // Railway monorepo: CWD is /app/server
+  path.resolve('client/dist'),    // local dev
   path.resolve('dist'),
-  path.resolve('/app/client/dist'),
 ];
 let clientDist = '';
 for (const d of possibleDirs) {
