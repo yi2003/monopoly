@@ -26,6 +26,9 @@ const allowedOrigins = [
 const app = express();
 app.use(cors({ origin: allowedOrigins }));
 
+// Health check for Railway
+app.get('/health', (_req, res) => res.send('OK'));
+
 // Serve static client files if they exist (production)
 const clientDist = path.resolve('client/dist');
 if (fs.existsSync(clientDist)) {
@@ -430,7 +433,7 @@ app.get('/health', (_req, res) => {
 // ---- Start ----
 
 const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => {
-  console.log(`🏠 家庭大富翁 Server running on http://localhost:${PORT}`);
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`🏠 家庭大富翁 Server running on port ${PORT}`);
   console.log(`   Socket.IO ready for connections`);
 });
