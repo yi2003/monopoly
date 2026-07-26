@@ -67,13 +67,19 @@ export class Dice3D {
   private group: THREE.Group;
   private tableGroup: THREE.Group;
   private die1: DiePhysics;
+  private die2: DiePhysics;
 
   private animating = false;
   private animTime = 0;
   private settling = false;
   private started = false;
+  private spinning = false;
 
   onAnimationDone: (() => void) | null = null;
+  /** Callback when player clicks stop during spinning — returns random dice values */
+  onManualStop: ((die1: number, die2: number) => void) | null = null;
+  /** Whether dice is currently in spinning (click-to-stop) mode */
+  isSpinning(): boolean { return this.spinning; }
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -120,9 +126,11 @@ export class Dice3D {
 
     this.group.add(this.tableGroup);
 
-    // ---- Single Die (center) ----
-    this.die1 = this.createDiePhysics(0, TABLE_Y + 3.5, 0);
+    // ---- Two Dice ----
+    this.die1 = this.createDiePhysics(-1, TABLE_Y + 3.5, -0.5);
+    this.die2 = this.createDiePhysics(1, TABLE_Y + 4.5, 0.5);
     this.group.add(this.die1.group);
+    this.group.add(this.die2.group);
 
     // ---- Lighting ----
     const spotGeo = new THREE.SphereGeometry(0.3, 16, 16);
@@ -252,21 +260,78 @@ export class Dice3D {
 
   // ---- Public API ----
 
-  roll(die1: number, _die2: number): void {
-    // Single die: show die1 face-up at the end
-    this.die1.targetQuat.copy(getTargetQuat(die1));
+  /** Show final result — standard auto-settle animation */
+  roll(die1Val: number, die2Val: number): void {
+    this.spinning = false;
+    this.die1.targetQuat.copy(getTargetQuat(die1Val));
+    this.die2.targetQuat.copy(getTargetQuat(die2Val));
 
-    // Toss from center, slightly random
     const tossX = (Math.random() - 0.5) * 1.0;
     const tossZ = (Math.random() - 0.5) * 1.0;
     const tossY = TABLE_Y + 3.5 + Math.random() * 2;
-    this.resetDie(this.die1, tossX, tossY, tossZ);
+    this.resetDie(this.die1, tossX - 1, tossY, tossZ - 0.3);
+    this.resetDie(this.die2, tossX + 1, tossY + 0.5, tossZ + 0.3);
 
     this.group.visible = true;
     this.animating = true;
     this.settling = false;
     this.animTime = 0;
     this.started = false;
+  }
+
+  /** Start continuous rapid spinning — player clicks to stop */
+  startSpinning(): void {
+    this.spinning = true;
+    this.animating = true;
+    this.settling = false;
+    this.animTime = 0;
+    this.started = false;
+
+    // Place dice on table, give rapid spin
+    this.die1.pos.set(-1, TABLE_Y + HALF, -0.3);
+    this.die1.vel.set(0, 0, 0);
+    this.die1.angVel.set(8, 12, 6);
+    this.die1.quat.random();
+    this.die1.onGround = true;
+
+    this.die2.pos.set(1, TABLE_Y + HALF, 0.3);
+    this.die2.vel.set(0, 0, 0);
+    this.die2.angVel.set(-7, 10, -8);
+    this.die2.quat.random();
+    this.die2.onGround = true;
+
+    this.die1.group.position.copy(this.die1.pos);
+    this.die1.group.quaternion.copy(this.die1.quat);
+    this.die2.group.position.copy(this.die2.pos);
+    this.die2.group.quaternion.copy(this.die2.quat);
+
+    this.group.visible = true;
+  }
+
+  /** Stop spinning and settle to specific values */
+  settleTo(die1Val: number, die2Val: number): void {
+    if (!this.spinning) return;
+    this.spinning = false;
+    this.animating = false;
+
+    this.die1.targetQuat.copy(getTargetQuat(die1Val));
+    this.die2.targetQuat.copy(getTargetQuat(die2Val));
+    this.die1.settleStartQuat.copy(this.die1.quat);
+    this.die2.settleStartQuat.copy(this.die2.quat);
+
+    this.settling = true;
+    this.animating = true;
+    this.animTime = SETTLE_START;
+    this.started = true;
+  }
+
+  /** Player clicked stop — generate random values and settle, then callback */
+  manualStop(): void {
+    if (!this.spinning) return;
+    const d1 = Math.floor(Math.random() * 6) + 1;
+    const d2 = Math.floor(Math.random() * 6) + 1;
+    this.settleTo(d1, d2);
+    this.onManualStop?.(d1, d2);
   }
 
   private resetDie(d: DiePhysics, x: number, y: number, z: number): void {
@@ -292,50 +357,74 @@ export class Dice3D {
   update(dt: number): void {
     if (!this.animating) return;
 
-    // Small startup delay
+    // Continuous spinning mode
+    if (this.spinning) {
+      const spinDt = Math.min(dt, 0.05);
+      this.die1.angVel.set(8 + Math.sin(Date.now() * 0.003) * 3, 12, 6 + Math.cos(Date.now() * 0.004) * 4);
+      this.die2.angVel.set(-7 + Math.cos(Date.now() * 0.003) * 3, 10, -8 + Math.sin(Date.now() * 0.004) * 4);
+
+      for (const d of [this.die1, this.die2]) {
+        const angSpeed = d.angVel.length();
+        if (angSpeed > 0.001) {
+          const axis = d.angVel.clone().normalize();
+          const angle = angSpeed * spinDt;
+          const dq = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+          d.quat.multiply(dq);
+          d.quat.normalize();
+        }
+        d.group.quaternion.copy(d.quat);
+        // Subtle bobbing
+        d.pos.y = TABLE_Y + HALF + Math.sin(Date.now() * 0.01 + (d === this.die1 ? 0 : 1)) * 0.15;
+        d.group.position.copy(d.pos);
+      }
+      return;
+    }
+
+    // Startup delay
     if (!this.started) {
       this.animTime += dt;
-      if (this.animTime < 0.15) return; // brief hold before release
+      if (this.animTime < 0.15) return;
       this.started = true;
     }
 
     this.animTime += dt;
     const progress = Math.min(this.animTime / ANIM_DURATION, 1);
 
-    // Physics step (sub-step for stability)
     const subSteps = 2;
     const subDt = dt / subSteps;
-
     for (let s = 0; s < subSteps; s++) {
       this.stepDie(this.die1, subDt, progress);
+      this.stepDie(this.die2, subDt, progress);
     }
 
-    // Check if settling phase
+    // Settling phase
     if (progress >= SETTLE_START / ANIM_DURATION && !this.settling) {
       this.settling = true;
       this.die1.settleStartQuat.copy(this.die1.quat);
+      this.die2.settleStartQuat.copy(this.die2.quat);
     }
 
-    // Settling: blend to target rotation
     if (this.settling) {
       const settleProgress = (progress - SETTLE_START / ANIM_DURATION) / (1 - SETTLE_START / ANIM_DURATION);
       const t = this.smoothstep(settleProgress);
       this.die1.quat.slerpQuaternions(this.die1.settleStartQuat, this.die1.targetQuat, t);
+      this.die2.quat.slerpQuaternions(this.die2.settleStartQuat, this.die2.targetQuat, t);
       this.die1.pos.y = THREE.MathUtils.lerp(this.die1.pos.y, TABLE_Y + HALF, t * 0.5);
+      this.die2.pos.y = THREE.MathUtils.lerp(this.die2.pos.y, TABLE_Y + HALF, t * 0.5);
     }
 
-    // Apply rotation
     this.die1.group.position.copy(this.die1.pos);
     this.die1.group.quaternion.copy(this.die1.quat);
+    this.die2.group.position.copy(this.die2.pos);
+    this.die2.group.quaternion.copy(this.die2.quat);
 
-    // Done
     if (progress >= 1) {
-      // Snap to exact final position
-      this.die1.pos.set(0, TABLE_Y + HALF, 0);
-      this.die1.quat.copy(this.die1.targetQuat);
-      this.die1.group.position.copy(this.die1.pos);
-      this.die1.group.quaternion.copy(this.die1.quat);
-
+      for (const d of [this.die1, this.die2]) {
+        d.pos.set(d === this.die1 ? -0.5 : 0.5, TABLE_Y + HALF, d === this.die1 ? -0.3 : 0.3);
+        d.quat.copy(d.targetQuat);
+        d.group.position.copy(d.pos);
+        d.group.quaternion.copy(d.quat);
+      }
       setTimeout(() => {
         this.group.visible = false;
         this.animating = false;

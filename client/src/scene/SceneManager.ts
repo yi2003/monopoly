@@ -22,6 +22,7 @@ import { Dice3D } from './Dice3D';
 import { SkyEnvironment } from './SkyEnvironment';
 import { PostProcessing } from './PostProcessing';
 import { preloadModels } from './ModelLoader';
+import { useGameStore } from '../store/gameStore';
 import { audioManager } from '../audio/AudioManager';
 
 export class SceneManager {
@@ -413,12 +414,28 @@ export class SceneManager {
       this.prevWeather = state.weather;
     }
 
-    // Trigger 3D dice roll animation when new dice appear
+    // Trigger 3D dice animation
     const diceId = state.dice !== null
       ? `${state.dice.die1},${state.dice.die2}`
       : null;
+
+    // Start spinning when player enters rolling phase
+    if (state.phase === 'rolling' && !state.diceRolled && !this.dice3D.isSpinning()) {
+      // Only auto-spin for human player's turn
+      const cp = state.players[state.currentPlayerIndex];
+      const playerId = useGameStore.getState().playerId;
+      if (cp && !cp.isBot && cp.id === playerId) {
+        this.dice3D.startSpinning();
+      }
+    }
+
+    // Stop spinning when dice values arrive
     if (diceId !== null && diceId !== this.prevDiceVal) {
-      this.dice3D.roll(state.dice!.die1, state.dice!.die2);
+      if (this.dice3D.isSpinning()) {
+        this.dice3D.settleTo(state.dice!.die1, state.dice!.die2);
+      } else {
+        this.dice3D.roll(state.dice!.die1, state.dice!.die2);
+      }
       audioManager.playDice();
     }
     this.prevDiceVal = diceId;
