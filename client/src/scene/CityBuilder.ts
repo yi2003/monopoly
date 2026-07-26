@@ -1061,82 +1061,126 @@ export class CityBuilder {
     const group = new THREE.Group();
     group.name = 'tokyo_tower';
 
-    const redMat = new THREE.MeshStandardMaterial({ color: '#E65100', roughness: 0.3, metalness: 0.2, emissive: '#E65100', emissiveIntensity: 0.2 });
-    const whiteMat = new THREE.MeshStandardMaterial({ color: '#FAFAFA', roughness: 0.3, metalness: 0.1 });
+    const redMat = new THREE.MeshStandardMaterial({ color: '#E65100', roughness: 0.35, metalness: 0.15, emissive: '#E65100', emissiveIntensity: 0.2 });
+    const whiteMat = new THREE.MeshStandardMaterial({ color: '#FAFAFA', roughness: 0.35, metalness: 0.1 });
+    const baseMat = new THREE.MeshStandardMaterial({ color: '#E0E0E0', roughness: 0.5 });
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: '#87CEEB', roughness: 0.1, metalness: 0.2, emissive: '#87CEEB', emissiveIntensity: 0.35,
+    });
 
-    // Base platform
-    addBox(group, 6, 1.5, 6, new THREE.MeshStandardMaterial({ color: '#BDBDBD', roughness: 0.5 }), 0, 0.75, 0);
+    const legH = 28; // total leg height
+    const baseW = 3.5; // half-width at base
+    const topW = 0.6; // half-width at top
 
-    // 4 corner legs — tapered cylinders going up and inward
-    const legH = 14;
+    // ── Base building (FootTown) ──
+    addBox(group, 9, 2, 9, baseMat, 0, 1, 0);
+    // Entrance arches on all 4 sides
+    for (let side = 0; side < 4; side++) {
+      const angle = (side * Math.PI) / 2;
+      addBox(group, side % 2 === 0 ? 4 : 0.4, 1.2, side % 2 === 0 ? 0.4 : 4, whiteMat,
+        Math.sin(angle) * 2.2, 0.6, Math.cos(angle) * 2.2);
+    }
+    // Base roof
+    addBox(group, 10, 0.3, 10, whiteMat, 0, 2.2, 0);
+
+    // ── 4 main legs with taper ──
     for (let lx = -1; lx <= 1; lx += 2) {
       for (let lz = -1; lz <= 1; lz += 2) {
-        // Bottom of leg
-        const bx = lx * 2.5, bz = lz * 2.5;
-        // Top of leg (tapered inward)
-        const tx = lx * 0.8, tz = lz * 0.8;
-        // Use multiple segments to approximate tapered leg
-        for (let s = 0; s < 6; s++) {
-          const t = s / 5;
-          const y = 1.5 + t * legH;
-          const segH = legH / 6 + 0.2;
-          const rx = bx + (tx - bx) * t;
-          const rz = bz + (tz - bz) * t;
-          const thickness = 0.4 * (1 - t * 0.6);
+        const segments = 14;
+        for (let s = 0; s < segments; s++) {
+          const t = s / (segments - 1);
+          const y = 2.3 + t * legH;
+          const segH = legH / segments + 0.15;
+          const rx = lx * (baseW + (topW - baseW) * t);
+          const rz = lz * (baseW + (topW - baseW) * t);
+          const thk = 0.35 * (1 - t * 0.5);
           const segColor = s % 2 === 0 ? redMat : whiteMat;
-          const segGeo = new THREE.BoxGeometry(thickness, segH, thickness);
-          const seg = new THREE.Mesh(segGeo, segColor);
-          seg.position.set(rx, y + segH / 2, rz);
-          seg.castShadow = true;
-          group.add(seg);
+          addBox(group, thk, segH, thk, segColor, rx, y + segH / 2, rz);
         }
       }
     }
 
-    // Horizontal braces between legs
-    for (let h = 0; h < 5; h++) {
-      const t = (h + 0.5) / 5;
-      const y = 1.5 + t * legH;
-      const w = 2.5 * (1 - t * 0.68); // half-width at this height
-      // 4 sides connecting the legs
-      for (const [x1, z1, x2, z2] of [[-w, -w, w, -w], [w, -w, w, w], [w, w, -w, w], [-w, w, -w, -w]]) {
-        const midX = (x1 + x2) / 2, midZ = (z1 + z2) / 2;
+    // ── Horizontal braces connecting legs ──
+    for (let h = 0; h < 10; h++) {
+      const t = (h + 0.5) / 10;
+      const y = 2.3 + t * legH;
+      const hw = baseW + (topW - baseW) * t;
+
+      for (const [x1, z1, x2, z2] of [[-hw, -hw, hw, -hw], [hw, -hw, hw, hw], [hw, hw, -hw, hw], [-hw, hw, -hw, -hw]]) {
+        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
         const len = Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2);
-        const angle = Math.atan2(x2 - x1, z2 - z1);
-        const braceGeo = new THREE.BoxGeometry(len, 0.2, 0.15);
-        const brace = new THREE.Mesh(braceGeo, h % 2 === 0 ? redMat : whiteMat);
-        brace.position.set(midX, y, midZ);
-        brace.rotation.y = angle;
-        group.add(brace);
+        const ang = Math.atan2(x2 - x1, z2 - z1);
+        const geo = new THREE.BoxGeometry(len, 0.15, 0.12);
+        const mesh = new THREE.Mesh(geo, h % 2 === 0 ? redMat : whiteMat);
+        mesh.position.set(mx, y, mz);
+        mesh.rotation.y = ang;
+        group.add(mesh);
       }
     }
 
-    // Main observation deck
-    addBox(group, 5, 0.8, 5, whiteMat, 0, 9, 0);
-    // Glass band
-    const glassMat = new THREE.MeshStandardMaterial({
-      color: '#87CEEB', roughness: 0.1, metalness: 0.2, emissive: '#87CEEB', emissiveIntensity: 0.3,
-    });
+    // ── Main observation deck (lower, larger) ──
+    const mainDeckY = 2.3 + legH * 0.45;
+    const mainDeckW = 3.8;
+    addBox(group, mainDeckW * 2, 0.8, mainDeckW * 2, whiteMat, 0, mainDeckY, 0);
+    // Glass curtain wall
     for (let side = 0; side < 4; side++) {
       const angle = (side * Math.PI) / 2;
-      const gx = Math.sin(angle) * 2.5;
-      const gz = Math.cos(angle) * 2.5;
-      addBox(group, side % 2 === 0 ? 4.6 : 0.06, 0.6, side % 2 === 0 ? 0.06 : 4.6, glassMat, gx, 9, gz);
+      const gx = Math.sin(angle) * (mainDeckW - 0.2);
+      const gz = Math.cos(angle) * (mainDeckW - 0.2);
+      const glassGeo = side % 2 === 0
+        ? new THREE.BoxGeometry(mainDeckW * 2 - 0.4, 0.6, 0.05)
+        : new THREE.BoxGeometry(0.05, 0.6, mainDeckW * 2 - 0.4);
+      const glass = new THREE.Mesh(glassGeo, glassMat);
+      glass.position.set(gx, mainDeckY, gz);
+      group.add(glass);
     }
 
-    // Upper deck
-    addBox(group, 3, 0.6, 3, redMat, 0, 13, 0);
+    // ── Upper observation deck (smaller) ──
+    const upperDeckY = 2.3 + legH * 0.78;
+    const upperDeckW = 2.0;
+    addBox(group, upperDeckW * 2, 0.5, upperDeckW * 2, redMat, 0, upperDeckY, 0);
+    for (let side = 0; side < 4; side++) {
+      const angle = (side * Math.PI) / 2;
+      const gx = Math.sin(angle) * (upperDeckW - 0.1);
+      const gz = Math.cos(angle) * (upperDeckW - 0.1);
+      const glassGeo = side % 2 === 0
+        ? new THREE.BoxGeometry(upperDeckW * 2 - 0.2, 0.4, 0.04)
+        : new THREE.BoxGeometry(0.04, 0.4, upperDeckW * 2 - 0.2);
+      const glass = new THREE.Mesh(glassGeo, glassMat);
+      glass.position.set(gx, upperDeckY, gz);
+      group.add(glass);
+    }
 
-    // Antenna spire
-    const antGeo = new THREE.CylinderGeometry(0.08, 0.2, 4, 8);
+    // ── Antenna spire ──
+    const antY = 2.3 + legH;
     const antMat = new THREE.MeshStandardMaterial({ color: '#E0E0E0', roughness: 0.2, metalness: 0.9 });
-    const ant = new THREE.Mesh(antGeo, antMat);
-    ant.position.y = 15.5;
-    group.add(ant);
+    // Tapered antenna in sections
+    const antSections = [
+      { rBot: 0.2, rTop: 0.12, h: 2 },
+      { rBot: 0.12, rTop: 0.06, h: 2 },
+      { rBot: 0.06, rTop: 0.03, h: 2 },
+      { rBot: 0.03, rTop: 0.015, h: 2 },
+    ];
+    let ay = antY;
+    for (const sec of antSections) {
+      const geo = new THREE.CylinderGeometry(sec.rTop, sec.rBot, sec.h, 8);
+      const mesh = new THREE.Mesh(geo, antMat);
+      mesh.position.y = ay + sec.h / 2;
+      group.add(mesh);
+      ay += sec.h;
+    }
+
+    // Top beacon
+    const beacon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.15, 8, 8),
+      new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.2, emissive: '#FFD700', emissiveIntensity: 0.8 }),
+    );
+    beacon.position.y = ay + 0.2;
+    group.add(beacon);
 
     group.position.set(cx, 0.15, cz);
     this.propGroup.add(group);
-    this.nightGlowMaterials.push(redMat, glassMat);
+    this.nightGlowMaterials.push(redMat, glassMat, beacon.material as THREE.MeshStandardMaterial);
 
     this.addPagoda(6, -8);
     this.addPagoda(-6, 8);
