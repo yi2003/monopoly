@@ -586,8 +586,8 @@ export class CityBuilder {
       // Hover glow disc beneath building
       const glowGeo = new THREE.CylinderGeometry(W * 0.45, W * 0.55, 0.15, 16);
       const glowMat = new THREE.MeshStandardMaterial({
-        color: '#40ffe0', emissive: '#40ffe0', emissiveIntensity: 2.0,
-        roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.7,
+        color: '#40ffe0', emissive: '#40ffe0', emissiveIntensity: 0.5,
+        roughness: 0.4, metalness: 0.1, transparent: true, opacity: 0.3,
       });
       const glowDisc = new THREE.Mesh(glowGeo, glowMat);
       glowDisc.position.y = -H / 2;
@@ -597,8 +597,8 @@ export class CityBuilder {
       // Support pillars for larger buildings
       if (floors > 10) {
         const pillarMat = new THREE.MeshStandardMaterial({
-          color: '#80ffe0', emissive: '#40ffe0', emissiveIntensity: 0.4,
-          roughness: 0.2, metalness: 0.8,
+          color: '#80ffe0', emissive: '#40ffe0', emissiveIntensity: 0.15,
+          roughness: 0.3, metalness: 0.8,
         });
         for (const [cx, cz] of [[-W * 0.3, -D * 0.3], [W * 0.3, -D * 0.3], [-W * 0.3, D * 0.3], [W * 0.3, D * 0.3]]) {
           const pillarGeo = new THREE.CylinderGeometry(0.15, 0.2, floatHeight, 8);
