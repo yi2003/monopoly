@@ -575,22 +575,55 @@ export class CityBuilder {
     }
 
     // --- Orient so local +Z faces the street ---
-    // tileRot gives the direction the tile faces
     group.rotation.y = tileRot;
-    group.position.set(centerX, 0, centerZ);
 
-    // --- Sidewalk slab ---
-    const swGeo = new THREE.BoxGeometry(W + 0.4, 0.1, SIDEWALK_WIDTH);
-    const swM = new THREE.MeshStandardMaterial({ color: '#BDBDBD', roughness: 0.8 });
-    const sw = new THREE.Mesh(swGeo, swM);
-    sw.position.set(
-      tileX + dirX * sidewalkOffset,
-      0.05,
-      tileZ + dirZ * sidewalkOffset,
-    );
-    sw.rotation.y = tileRot;
-    sw.receiveShadow = true;
-    group.add(sw);
+    // 2055: floating buildings with hover pads
+    const isFuturistic = eraDef.id === '2055';
+    const floatHeight = isFuturistic ? 4 + rng.f(0, 18) * (floors / eb.maxFloors) : 0;
+    group.position.set(centerX, floatHeight, centerZ);
+
+    if (isFuturistic && floatHeight > 0) {
+      // Hover glow disc beneath building
+      const glowGeo = new THREE.CylinderGeometry(W * 0.45, W * 0.55, 0.15, 16);
+      const glowMat = new THREE.MeshStandardMaterial({
+        color: '#40ffe0', emissive: '#40ffe0', emissiveIntensity: 2.0,
+        roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.7,
+      });
+      const glowDisc = new THREE.Mesh(glowGeo, glowMat);
+      glowDisc.position.y = -H / 2;
+      group.add(glowDisc);
+      this.nightGlowMaterials.push(glowMat);
+
+      // Support pillars for larger buildings
+      if (floors > 10) {
+        const pillarMat = new THREE.MeshStandardMaterial({
+          color: '#80ffe0', emissive: '#40ffe0', emissiveIntensity: 0.4,
+          roughness: 0.2, metalness: 0.8,
+        });
+        for (const [cx, cz] of [[-W * 0.3, -D * 0.3], [W * 0.3, -D * 0.3], [-W * 0.3, D * 0.3], [W * 0.3, D * 0.3]]) {
+          const pillarGeo = new THREE.CylinderGeometry(0.15, 0.2, floatHeight, 8);
+          const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+          pillar.position.set(cx, -H / 2 - floatHeight / 2, cz);
+          group.add(pillar);
+        }
+        this.nightGlowMaterials.push(pillarMat);
+      }
+    }
+
+    // --- Sidewalk slab (always on ground, not part of floating group) ---
+    if (!isFuturistic) {
+      const swGeo = new THREE.BoxGeometry(W + 0.4, 0.1, SIDEWALK_WIDTH);
+      const swM = new THREE.MeshStandardMaterial({ color: '#BDBDBD', roughness: 0.8 });
+      const sw = new THREE.Mesh(swGeo, swM);
+      sw.position.set(
+        tileX + dirX * sidewalkOffset,
+        0.05,
+        tileZ + dirZ * sidewalkOffset,
+      );
+      sw.rotation.y = tileRot;
+      sw.receiveShadow = true;
+      group.add(sw);
+    }
 
     this.buildingGroup.add(group);
   }
