@@ -12,7 +12,7 @@ let socket: Socket | null = null;
 export function connectSocket(): Socket {
   if (socket?.connected) return socket;
 
-  const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+  const serverUrl = import.meta.env.VITE_SERVER_URL || window.location.origin;
   socket = io(serverUrl, {
     autoConnect: true,
     reconnection: true,
