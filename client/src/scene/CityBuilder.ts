@@ -1210,92 +1210,191 @@ export class CityBuilder {
   }
 
   private buildClassicLandmarks(): void {
+    const eraDef = this.getEraDef();
+    const eraId = eraDef.id;
     const cx = 0, cz = 0;
+
+    if (eraId === '2055') {
+      this.buildCrystalSpire(cx, cz);
+    } else if (eraId === '1985') {
+      this.buildNeonTower(cx, cz);
+    } else if (eraId === '2025') {
+      this.buildGlassTower(cx, cz);
+    } else {
+      this.buildClockTower(cx, cz);
+    }
+  }
+
+  /** 1945: Classic stone clock tower */
+  private buildClockTower(cx: number, cz: number): void {
     const group = new THREE.Group();
     group.name = 'clock_tower';
 
-    const stoneMat = new THREE.MeshStandardMaterial({ color: '#D2B48C', roughness: 0.5 });
-    const darkStoneMat = new THREE.MeshStandardMaterial({ color: '#A0896E', roughness: 0.5 });
-    const goldMat = new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.2, metalness: 0.8 });
+    const stoneMat = new THREE.MeshStandardMaterial({ color: '#8a7868', roughness: 0.6 });
+    const darkStoneMat = new THREE.MeshStandardMaterial({ color: '#5a4840', roughness: 0.6 });
+    const brassMat = new THREE.MeshStandardMaterial({ color: '#8a7a3a', roughness: 0.3, metalness: 0.7 });
 
-    const baseGeo = new THREE.BoxGeometry(5, 1, 5);
-    const base = new THREE.Mesh(baseGeo, darkStoneMat);
-    base.position.y = 0.5;
-    base.castShadow = true;
-    base.receiveShadow = true;
-    group.add(base);
-
+    addBox(group, 5, 1, 5, darkStoneMat, 0, 0.5, 0);
     for (let s = 0; s < 3; s++) {
-      const stepGeo = new THREE.BoxGeometry(5.5 + s * 1, 0.2, 5.5 + s * 1);
-      const step = new THREE.Mesh(stepGeo, stoneMat);
-      step.position.y = 0.1 + s * 0.2;
-      group.add(step);
+      addBox(group, 5.5 + s * 1, 0.2, 5.5 + s * 1, stoneMat, 0, 0.1 + s * 0.2, 0);
     }
-
-    const towerGeo = new THREE.BoxGeometry(2.5, 8, 2.5);
-    const tower = new THREE.Mesh(towerGeo, stoneMat);
-    tower.position.y = 5;
-    tower.castShadow = true;
-    group.add(tower);
+    addBox(group, 2.5, 8, 2.5, stoneMat, 0, 5, 0);
 
     for (let lx = -1; lx <= 1; lx += 2) {
       for (let lz = -1; lz <= 1; lz += 2) {
-        const pillarGeo = new THREE.CylinderGeometry(0.2, 0.25, 8, 8);
-        const pillar = new THREE.Mesh(pillarGeo, darkStoneMat);
-        pillar.position.set(lx * 1, 5, lz * 1);
-        pillar.castShadow = true;
-        group.add(pillar);
+        addCyl(group, 0.2, 0.25, 8, darkStoneMat, lx * 1, 5, lz * 1);
       }
     }
 
-    const clockSectionGeo = new THREE.BoxGeometry(3.5, 2, 3.5);
-    const clockSection = new THREE.Mesh(clockSectionGeo, darkStoneMat);
-    clockSection.position.y = 9.5;
-    clockSection.castShadow = true;
-    group.add(clockSection);
+    addBox(group, 3.5, 2, 3.5, darkStoneMat, 0, 9.5, 0);
+    addClockFaces(group, brassMat, '#ffffe0', 0.4);
+    addCone(group, 0.6, 2.5, darkStoneMat, 0, 11.75, 0);
+    addSphere(group, 0.2, brassMat, 0, 13.1, 0);
 
-    for (let side = 0; side < 4; side++) {
-      const faceGroup = new THREE.Group();
-      const discGeo = new THREE.CylinderGeometry(0.7, 0.7, 0.05, 24);
-      const disc = new THREE.Mesh(discGeo, new THREE.MeshStandardMaterial({
-        color: '#FFFFF0', roughness: 0.2, emissive: '#FFFFF0', emissiveIntensity: 0.4,
-      }));
-      disc.rotation.x = Math.PI / 2;
-      faceGroup.add(disc);
+    group.position.set(cx, 0.15, cz);
+    this.propGroup.add(group);
+  }
 
-      const hourGeo = new THREE.BoxGeometry(0.06, 0.35, 0.03);
-      const hour = new THREE.Mesh(hourGeo, new THREE.MeshStandardMaterial({ color: '#212121', roughness: 0.3 }));
-      hour.position.y = 0.15;
-      hour.rotation.z = (side * Math.PI) / 2;
-      faceGroup.add(hour);
+  /** 1985: Dark neon clock tower */
+  private buildNeonTower(cx: number, cz: number): void {
+    const group = new THREE.Group();
+    group.name = 'neon_tower';
 
-      const minGeo = new THREE.BoxGeometry(0.04, 0.5, 0.03);
-      const min = new THREE.Mesh(minGeo, new THREE.MeshStandardMaterial({ color: '#424242', roughness: 0.3 }));
-      min.position.y = 0.22;
-      min.rotation.z = (side * Math.PI) / 2 + 0.5;
-      faceGroup.add(min);
+    const darkMat = new THREE.MeshStandardMaterial({ color: '#15151a', roughness: 0.3, metalness: 0.6 });
+    const neonPink = new THREE.MeshStandardMaterial({
+      color: '#ff40a0', emissive: '#ff40a0', emissiveIntensity: 1.5, roughness: 0.2,
+    });
+    const neonCyan = new THREE.MeshStandardMaterial({
+      color: '#40e0ff', emissive: '#40e0ff', emissiveIntensity: 1.5, roughness: 0.2,
+    });
 
-      const dotGeo = new THREE.SphereGeometry(0.08, 8, 8);
-      const dot = new THREE.Mesh(dotGeo, goldMat);
-      faceGroup.add(dot);
+    addBox(group, 4, 1, 4, darkMat, 0, 0.5, 0);
+    addBox(group, 2, 12, 2, darkMat, 0, 7, 0);
 
-      const angle = (side * Math.PI) / 2;
-      faceGroup.position.set(Math.sin(angle) * 1.8, 9.5, Math.cos(angle) * 1.8);
-      faceGroup.rotation.y = angle;
-      group.add(faceGroup);
-      this.nightGlowMaterials.push(disc.material as THREE.MeshStandardMaterial);
+    // Neon strips up the tower
+    for (let y = 1.5; y < 13; y += 2.5) {
+      addBox(group, 2.3, 0.08, 0.08, neonPink, 1.1, y, 0);
+      addBox(group, 2.3, 0.08, 0.08, neonPink, -1.1, y, 0);
+      addBox(group, 0.08, 0.08, 2.3, neonCyan, 0, y, 1.1);
+      addBox(group, 0.08, 0.08, 2.3, neonCyan, 0, y, -1.1);
     }
 
-    const spireGeo = new THREE.ConeGeometry(0.6, 2.5, 8);
-    const spire = new THREE.Mesh(spireGeo, darkStoneMat);
-    spire.position.y = 11.75;
-    spire.castShadow = true;
-    group.add(spire);
+    // Glowing clock section
+    addBox(group, 3.2, 1.8, 3.2, darkMat, 0, 13.2, 0);
+    addClockFaces(group, neonPink, '#ffffff', 1.2);
 
-    const finialGeo = new THREE.SphereGeometry(0.2, 12, 12);
-    const finial = new THREE.Mesh(finialGeo, goldMat);
-    finial.position.y = 13.1;
-    group.add(finial);
+    // Neon crown
+    addCone(group, 0.5, 2.5, darkMat, 0, 15, 0);
+    const topGlow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.25, 8, 8),
+      neonCyan,
+    );
+    topGlow.position.set(0, 16.5, 0);
+    group.add(topGlow);
+
+    this.nightGlowMaterials.push(neonPink, neonCyan, topGlow.material as THREE.MeshStandardMaterial);
+
+    group.position.set(cx, 0.15, cz);
+    this.propGroup.add(group);
+  }
+
+  /** 2025: Modern glass/steel tower */
+  private buildGlassTower(cx: number, cz: number): void {
+    const group = new THREE.Group();
+    group.name = 'glass_tower';
+
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: '#5a8090', roughness: 0.15, metalness: 0.4, transparent: true, opacity: 0.8,
+    });
+    const steelMat = new THREE.MeshStandardMaterial({ color: '#d0d4d8', roughness: 0.25, metalness: 0.9 });
+    const ledMat = new THREE.MeshStandardMaterial({
+      color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.6, roughness: 0.3,
+    });
+
+    addBox(group, 4.5, 0.5, 4.5, steelMat, 0, 0.25, 0);
+    addBox(group, 3, 16, 3, glassMat, 0, 8.5, 0);
+
+    // Steel frame edges
+    for (const [ex, ez] of [[1.4, 1.4], [1.4, -1.4], [-1.4, 1.4], [-1.4, -1.4]]) {
+      addCyl(group, 0.15, 0.15, 16, steelMat, ex, 8.5, ez);
+    }
+
+    // LED display band
+    addBox(group, 3.2, 1.5, 3.2, steelMat, 0, 16.8, 0);
+    addBox(group, 2.2, 1, 0.1, ledMat, 0, 16.8, 1.6);
+    addBox(group, 2.2, 1, 0.1, ledMat, 0, 16.8, -1.6);
+    addBox(group, 0.1, 1, 2.2, ledMat, 1.6, 16.8, 0);
+    addBox(group, 0.1, 1, 2.2, ledMat, -1.6, 16.8, 0);
+
+    // Green roof
+    const greenRoof = new THREE.MeshStandardMaterial({ color: '#2a5a30', roughness: 0.8 });
+    addBox(group, 3.2, 0.4, 3.2, greenRoof, 0, 18, 0);
+
+    this.nightGlowMaterials.push(ledMat);
+
+    group.position.set(cx, 0.15, cz);
+    this.propGroup.add(group);
+  }
+
+  /** 2055: Floating crystal biolume spire */
+  private buildCrystalSpire(cx: number, cz: number): void {
+    const group = new THREE.Group();
+    group.name = 'crystal_spire';
+
+    const crystalMat = new THREE.MeshStandardMaterial({
+      color: '#c0ffe0', roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.7,
+    });
+    const bioMat = new THREE.MeshStandardMaterial({
+      color: '#40ffe0', emissive: '#40ffe0', emissiveIntensity: 0.8, roughness: 0.2,
+    });
+    const bioRing = new THREE.MeshStandardMaterial({
+      color: '#80ffc0', emissive: '#80ffc0', emissiveIntensity: 1.0, roughness: 0.1, transparent: true, opacity: 0.6,
+    });
+
+    const floatH = 3;
+
+    // Crystal shards forming a spire
+    for (let i = 0; i < 3; i++) {
+      const angle = (i / 3) * Math.PI * 2;
+      const r = 0.8;
+      const shardGeo = new THREE.CylinderGeometry(0.06, 0.35, 10 + i * 3, 8);
+      const shard = new THREE.Mesh(shardGeo, crystalMat);
+      shard.position.set(Math.cos(angle) * r, floatH + 5, Math.sin(angle) * r);
+      shard.rotation.z = (Math.cos(angle) > 0 ? 1 : -1) * 0.15;
+      shard.rotation.x = (Math.sin(angle) > 0 ? 1 : -1) * 0.15;
+      group.add(shard);
+    }
+
+    // Central crystal
+    const centerGeo = new THREE.CylinderGeometry(0.08, 0.5, 16, 12);
+    const center = new THREE.Mesh(centerGeo, crystalMat);
+    center.position.y = floatH + 8;
+    group.add(center);
+
+    // Biolume rings
+    for (let r = 0; r < 4; r++) {
+      const ringGeo = new THREE.TorusGeometry(1.5 + r * 0.4, 0.08, 8, 24);
+      const ring = new THREE.Mesh(ringGeo, bioRing);
+      ring.position.y = floatH + 3 + r * 3.5;
+      ring.rotation.x = Math.PI / 2 + r * 0.3;
+      group.add(ring);
+    }
+
+    // Top glow orb
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), bioMat);
+    orb.position.y = floatH + 17;
+    group.add(orb);
+
+    // Hover glow disc
+    const discGeo = new THREE.CylinderGeometry(1.8, 2.2, 0.2, 24);
+    const discMat = new THREE.MeshStandardMaterial({
+      color: '#40ffe0', emissive: '#40ffe0', emissiveIntensity: 0.6, roughness: 0.3, transparent: true, opacity: 0.4,
+    });
+    const disc = new THREE.Mesh(discGeo, discMat);
+    disc.position.y = 0.1;
+    group.add(disc);
+
+    this.nightGlowMaterials.push(bioMat, bioRing, discMat, orb.material as THREE.MeshStandardMaterial);
 
     group.position.set(cx, 0.15, cz);
     this.propGroup.add(group);
@@ -1631,6 +1730,69 @@ function addRoofDetails(
     sign.name = 'hotel-sign';
     root.add(sign);
     glowMats.push(signMat);
+  }
+}
+
+// ── Landmark helper functions ──
+
+function addBox(g: THREE.Group, w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number): void {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  g.add(m);
+}
+
+function addCyl(g: THREE.Group, rTop: number, rBot: number, h: number, mat: THREE.Material, x: number, y: number, z: number): void {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, 8), mat);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  g.add(m);
+}
+
+function addCone(g: THREE.Group, r: number, h: number, mat: THREE.Material, x: number, y: number, z: number): void {
+  const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 8), mat);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  g.add(m);
+}
+
+function addSphere(g: THREE.Group, r: number, mat: THREE.Material, x: number, y: number, z: number): void {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 12), mat);
+  m.position.set(x, y, z);
+  g.add(m);
+}
+
+function addClockFaces(g: THREE.Group, handMat: THREE.Material, faceColor: string, emissiveIntensity: number): void {
+  for (let side = 0; side < 4; side++) {
+    const fg = new THREE.Group();
+    const discGeo = new THREE.CylinderGeometry(0.7, 0.7, 0.05, 24);
+    const discMat = new THREE.MeshStandardMaterial({
+      color: faceColor, roughness: 0.2, emissive: faceColor, emissiveIntensity,
+    });
+    const disc = new THREE.Mesh(discGeo, discMat);
+    disc.rotation.x = Math.PI / 2;
+    fg.add(disc);
+
+    const hourGeo = new THREE.BoxGeometry(0.06, 0.35, 0.03);
+    const hour = new THREE.Mesh(hourGeo, handMat);
+    hour.position.y = 0.15;
+    hour.rotation.z = (side * Math.PI) / 2;
+    fg.add(hour);
+
+    const minGeo = new THREE.BoxGeometry(0.04, 0.5, 0.03);
+    const min = new THREE.Mesh(minGeo, handMat);
+    min.position.y = 0.22;
+    min.rotation.z = (side * Math.PI) / 2 + 0.5;
+    fg.add(min);
+
+    const dotGeo = new THREE.SphereGeometry(0.08, 8, 8);
+    fg.add(new THREE.Mesh(dotGeo, handMat));
+
+    const angle = (side * Math.PI) / 2;
+    fg.position.set(Math.sin(angle) * 1.8, 0, Math.cos(angle) * 1.8);
+    fg.rotation.y = angle;
+    g.add(fg);
   }
 }
 
