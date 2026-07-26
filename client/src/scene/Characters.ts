@@ -316,8 +316,8 @@ export class Characters {
 
       // Footstep sounds: trigger every ~0.4s of walking
       charData.footstepTimer += dt;
-      if (charData.footstepTimer >= 0.4) {
-        charData.footstepTimer -= 0.4;
+      if (charData.footstepTimer >= 0.55) {
+        charData.footstepTimer -= 0.55;
         audioManager.playFootstep();
       }
 
