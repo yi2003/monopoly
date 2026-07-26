@@ -76,6 +76,9 @@ export default function Lobby() {
         <div className="lobby-container">
           <h1 className="lobby-title">{t('app.title')}</h1>
           <p className="lobby-subtitle">{t('app.subtitle')}</p>
+          <p className="lobby-contact">
+            📧 <a href="mailto:hotyi2003@gmail.com">hotyi2003@gmail.com</a>
+          </p>
 
           {/* Language toggle */}
           <div style={{ marginBottom: '1rem' }}>

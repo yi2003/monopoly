@@ -77,7 +77,10 @@ html, body, #root {
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   margin-bottom: 4px;
 }
-.lobby-subtitle { text-align: center; color: var(--text-secondary); margin-bottom: 32px; }
+.lobby-subtitle { text-align: center; color: var(--text-secondary); margin-bottom: 16px; }
+.lobby-contact { text-align: center; margin-bottom: 24px; font-size: 0.85rem; }
+.lobby-contact a { color: var(--text-secondary); text-decoration: none; }
+.lobby-contact a:hover { color: var(--text-primary); }
 .lobby-status { text-align: center; padding: 8px; border-radius: 8px; margin-bottom: 16px; }
 .lobby-status.connecting { background: rgba(255,152,0,0.2); color: #FFB74D; }
 
