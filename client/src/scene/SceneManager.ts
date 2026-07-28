@@ -489,6 +489,10 @@ export class SceneManager {
     this.cameraController.setMode(mode);
   }
 
+  setSpectator(spectator: boolean): void {
+    this.cameraController.setSpectator(spectator);
+  }
+
   setRoamFov(fov: number): void {
     this.fpsController.setFov(fov);
   }

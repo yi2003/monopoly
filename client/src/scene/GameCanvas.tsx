@@ -9,6 +9,7 @@ export default function GameCanvas() {
   const cameraMode = useGameStore(s => s.cameraMode);
   const qualityMode = useGameStore(s => s.qualityMode);
   const roamFov = useGameStore(s => s.roamFov);
+  const isSpectator = useGameStore(s => s.isSpectator);
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -74,6 +75,12 @@ export default function GameCanvas() {
     if (!sceneRef.current) return;
     sceneRef.current.setRoamFov(roamFov);
   }, [roamFov]);
+
+  // Sync spectator status for camera follow behavior
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    sceneRef.current.setSpectator(isSpectator);
+  }, [isSpectator]);
 
   return <div ref={containerRef} className="game-canvas" />;
 }

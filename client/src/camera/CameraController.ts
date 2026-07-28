@@ -29,6 +29,7 @@ export class CameraController {
   private prevMouse = new THREE.Vector2();
 
   private gameState: GameState | null = null;
+  private isSpectator = false;
 
   // Roam mode
   private fpsController: FirstPersonController | null = null;
@@ -163,12 +164,16 @@ export class CameraController {
     this.gameState = state;
   }
 
+  setSpectator(spectator: boolean): void {
+    this.isSpectator = spectator;
+  }
+
   update(dt: number, boardGroup?: THREE.Group): void {
     if (this.mode === 'roam' && this.fpsController) {
       if (this.gameState) {
         const cp = this.gameState.players[this.gameState.currentPlayerIndex];
-        if (cp && !cp.isBot) {
-          // Use animated character position & yaw (only for human players)
+        if (cp && (!cp.isBot || this.isSpectator)) {
+          // Use animated character position & yaw (for human players, or any player when spectating)
           const charPos = this.getCharacterPosition?.(cp.id);
           if (charPos) {
             this.fpsController.setFollowTarget(new THREE.Vector3(charPos.x, 0, charPos.z));
@@ -181,7 +186,7 @@ export class CameraController {
             this.fpsController.setFollowTarget(new THREE.Vector3(pos.x, 0, pos.z));
           }
         } else {
-          // Bot turn: release follow so camera stays put
+          // Bot turn (non-spectator): release follow so camera stays put
           this.fpsController.clearFollowTarget();
         }
       }
@@ -212,8 +217,9 @@ export class CameraController {
     if (!this.gameState) { this.updateOrbit(); return; }
 
     const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
-    // Bot turn: don't switch camera — hold at current view
-    if (!currentPlayer || currentPlayer.isBot) return;
+    // Bot turn (non-spectator): don't switch camera — hold at current view
+    if (!currentPlayer) return;
+    if (currentPlayer.isBot && !this.isSpectator) return;
 
     // Get character position from the board
     const boardPos = getCharacterTilePos(currentPlayer.position);
