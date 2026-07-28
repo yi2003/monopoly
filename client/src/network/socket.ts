@@ -165,7 +165,8 @@ export function connectSocket(): Socket {
       // Check for quiz — read from the LIVE store state (not the closure-captured state)
       // to avoid re-showing an already-resolved quiz after a delay.
       const liveState = useGameStore.getState().gameState;
-      if (liveState?.quizActive && liveState.quizQuestion) {
+      const liveIsSpectator = useGameStore.getState().isSpectator;
+      if (!liveIsSpectator && liveState?.quizActive && liveState.quizQuestion) {
         uiStore().setQuizData({
           question: liveState.quizQuestion.question,
           options: liveState.quizQuestion.options,

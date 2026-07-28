@@ -25,7 +25,7 @@ export default function QuizModal() {
     }
   }, [showQuizModal, quizData]);
 
-  // Auto-close after showing result for 2s
+  // Auto-close after showing result for 2s (player who submitted)
   useEffect(() => {
     if (quizResult && submitted) {
       const timer = setTimeout(() => {
@@ -36,6 +36,19 @@ export default function QuizModal() {
       return () => clearTimeout(timer);
     }
   }, [quizResult, submitted]);
+
+  // Close when quiz is resolved by another player (spectator / stale state)
+  useEffect(() => {
+    if (showQuizModal && gameState && !gameState.quizActive) {
+      // Quiz was active, now resolved — close the modal
+      const timer = setTimeout(() => {
+        setQuizData(null);
+        setSelectedIndex(null);
+        setSubmitted(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [showQuizModal, gameState?.quizActive]);
 
   if (!showQuizModal || !quizData) return null;
 
