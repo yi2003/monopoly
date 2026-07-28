@@ -1,4 +1,4 @@
-import type { GameState, Player } from '@monopoly/shared';
+import type { GameState, Player, GameEvent } from '@monopoly/shared';
 export declare class RuleEngine {
     private state;
     constructor(state: GameState);
@@ -20,6 +20,7 @@ export declare class RuleEngine {
         rentAmount: number;
         rentTarget: string | null;
         cardType: 'chance' | 'community_chest' | null;
+        gameEvent?: GameEvent;
     };
     validateBuyProperty(): string | null;
     executeBuyProperty(): void;

@@ -45,11 +45,11 @@ export default function Lobby() {
     setScreen('menu');
   };
 
-  const handleJoin = () => {
+  const handleJoin = (asSpectator = false) => {
     if (!playerName.trim()) { setError(t('lobby.nameRequired')); return; }
     if (!joinCode.trim() || joinCode.length !== 4) { setError(t('lobby.roomCodeInvalid')); return; }
     setError('');
-    socket?.emit('joinRoom', { roomCode: joinCode.toUpperCase(), playerName: playerName.trim(), playerColor });
+    socket?.emit('joinRoom', { roomCode: joinCode.toUpperCase(), playerName: playerName.trim(), playerColor, asSpectator });
   };
 
   const handleStart = () => {
@@ -222,7 +222,8 @@ export default function Lobby() {
               {error && <div className="error-msg">{error}</div>}
 
               <div className="form-actions">
-                <button className="btn btn-primary" onClick={handleJoin}>{t('lobby.join')}</button>
+                <button className="btn btn-primary" onClick={() => handleJoin(false)}>{t('lobby.join')}</button>
+                <button className="btn btn-secondary" onClick={() => handleJoin(true)}>{t('lobby.spectate')}</button>
                 <button className="btn btn-ghost" onClick={() => setScreen('menu')}>{t('lobby.back')}</button>
               </div>
             </div>

@@ -4,7 +4,7 @@
 import { PLAYER_COLORS, MAX_PLAYERS, MIN_PLAYERS_TO_START } from '@monopoly/shared';
 import { generatePlayerId } from './utils/random';
 const rooms = new Map();
-export function createRoom(code, hostName, hostColor, theme, difficulty) {
+export function createRoom(code, hostName, hostColor, theme, era, difficulty) {
     const host = {
         id: generatePlayerId(),
         name: hostName,
@@ -36,6 +36,7 @@ export function createRoom(code, hostName, hostColor, theme, difficulty) {
         players: [host],
         config: {
             theme,
+            era,
             difficulty,
             maxPlayers: MAX_PLAYERS,
             turnLimit: 0,

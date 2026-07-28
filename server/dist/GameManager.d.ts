@@ -4,6 +4,7 @@ export declare class GameManager {
     state: GameState;
     private botTimers;
     private onStateChange;
+    private logIdCounter;
     constructor(config: GameConfig, onStateChange: (roomCode: string, state: GameState) => void);
     get engine(): RuleEngine;
     addPlayer(name: string, color?: string, isBot?: boolean): Player;
@@ -81,6 +82,7 @@ export declare class GameManager {
     clearBotTimers(): void;
     private emitChange;
     private addLog;
+    private emitEvent;
     private rollWeather;
 }
 //# sourceMappingURL=GameManager.d.ts.map

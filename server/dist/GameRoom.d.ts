@@ -1,4 +1,4 @@
-import type { Player, GameConfig, ThemeId, DifficultyId } from '@monopoly/shared';
+import type { Player, GameConfig, ThemeId, DifficultyId, EraId } from '@monopoly/shared';
 export interface RoomState {
     code: string;
     players: Player[];
@@ -6,7 +6,7 @@ export interface RoomState {
     createdAt: number;
     started: boolean;
 }
-export declare function createRoom(code: string, hostName: string, hostColor: string, theme: ThemeId, difficulty: DifficultyId): RoomState;
+export declare function createRoom(code: string, hostName: string, hostColor: string, theme: ThemeId, era: EraId, difficulty: DifficultyId): RoomState;
 export declare function joinRoom(code: string, name: string, color: string, asSpectator: boolean): {
     room: RoomState;
     player: Player;

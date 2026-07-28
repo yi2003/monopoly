@@ -49,6 +49,11 @@ export function connectSocket(): Socket {
     // Store our player ID so we know when it's our turn
     if (info.playerId) {
       updates.playerId = info.playerId;
+      // Track spectator status
+      const me = info.players.find(p => p.id === info.playerId);
+      if (me?.isSpectator) {
+        updates.isSpectator = true;
+      }
     }
     useGameStore.setState(updates);
   });

@@ -395,10 +395,13 @@ io.on('connection', (socket) => {
   socket.on('chat', (message) => {
     if (!currentRoom) return;
     const game = games.get(currentRoom);
-    const player = game?.state.players.find(p => p.id === currentPlayerId);
+    const gamePlayer = game?.state.players.find(p => p.id === currentPlayerId);
+    const room = getRoom(currentRoom);
+    const roomPlayer = room?.players.find(p => p.id === currentPlayerId);
+    const playerName = gamePlayer?.name || roomPlayer?.name || 'Unknown';
     io.to(currentRoom).emit('chatMessage', {
       playerId: currentPlayerId || '',
-      playerName: player?.name || 'Unknown',
+      playerName,
       message,
     });
   });
@@ -427,9 +430,14 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Helper
+  // Helper — returns the game for the current room. Blocks
+  // spectators from performing any game action.
   function getGame(): GameManager | undefined {
-    if (!currentRoom) return undefined;
+    if (!currentRoom || !currentPlayerId) return undefined;
+    const room = getRoom(currentRoom);
+    if (!room) return undefined;
+    const me = room.players.find(p => p.id === currentPlayerId);
+    if (me?.isSpectator) return undefined;
     return games.get(currentRoom);
   }
 });

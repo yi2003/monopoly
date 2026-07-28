@@ -3,18 +3,55 @@
 // ============================================================
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { PLAYER_COLORS } from '@monopoly/shared';
 import { createRoom, joinRoom, leaveRoom, getRoom, canStartGame } from './GameRoom';
 import { GameManager } from './GameManager';
 import { generatePlayerId, generateRoomCode } from './utils/random';
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+const allowedOrigins = [
+    CLIENT_URL,
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    /^https:\/\/.*\.vercel\.app$/,
+    /^https:\/\/.*\.up\.railway\.app$/,
+];
 const app = express();
-app.use(cors());
+app.use(cors({ origin: allowedOrigins }));
+// Health check for Railway
+app.get('/health', (_req, res) => res.send('OK'));
+// Serve static client files if they exist (production)
+const possibleDirs = [
+    path.resolve('../client/dist'), // Railway monorepo: CWD is /app/server
+    path.resolve('client/dist'), // local dev
+    path.resolve('dist'),
+];
+let clientDist = '';
+for (const d of possibleDirs) {
+    const testPath = path.join(d, 'index.html');
+    if (fs.existsSync(testPath)) {
+        clientDist = d;
+        break;
+    }
+}
+console.log(`CLIENT_DIST: ${clientDist || 'NOT FOUND, tried: ' + possibleDirs.join(', ')}`);
+if (clientDist) {
+    app.use(express.static(clientDist));
+    app.get('*', (_req, res, next) => {
+        const indexPath = path.join(clientDist, 'index.html');
+        if (fs.existsSync(indexPath))
+            res.sendFile(indexPath);
+        else
+            next();
+    });
+}
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+        origin: allowedOrigins,
         methods: ['GET', 'POST'],
     },
     pingInterval: 10000,
@@ -29,9 +66,9 @@ io.on('connection', (socket) => {
     let currentPlayerId = null;
     // ---- Room Management ----
     socket.on('createRoom', (data) => {
-        const { playerName, playerColor, theme, difficulty } = data;
+        const { playerName, playerColor, theme, era, difficulty } = data;
         const code = generateRoomCode();
-        const room = createRoom(code, playerName, playerColor, theme, difficulty);
+        const room = createRoom(code, playerName, playerColor, theme, era || '2025', difficulty);
         const player = room.players[0];
         socket.join(code);
         currentRoom = code;
@@ -331,10 +368,13 @@ io.on('connection', (socket) => {
         if (!currentRoom)
             return;
         const game = games.get(currentRoom);
-        const player = game?.state.players.find(p => p.id === currentPlayerId);
+        const gamePlayer = game?.state.players.find(p => p.id === currentPlayerId);
+        const room = getRoom(currentRoom);
+        const roomPlayer = room?.players.find(p => p.id === currentPlayerId);
+        const playerName = gamePlayer?.name || roomPlayer?.name || 'Unknown';
         io.to(currentRoom).emit('chatMessage', {
             playerId: currentPlayerId || '',
-            playerName: player?.name || 'Unknown',
+            playerName,
             message,
         });
     });
@@ -359,9 +399,16 @@ io.on('connection', (socket) => {
             }
         }
     });
-    // Helper
+    // Helper — returns the game for the current room. Blocks
+    // spectators from performing any game action.
     function getGame() {
-        if (!currentRoom)
+        if (!currentRoom || !currentPlayerId)
+            return undefined;
+        const room = getRoom(currentRoom);
+        if (!room)
+            return undefined;
+        const me = room.players.find(p => p.id === currentPlayerId);
+        if (me?.isSpectator)
             return undefined;
         return games.get(currentRoom);
     }
@@ -371,9 +418,9 @@ app.get('/health', (_req, res) => {
     res.json({ status: 'ok', games: games.size, uptime: process.uptime() });
 });
 // ---- Start ----
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 httpServer.listen(PORT, () => {
-    console.log(`🏠 家庭大富翁 Server running on http://localhost:${PORT}`);
+    console.log(`🏠 家庭大富翁 Server running on port ${PORT}`);
     console.log(`   Socket.IO ready for connections`);
 });
 //# sourceMappingURL=index.js.map

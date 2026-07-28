@@ -22,6 +22,7 @@ export function updateStockPrices(state) {
     }
 }
 export function processDividends(state) {
+    const events = [];
     const config = state.config;
     // Probability varies by theme
     const dividendChance = config.theme === 'shanghai' ? 0.18 : 0.12;
@@ -29,7 +30,7 @@ export function processDividends(state) {
     // Pick a random stock
     const eligibleStocks = state.stocks.filter(s => state.players.some(p => p.stocks.some(h => h.symbol === s.symbol)));
     if (eligibleStocks.length === 0)
-        return;
+        return events;
     const stock = eligibleStocks[Math.floor(Math.random() * eligibleStocks.length)];
     // Award dividends to all holders
     for (const player of state.players) {
@@ -47,8 +48,18 @@ export function processDividends(state) {
                 message: `${player.name} 获得 ${stock.nameCN} 分红 $${dividend} (${holding.shares}股)`,
                 type: 'dividend',
             });
+            events.push({
+                kind: 'dividend',
+                playerId: player.id,
+                symbol: stock.symbol,
+                stockName: stock.name,
+                stockNameCN: stock.nameCN,
+                shares: holding.shares,
+                amount: dividend,
+            });
         }
     }
+    return events;
 }
 export function executeBuyStock(state, playerId, symbol, shares) {
     const player = state.players.find(p => p.id === playerId);

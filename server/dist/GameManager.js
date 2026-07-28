@@ -14,6 +14,7 @@ export class GameManager {
     state;
     botTimers = new Map();
     onStateChange;
+    logIdCounter = 0;
     constructor(config, onStateChange) {
         this.onStateChange = onStateChange;
         // Append theme-specific extra cards
@@ -47,6 +48,8 @@ export class GameManager {
             quizQuestion: null,
             wheelResult: null,
             lastCardDrawn: null,
+            gameEvent: null,
+            ringTransferred: false,
             createdAt: Date.now(),
         };
     }
@@ -137,10 +140,11 @@ export class GameManager {
         this.state.dice = dice;
         this.state.diceRolled = true;
         const result = this.engine.processDiceResult(dice);
-        this.addLog(`${this.currentPlayer.name} 掷出 [${dice.die1}][${dice.die2}] = ${dice.total}`);
+        this.addLog(`${this.currentPlayer.name} 掷出 ${dice.total} 点`);
         if (result.passedGo) {
             const eff = getEffectiveConfig(this.state.config.theme, this.state.config.difficulty);
             this.addLog(`💰 ${this.currentPlayer.name} 经过起点，银行发放工资 $${eff.goSalary}`, 'info');
+            this.emitEvent({ kind: 'go_salary', playerId: this.currentPlayer.id, amount: eff.goSalary });
         }
         // Track consecutive doubles
         if (dice.isDoubles) {
@@ -159,10 +163,11 @@ export class GameManager {
                 this.currentPlayer.status = 'jailed';
                 this.currentPlayer.consecutiveDoubles = 0;
                 this.addLog(`${this.currentPlayer.name} 连续三次掷出对子，被送进监狱！`, 'jail');
+                this.emitEvent({ kind: 'jail_in', playerId: this.currentPlayer.id, reason: 'three_doubles' });
                 this.state.phase = 'awaitEnd';
             }
             else {
-                this.addLog(`${this.currentPlayer.name} 掷出对子 (${dice.die1}+${dice.die2})，再掷一次！`, 'info');
+                this.addLog(`${this.currentPlayer.name} 掷出对子，再掷一次！`, 'info');
                 this.state.diceRolled = false; // allow re-roll
                 this.emitChange();
                 return { dice, result };
@@ -170,6 +175,10 @@ export class GameManager {
         }
         // Process landing
         const landing = this.engine.processLanding(result.newPosition);
+        // Forward gameEvent from landing (rent, tax, jail_in from goto_jail)
+        if (landing.gameEvent) {
+            this.state.gameEvent = landing.gameEvent;
+        }
         if (landing.cardType) {
             this.drawCard(landing.cardType);
         }
@@ -230,6 +239,7 @@ export class GameManager {
                 this.state.winner = winner.id;
                 this.state.phase = 'ended';
                 this.addLog(`${winner.name} 获胜！`, 'victory');
+                this.emitEvent({ kind: 'game_over', winnerId: winner.id, winnerName: winner.name });
                 this.emitChange();
                 return;
             }
@@ -240,6 +250,7 @@ export class GameManager {
             this.state.winner = winner.id;
             this.state.phase = 'ended';
             this.addLog(`${winner.name} 获胜！`, 'victory');
+            this.emitEvent({ kind: 'game_over', winnerId: winner.id, winnerName: winner.name });
             this.emitChange();
             return;
         }
@@ -251,13 +262,20 @@ export class GameManager {
                 this.currentPlayer.cash -= drain;
                 if (drain > 0) {
                     this.addLog(`🔧 ${this.currentPlayer.name} → 银行 资产维护费 $${drain}（${Math.round(eff.drainPct * 100)}%）`, 'info');
+                    this.emitEvent({ kind: 'maintenance', playerId: this.currentPlayer.id, amount: drain, rate: Math.round(eff.drainPct * 100) });
                 }
             }
         }
         // Update stock prices
         updateStockPrices(this.state);
         // Process dividends
-        processDividends(this.state);
+        const dividendEvents = processDividends(this.state);
+        if (dividendEvents.length > 0) {
+            // Show dividend event for the current player if they received one
+            const myEvent = dividendEvents.find(e => e.kind === 'dividend' && e.playerId === this.currentPlayer.id);
+            if (myEvent)
+                this.state.gameEvent = myEvent;
+        }
         // Advance to next player
         this.advanceTurn();
         this.emitChange();
@@ -283,6 +301,9 @@ export class GameManager {
         this.state.quizActive = false;
         this.state.quizQuestion = null;
         this.state.lastCardDrawn = null;
+        this.state.wheelResult = null;
+        this.state.gameEvent = null;
+        this.state.ringTransferred = false;
         // Check for quiz trigger at turn start
         if (QUIZ_TRIGGER_CHANCE > 0 && Math.random() < QUIZ_TRIGGER_CHANCE) {
             const questions = QUIZ_QUESTIONS;
@@ -294,8 +315,12 @@ export class GameManager {
         // Weather change check
         this.state.weatherTimer--;
         if (this.state.weatherTimer <= 0) {
+            const oldWeather = this.state.weather;
             this.state.weather = this.rollWeather();
             this.state.weatherTimer = 25 + Math.floor(Math.random() * 20);
+            if (oldWeather !== this.state.weather) {
+                this.emitEvent({ kind: 'weather', from: oldWeather, to: this.state.weather });
+            }
         }
         // Day/night progression
         this.state.dayTime = (this.state.dayTime + 0.008) % 1;
@@ -316,6 +341,7 @@ export class GameManager {
         this.currentPlayer.jailTurns = 0;
         this.currentPlayer.status = 'active';
         this.addLog(`🔓 ${this.currentPlayer.name} 向银行缴纳 $${JAIL_FINE} 保释出狱`, 'info');
+        this.emitEvent({ kind: 'jail_out', playerId: this.currentPlayer.id, method: 'pay_fine' });
         this.emitChange();
         return { success: true };
     }
@@ -328,6 +354,7 @@ export class GameManager {
         this.currentPlayer.jailTurns = 0;
         this.currentPlayer.status = 'active';
         this.addLog(`🃏 ${this.currentPlayer.name} 使用出狱卡出狱`, 'info');
+        this.emitEvent({ kind: 'jail_out', playerId: this.currentPlayer.id, method: 'use_card' });
         this.emitChange();
         return { success: true };
     }
@@ -336,21 +363,25 @@ export class GameManager {
             return { success: false };
         const dice = rollDice();
         this.state.dice = dice;
-        if (dice.isDoubles) {
+        // Single die: 1/3 chance to escape (rolling 5 or 6)
+        const escaped = dice.die1 >= 5;
+        if (escaped) {
             this.currentPlayer.jailTurns = 0;
             this.currentPlayer.status = 'active';
             this.currentPlayer.consecutiveDoubles = 0;
             this.state.phase = 'rolling';
-            this.addLog(`🎲 ${this.currentPlayer.name} 掷出对子 [${dice.die1}][${dice.die2}]，越狱成功！`, 'info');
+            this.addLog(`🎲 ${this.currentPlayer.name} 掷出 ${dice.die1} 点，越狱成功！`, 'info');
+            this.emitEvent({ kind: 'jail_out', playerId: this.currentPlayer.id, method: 'doubles' });
         }
         else {
             this.currentPlayer.jailTurns++;
-            this.addLog(`🔒 ${this.currentPlayer.name} 掷出 [${dice.die1}][${dice.die2}]，未能出狱（${this.currentPlayer.jailTurns}/3回合）`, 'info');
+            this.addLog(`🔒 ${this.currentPlayer.name} 掷出 ${dice.die1} 点，未能出狱（${this.currentPlayer.jailTurns}/3回合）`, 'info');
             if (this.currentPlayer.jailTurns >= 3) {
                 this.currentPlayer.cash -= JAIL_FINE;
                 this.currentPlayer.jailTurns = 0;
                 this.currentPlayer.status = 'active';
                 this.addLog(`${this.currentPlayer.name} 关押3回，强制付 $${JAIL_FINE} 出狱`);
+                this.emitEvent({ kind: 'jail_out', playerId: this.currentPlayer.id, method: 'forced' });
             }
         }
         this.state.phase = 'awaitEnd';
@@ -424,6 +455,7 @@ export class GameManager {
                 player.position = CORNER_JAIL;
                 player.jailTurns = 1;
                 player.status = 'jailed';
+                this.emitEvent({ kind: 'jail_in', playerId: player.id, reason: 'card' });
                 break;
             }
             case 'getOutOfJail': {
@@ -507,6 +539,7 @@ export class GameManager {
                 player.position = CORNER_JAIL;
                 player.jailTurns = 1;
                 player.status = 'jailed';
+                this.emitEvent({ kind: 'jail_in', playerId: player.id, reason: 'wheel' });
                 break;
             case 'moveToGO':
                 player.position = CORNER_GO;
@@ -629,6 +662,8 @@ export class GameManager {
             return { success: false, error: '不在街道环上' };
         if (player.groundRing === toRing)
             return { success: false, error: '已经在该环上' };
+        if (this.state.ringTransferred)
+            return { success: false, error: '本回合已换过环' };
         const fee = toRing === 'outer' ? 100 : 50;
         if (player.cash < fee)
             return { success: false, error: '现金不足' };
@@ -640,6 +675,7 @@ export class GameManager {
         // Process landing on new tile
         const landing = this.engine.processLanding(player.position);
         this.state.phase = landing.phase === 'buying' ? 'buying' : 'awaitEnd';
+        this.state.ringTransferred = true;
         this.addLog(`${player.name} 换乘到${toRing === 'outer' ? '外环' : '内环'} (费用 $${fee})`, 'info');
         this.emitChange();
         return { success: true };
@@ -647,8 +683,13 @@ export class GameManager {
     // ---- Bot AI ----
     scheduleBotTurn() {
         const player = this.currentPlayer;
+        // Clear any stale timer for this player
+        const existing = this.botTimers.get(player.id);
+        if (existing)
+            clearTimeout(existing);
         const delay = player.isBot ? 1000 : 1500; // bots faster than auto-pilot
         const timer = setTimeout(() => {
+            this.botTimers.delete(player.id);
             this.executeBotAction();
         }, delay);
         this.botTimers.set(player.id, timer);
@@ -736,6 +777,16 @@ export class GameManager {
                 this.tryJailDice();
                 setTimeout(() => this.executeBotAction(), 1500);
                 break;
+            case 'spinWheel':
+                this.spinWheel();
+                setTimeout(() => this.endTurn(), 1500);
+                break;
+            case 'answerQuiz':
+                if (decision.quizAnswer !== undefined) {
+                    this.answerQuiz(decision.quizAnswer);
+                }
+                setTimeout(() => this.endTurn(), 1500);
+                break;
         }
     }
     clearBotTimers() {
@@ -750,7 +801,7 @@ export class GameManager {
     }
     addLog(message, type = 'info') {
         this.state.logs.push({
-            id: this.state.logs.length,
+            id: this.logIdCounter++, // monotonically increasing, never collides
             round: this.state.round,
             timestamp: Date.now(),
             message,
@@ -760,6 +811,9 @@ export class GameManager {
         if (this.state.logs.length > 50) {
             this.state.logs.shift();
         }
+    }
+    emitEvent(event) {
+        this.state.gameEvent = event;
     }
     rollWeather() {
         const r = Math.random();

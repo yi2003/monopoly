@@ -11,6 +11,7 @@ interface GameStore {
   connected: boolean;
   roomCode: string | null;
   playerId: string | null;
+  isSpectator: boolean;
 
   // Game state (mirror from server)
   gameState: GameState | null;
@@ -81,6 +82,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   connected: false,
   roomCode: null,
   playerId: null,
+  isSpectator: false,
 
   gameState: null,
   phase: 'lobby',
@@ -167,5 +169,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     showBuildPanel: false,
     logCutoffId: 0,
     selectedTile: null,
+    isSpectator: false,
   }),
 }));

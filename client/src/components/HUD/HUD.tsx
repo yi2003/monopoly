@@ -30,11 +30,13 @@ export default function HUD() {
   const togglePortfolio = useGameStore(s => s.togglePortfolio);
   const toggleBuildPanel = useGameStore(s => s.toggleBuildPanel);
   const playerId = useGameStore(s => s.playerId);
+  const isSpectator = useGameStore(s => s.isSpectator);
   const phaseDelayUntil = useGameStore(s => s.phaseDelayUntil);
 
   const { t, lang, switchLang } = useI18n();
   const socket = getSocket();
-  const isMyTurn = players[currentPlayerIndex]?.id === playerId;
+  const myPlayer = players.find(p => p.id === playerId);
+  const isMyTurn = !isSpectator && !!(myPlayer && players[currentPlayerIndex]?.id === playerId);
   const currentPlayer = players[currentPlayerIndex];
   const weather = gameState?.weather || 'clear';
 
@@ -57,7 +59,6 @@ export default function HUD() {
   const handleTransferRing = (toRing: 'inner' | 'outer') => socket?.emit('transferRing', toRing);
 
   // Check if current player is on a railway (for ring transfer)
-  const myPlayer = players.find(p => p.id === playerId);
   const myTile = myPlayer && gameState ? gameState.tiles[myPlayer.position] : null;
   const onRailway = myTile?.type === 'railway';
   const onInnerRing = myPlayer?.groundRing === 'inner';
@@ -80,7 +81,10 @@ export default function HUD() {
 
         <div className="hud-top-center">
           <span className="hud-phase">{t(`phase.${phase}` as any)}</span>
-          {currentPlayer && (
+          {isSpectator && (
+            <span className="hud-spectator-badge">{t('hud.spectatorMode')}</span>
+          )}
+          {currentPlayer && !isSpectator && (
             <span className="hud-turn" style={{ color: currentPlayer.color }}>
               🎯 {t('hud.turn', { name: currentPlayer.name })}
             </span>
@@ -191,7 +195,11 @@ export default function HUD() {
 
       {/* Action Panel */}
       <div className="action-panel">
-        {phase === 'rolling' && isMyTurn && !diceRolled && (
+        {isSpectator && phase !== 'ended' && phase !== 'lobby' && (
+          <div className="action-panel-waiting">{t('hud.spectating')}</div>
+        )}
+
+        {!isSpectator && phase === 'rolling' && isMyTurn && !diceRolled && (
           <div className="action-buttons">
             <button className="btn btn-primary btn-lg" onClick={handleRoll}>
               {t('hud.rollDice')}

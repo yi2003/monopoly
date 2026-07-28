@@ -35,6 +35,7 @@ export const translations = {
     'lobby.roomCodePlaceholder': '输入4位房间号（如 A3F7）',
     'lobby.roomCodeInvalid': '请输入4位房间号',
     'lobby.join': '加入',
+    'lobby.spectate': '👀 旁观',
 
     // Lobby - Room
     'lobby.roomTitle': '房间号',
@@ -88,6 +89,8 @@ export const translations = {
     'hud.toOuter': '→外环',
     'hud.toInner': '→内环',
     'hud.backToLobby': '🔄 返回大厅',
+    'hud.spectatorMode': '👀 观战模式',
+    'hud.spectating': '正在观战...',
 
     // HUD - Player cards
     'hud.player.props': '{props}块地',
@@ -243,6 +246,7 @@ export const translations = {
     'lobby.roomCodePlaceholder': 'Enter 4-digit room code (e.g. A3F7)',
     'lobby.roomCodeInvalid': 'Please enter a 4-digit room code',
     'lobby.join': 'Join',
+    'lobby.spectate': '👀 Spectate',
 
     'lobby.roomTitle': 'Room',
     'lobby.players': 'Players',
@@ -290,6 +294,8 @@ export const translations = {
     'hud.toOuter': '→Outer',
     'hud.toInner': '→Inner',
     'hud.backToLobby': '🔄 Back to Lobby',
+    'hud.spectatorMode': '👀 Spectator Mode',
+    'hud.spectating': 'Spectating...',
 
     'hud.player.props': '{props} lots',
     'hud.player.houses': '{houses} houses',
