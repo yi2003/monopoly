@@ -36,7 +36,7 @@ export default function HUD() {
   const { t, lang, switchLang } = useI18n();
   const socket = getSocket();
   const myPlayer = players.find(p => p.id === playerId);
-  const isMyTurn = !isSpectator && !!(myPlayer && players[currentPlayerIndex]?.id === playerId);
+  const isMyTurn = !isSpectator && players[currentPlayerIndex]?.id === playerId;
   const currentPlayer = players[currentPlayerIndex];
   const weather = gameState?.weather || 'clear';
 
