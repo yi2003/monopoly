@@ -8,7 +8,6 @@ export default function BuyModal() {
   const gameState = useGameStore(s => s.gameState);
   const playerId = useGameStore(s => s.playerId);
   const phase = useGameStore(s => s.phase);
-  const players = useGameStore(s => s.players);
   const phaseDelayUntil = useGameStore(s => s.phaseDelayUntil);
   const { t, localName } = useI18n();
   const [delayTick, setDelayTick] = useState(0);
@@ -24,7 +23,7 @@ export default function BuyModal() {
   if (!gameState || phase !== 'buying') return null;
   if (Date.now() < phaseDelayUntil) return null;
 
-  const currentPlayer = players[gameState.currentPlayerIndex];
+  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
   if (currentPlayer?.id !== playerId) return null;
 
   const tile = gameState.tiles[currentPlayer.position];

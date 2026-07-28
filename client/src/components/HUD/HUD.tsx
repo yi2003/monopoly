@@ -35,8 +35,8 @@ export default function HUD() {
 
   const { t, lang, switchLang } = useI18n();
   const socket = getSocket();
-  const myPlayer = players.find(p => p.id === playerId);
-  const isMyTurn = !isSpectator && players[currentPlayerIndex]?.id === playerId;
+  const myPlayer = gameState?.players.find(p => p.id === playerId);
+  const isMyTurn = !isSpectator && !!(gameState && gameState.players[gameState.currentPlayerIndex]?.id === playerId);
   const currentPlayer = players[currentPlayerIndex];
   const weather = gameState?.weather || 'clear';
 
@@ -138,7 +138,7 @@ export default function HUD() {
 
       {/* Player Cards */}
       <div className="hud-player-cards">
-        {players.filter(p => !p.isSpectator).map((p, i) => (
+        {gameState?.players.filter(p => !p.isSpectator).map((p, i) => (
           <div
             key={p.id}
             className={`player-card ${p.status === 'bankrupt' ? 'bankrupt' : ''} ${i === currentPlayerIndex ? 'active' : ''}`}

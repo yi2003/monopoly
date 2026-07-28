@@ -42,10 +42,16 @@ export function connectSocket(): Socket {
 
   socket.on('roomInfo', (info: { code: string; players: Player[]; config: GameConfig; playerId?: string }) => {
     console.log('[socket] roomInfo:', info);
+    const store = useGameStore.getState();
+    const inGame = store.gameState && store.gameState.phase !== 'lobby';
     const updates: any = {
       roomCode: info.code,
-      players: info.players,
     };
+    // Only overwrite players from roomInfo when NOT in a game —
+    // gameState.players is shuffled and authoritative during play.
+    if (!inGame) {
+      updates.players = info.players;
+    }
     // Store our player ID so we know when it's our turn
     if (info.playerId) {
       updates.playerId = info.playerId;
@@ -60,16 +66,25 @@ export function connectSocket(): Socket {
 
   socket.on('playerJoined', (player: Player) => {
     const store = useGameStore.getState();
-    useGameStore.setState({ players: [...store.players, player] });
+    // Don't mutate players during an active game — gameState is authoritative
+    const inGame = store.gameState && store.gameState.phase !== 'lobby';
+    if (!inGame) {
+      useGameStore.setState({ players: [...store.players, player] });
+    }
     uiStore().addToast(`${player.name} 加入了房间`);
   });
 
   socket.on('playerLeft', (playerId: string) => {
     const store = useGameStore.getState();
-    const player = store.players.find(p => p.id === playerId);
-    useGameStore.setState({ players: store.players.filter(p => p.id !== playerId) });
-    if (player) {
-      uiStore().addToast(`${player.name} 离开了房间`);
+    const inGame = store.gameState && store.gameState.phase !== 'lobby';
+    if (!inGame) {
+      const player = store.players.find(p => p.id === playerId);
+      useGameStore.setState({ players: store.players.filter(p => p.id !== playerId) });
+      if (player) {
+        uiStore().addToast(`${player.name} 离开了房间`);
+      }
+    } else {
+      uiStore().addToast(`玩家离开了房间`);
     }
   });
 
