@@ -365,6 +365,8 @@ export class SceneManager {
     this.houses.updateState(state);
     this.effects.updateState(state);
     this.cameraController.setGameState(state);
+    // Sync spectator flag every state update so camera follows bots when spectating
+    this.cameraController.setSpectator(useGameStore.getState().isSpectator);
 
     // ── Deferred initial build — only after we have the real era ──
     if (!this.initialBuildDone) {

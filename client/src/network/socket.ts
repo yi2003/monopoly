@@ -148,8 +148,13 @@ export function connectSocket(): Socket {
     const delay = state.dice ? Math.max(0, totalDelay - timeSinceDice) : 0;
 
     const showDelayedEvents = () => {
-      // Check for card drawn
-      if (state.lastCardDrawn) {
+      // Read from the LIVE store state (not the closure-captured state)
+      // to avoid re-showing an already-resolved event after a delay.
+      const liveState = useGameStore.getState().gameState;
+      const liveIsSpectator = useGameStore.getState().isSpectator;
+
+      // Check for card drawn — skip for spectators
+      if (!liveIsSpectator && state.lastCardDrawn) {
         uiStore().setCardDrawn({
           type: state.lastCardDrawn.type,
           description: state.lastCardDrawn.card.description,
@@ -157,15 +162,12 @@ export function connectSocket(): Socket {
         });
       }
 
-      // Check for wheel result
-      if (state.wheelResult !== null) {
+      // Check for wheel result — skip for spectators
+      if (!liveIsSpectator && state.wheelResult !== null) {
         uiStore().setWheelResult(state.wheelResult);
       }
 
-      // Check for quiz — read from the LIVE store state (not the closure-captured state)
-      // to avoid re-showing an already-resolved quiz after a delay.
-      const liveState = useGameStore.getState().gameState;
-      const liveIsSpectator = useGameStore.getState().isSpectator;
+      // Check for quiz — skip for spectators
       if (!liveIsSpectator && liveState?.quizActive && liveState.quizQuestion) {
         uiStore().setQuizData({
           question: liveState.quizQuestion.question,
@@ -175,8 +177,8 @@ export function connectSocket(): Socket {
         });
       }
 
-      // Check for generic game event (rent, tax, go_salary, jail, dividend, weather, maintenance)
-      if (liveState?.gameEvent && liveState.gameEvent.kind !== 'game_over') {
+      // Check for generic game event (rent, tax, go_salary, jail, dividend, weather, maintenance) — skip for spectators
+      if (!liveIsSpectator && liveState?.gameEvent && liveState.gameEvent.kind !== 'game_over') {
         uiStore().setGameEvent(liveState.gameEvent);
       }
     };
