@@ -212,13 +212,14 @@ export class GameManager {
       this.state.gameEvent = landing.gameEvent;
     }
 
+    // Set phase BEFORE drawCard — card effect may override it (e.g. move to property → buying)
+    this.state.phase = landing.phase;
+
     if (landing.cardType) {
       this.drawCard(landing.cardType);
     }
 
-    this.state.phase = landing.phase;
-
-    // Check bankruptcy
+    // Check bankruptcy (card effect may have taken cash)
     if (this.currentPlayer.cash < 0) {
       this.state.phase = 'debt';
     }

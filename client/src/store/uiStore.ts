@@ -92,7 +92,7 @@ export const useUIStore = create<UIStore>((set) => ({
     }
   },
 
-  setCardDrawn: (card) => set({ lastCardDrawn: card, showCardModal: true }),
+  setCardDrawn: (card) => set({ lastCardDrawn: card, showCardModal: card !== null }),
   setWheelResult: (index) => set({ wheelResult: index, showWheelModal: index !== null }),
   setQuizData: (data) => set({ quizData: data, showQuizModal: true, quizResult: null, quizRewardAmount: null }),
   setQuizResult: (result, amount) => set({ quizResult: result, quizRewardAmount: amount ?? null }),

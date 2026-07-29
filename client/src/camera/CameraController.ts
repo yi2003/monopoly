@@ -173,6 +173,14 @@ export class CameraController {
       if (this.gameState) {
         const cp = this.gameState.players[this.gameState.currentPlayerIndex];
         if (cp && (!cp.isBot || this.isSpectator)) {
+          // Handle character visibility when followed player changes
+          if (cp.id !== this.currentRoamPlayerId) {
+            if (this.currentRoamPlayerId) {
+              this.setCharacterVisible?.(this.currentRoamPlayerId, true);
+            }
+            this.setCharacterVisible?.(cp.id, false);
+            this.currentRoamPlayerId = cp.id;
+          }
           // Use animated character position & yaw (for human players, or any player when spectating)
           const charPos = this.getCharacterPosition?.(cp.id);
           if (charPos) {
@@ -186,7 +194,7 @@ export class CameraController {
             this.fpsController.setFollowTarget(new THREE.Vector3(pos.x, 0, pos.z));
           }
         } else {
-          // Bot turn (non-spectator): release follow so camera stays put
+          // Bot turn (non-spectator) or no follow target: release follow so camera stays put
           this.fpsController.clearFollowTarget();
         }
       }

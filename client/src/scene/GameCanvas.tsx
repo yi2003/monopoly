@@ -26,6 +26,16 @@ export default function GameCanvas() {
       }
       sceneRef.current = scene;
 
+      // Sync current store state — may have arrived during async init
+      const store = useGameStore.getState();
+      if (store.gameState) {
+        scene.updateState(store.gameState);
+      }
+      scene.setSpectator(store.isSpectator);
+      scene.setCameraMode(store.cameraMode);
+      scene.setQualityMode(store.qualityMode);
+      scene.setRoamFov(store.roamFov);
+
       // Animation loop — start after init completes
       const animate = () => {
         animId = requestAnimationFrame(animate);

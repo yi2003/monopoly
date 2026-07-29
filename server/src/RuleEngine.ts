@@ -2,7 +2,7 @@
 // RuleEngine — Server-side validation of all player actions
 // ============================================================
 
-import type { GameState, Player, PropertyTile, GameEvent } from '@monopoly/shared';
+import type { GameState, Player, PropertyTile, RailwayTile, UtilityTile, GameEvent } from '@monopoly/shared';
 import {
   getPropertyDef, getRailwayDef, getUtilityDef,
   calcPropertyRent, calcRailwayRent, calcUtilityRent,
@@ -128,6 +128,8 @@ export class RuleEngine {
             phase: 'awaitEnd', rentAmount, rentTarget, cardType: null,
             gameEvent: { kind: 'rent', playerId: player.id, targetId: owner.id, amount: rentAmount, tileIndex: position, tileName: tile.name, tileNameCN: tile.nameCN },
           };
+        } else if (!owner && player.cash >= (tile as RailwayTile).price) {
+          return { phase: 'buying', rentAmount: 0, rentTarget: null, cardType: null };
         }
         break;
       }
@@ -146,6 +148,8 @@ export class RuleEngine {
             phase: 'awaitEnd', rentAmount, rentTarget, cardType: null,
             gameEvent: { kind: 'rent', playerId: player.id, targetId: owner.id, amount: rentAmount, tileIndex: position, tileName: tile.name, tileNameCN: tile.nameCN },
           };
+        } else if (!owner && player.cash >= (tile as UtilityTile).price) {
+          return { phase: 'buying', rentAmount: 0, rentTarget: null, cardType: null };
         }
         break;
       }
