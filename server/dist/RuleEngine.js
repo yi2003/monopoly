@@ -95,6 +95,9 @@ export class RuleEngine {
                         gameEvent: { kind: 'rent', playerId: player.id, targetId: owner.id, amount: rentAmount, tileIndex: position, tileName: tile.name, tileNameCN: tile.nameCN },
                     };
                 }
+                else if (!owner && player.cash >= tile.price) {
+                    return { phase: 'buying', rentAmount: 0, rentTarget: null, cardType: null };
+                }
                 break;
             }
             case 'utility': {
@@ -111,6 +114,9 @@ export class RuleEngine {
                         phase: 'awaitEnd', rentAmount, rentTarget, cardType: null,
                         gameEvent: { kind: 'rent', playerId: player.id, targetId: owner.id, amount: rentAmount, tileIndex: position, tileName: tile.name, tileNameCN: tile.nameCN },
                     };
+                }
+                else if (!owner && player.cash >= tile.price) {
+                    return { phase: 'buying', rentAmount: 0, rentTarget: null, cardType: null };
                 }
                 break;
             }

@@ -1,7 +1,7 @@
 // ============================================================
 // GameManager — Authoritative game state & turn machine
 // ============================================================
-import { createTiles, CHANCE_CARDS, COMMUNITY_CHEST_CARDS, SHANGHAI_EXTRA_CHANCE_CARDS, SHANGHAI_EXTRA_COMMUNITY_CHEST_CARDS, TOKYO_EXTRA_CHANCE_CARDS, TOKYO_EXTRA_COMMUNITY_CHEST_CARDS, QUIZ_QUESTIONS, QUIZ_TRIGGER_CHANCE, GO_SALARY, JAIL_FINE, CORNER_GO, CORNER_JAIL, PLAYER_COLORS, } from '@monopoly/shared';
+import { createTiles, CHANCE_CARDS, COMMUNITY_CHEST_CARDS, SHANGHAI_EXTRA_CHANCE_CARDS, SHANGHAI_EXTRA_COMMUNITY_CHEST_CARDS, TOKYO_EXTRA_CHANCE_CARDS, TOKYO_EXTRA_COMMUNITY_CHEST_CARDS, GO_SALARY, JAIL_FINE, CORNER_GO, CORNER_JAIL, PLAYER_COLORS, } from '@monopoly/shared';
 import { getEffectiveConfig, THEMES } from '@monopoly/shared';
 import { rollDice, findNearestTile, moveToTile } from '@monopoly/shared';
 import { shuffle } from './utils/shuffle';
@@ -44,8 +44,6 @@ export class GameManager {
             weather: 'clear',
             weatherTimer: 30,
             dayTime: 0.3, // start at daytime
-            quizActive: false,
-            quizQuestion: null,
             wheelResult: null,
             lastCardDrawn: null,
             gameEvent: null,
@@ -179,11 +177,12 @@ export class GameManager {
         if (landing.gameEvent) {
             this.state.gameEvent = landing.gameEvent;
         }
+        // Set phase BEFORE drawCard — card effect may override it (e.g. move to property → buying)
+        this.state.phase = landing.phase;
         if (landing.cardType) {
             this.drawCard(landing.cardType);
         }
-        this.state.phase = landing.phase;
-        // Check bankruptcy
+        // Check bankruptcy (card effect may have taken cash)
         if (this.currentPlayer.cash < 0) {
             this.state.phase = 'debt';
         }
@@ -298,20 +297,10 @@ export class GameManager {
         this.state.phase = 'rolling';
         this.state.dice = null;
         this.state.diceRolled = false;
-        this.state.quizActive = false;
-        this.state.quizQuestion = null;
         this.state.lastCardDrawn = null;
         this.state.wheelResult = null;
         this.state.gameEvent = null;
         this.state.ringTransferred = false;
-        // Check for quiz trigger at turn start
-        if (QUIZ_TRIGGER_CHANCE > 0 && Math.random() < QUIZ_TRIGGER_CHANCE) {
-            const questions = QUIZ_QUESTIONS;
-            const q = questions[Math.floor(Math.random() * questions.length)];
-            this.state.quizActive = true;
-            this.state.quizQuestion = q;
-            this.addLog(`知识问答！`, 'info');
-        }
         // Weather change check
         this.state.weatherTimer--;
         if (this.state.weatherTimer <= 0) {
@@ -480,33 +469,6 @@ export class GameManager {
                 this.state.phase = landing.phase === 'buying' ? 'buying' : 'awaitEnd';
                 break;
             }
-        }
-    }
-    // ---- Quiz ----
-    answerQuiz(optionIndex) {
-        if (!this.state.quizActive || !this.state.quizQuestion) {
-            return { correct: false };
-        }
-        const question = this.state.quizQuestion;
-        const correct = optionIndex === question.correctIndex;
-        const eff = getEffectiveConfig(this.state.config.theme, this.state.config.difficulty);
-        if (correct) {
-            const reward = Math.round(200 * eff.rentMultiplier);
-            this.currentPlayer.cash += reward;
-            this.addLog(`✅ 问答正确！${this.currentPlayer.name} 获得 $${reward}`, 'info');
-            this.state.quizActive = false;
-            this.emitChange();
-            return { correct: true, reward };
-        }
-        else {
-            const penalty = Math.round(100 * eff.taxMultiplier);
-            this.currentPlayer.cash -= penalty;
-            this.addLog(`❌ 问答错误！${this.currentPlayer.name} 支付罚款 $${penalty}`, 'info');
-            this.state.quizActive = false;
-            if (this.currentPlayer.cash < 0)
-                this.state.phase = 'debt';
-            this.emitChange();
-            return { correct: false, penalty };
         }
     }
     // ---- Wheel ----
@@ -718,7 +680,7 @@ export class GameManager {
                     this.rollDice();
                 }
                 // After rolling, schedule follow-up
-                if (this.state.phase === 'buying' || this.state.phase === 'debt' || this.state.phase === 'stock' || this.state.phase === 'wheel' || this.state.phase === 'quiz') {
+                if (this.state.phase === 'buying' || this.state.phase === 'debt' || this.state.phase === 'stock' || this.state.phase === 'wheel') {
                     setTimeout(() => this.executeBotAction(), 2800);
                 }
                 else if (this.state.phase === 'awaitEnd') {
@@ -779,12 +741,6 @@ export class GameManager {
                 break;
             case 'spinWheel':
                 this.spinWheel();
-                setTimeout(() => this.endTurn(), 1500);
-                break;
-            case 'answerQuiz':
-                if (decision.quizAnswer !== undefined) {
-                    this.answerQuiz(decision.quizAnswer);
-                }
                 setTimeout(() => this.endTurn(), 1500);
                 break;
         }

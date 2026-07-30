@@ -320,14 +320,6 @@ io.on('connection', (socket) => {
             return;
         game.spinWheel();
     });
-    socket.on('answerQuiz', (optionIndex) => {
-        const game = getGame();
-        if (!game)
-            return;
-        const result = game.answerQuiz(optionIndex);
-        // Reply directly to the answering player, so they always get the result
-        socket.emit('quizResult', result);
-    });
     socket.on('takeHighSpeedRail', (targetTheme) => {
         const game = getGame();
         if (!game)

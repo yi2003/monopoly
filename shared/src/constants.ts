@@ -2,7 +2,7 @@
 // 家庭大富翁 — Game Constants
 // ============================================================
 
-import type { Tile, Card, Stock, WheelSector, QuizQuestion, ColorGroup, ThemeId } from './types';
+import type { Tile, Card, Stock, WheelSector, ColorGroup, ThemeId } from './types';
 
 // ---- Board Layout (48 inner ground + 48 outer ground + 24 inner city) ----
 
@@ -506,26 +506,6 @@ export const WHEEL_SECTORS: WheelSector[] = [
   { index: 13, label: 'AI股×2', effect: { kind: 'freeStock', symbol: 'AI', shares: 2 }, color: '#E91E63' },
 ];
 
-// ---- Quiz Questions ----
-
-export const QUIZ_QUESTIONS: QuizQuestion[] = [
-  { id: 0, question: '标准大富翁棋盘有多少格地面环？', options: ['40格', '44格', '48格', '52格'], correctIndex: 2, category: '规则' },
-  { id: 1, question: '掷出几次连续双数会直接进监狱？', options: ['2次', '3次', '4次', '5次'], correctIndex: 1, category: '规则' },
-  { id: 2, question: '一座酒店相当于几栋房屋？', options: ['3栋', '4栋', '5栋', '6栋'], correctIndex: 2, category: '规则' },
-  { id: 3, question: '经过起点(GO)可以领取多少工资？(经典模式)', options: ['$100', '$150', '$200', '$250'], correctIndex: 1, category: '规则' },
-  { id: 4, question: '本游戏有几只可交易的股票？', options: ['12只', '15只', '18只', '20只'], correctIndex: 2, category: '特色' },
-  { id: 5, question: '股市交易的手续费率是多少？', options: ['1%', '2%', '3%', '5%'], correctIndex: 2, category: '特色' },
-  { id: 6, question: '大转盘有多少个扇区？', options: ['10个', '12个', '14个', '16个'], correctIndex: 2, category: '特色' },
-  { id: 7, question: '知识问答在回合开始时的触发概率？', options: ['8%', '10%', '12%', '15%'], correctIndex: 2, category: '特色' },
-  { id: 8, question: '监狱最多关押几个回合？', options: ['2回合', '3回合', '4回合', '5回合'], correctIndex: 1, category: '规则' },
-  { id: 9, question: '拥有整组颜色地产时，无房屋的租金如何？', options: ['不变', '1.5倍', '双倍', '三倍'], correctIndex: 2, category: '规则' },
-  { id: 10, question: '内城共有几个环？', options: ['2个', '3个', '4个', '5个'], correctIndex: 1, category: '特色' },
-  { id: 11, question: '困难难度下回合维护费是多少？', options: ['2%', '3%', '5%', '8%'], correctIndex: 2, category: '规则' },
-  { id: 12, question: '本游戏包含几种天气？', options: ['3种', '4种', '5种', '6种'], correctIndex: 2, category: '特色' },
-  { id: 13, question: '拥有2个公共事业时，租金是骰点的几倍？', options: ['4倍', '6倍', '8倍', '10倍'], correctIndex: 3, category: '规则' },
-  { id: 14, question: '第一大富翁比赛于哪一年举行？', options: ['1970年', '1973年', '1975年', '1977年'], correctIndex: 1, category: '历史' },
-];
-
 // ---- Player Colors ----
 
 export const PLAYER_COLORS = [
@@ -559,7 +539,6 @@ export const MAX_HOUSES = 5;
 export const HOUSE_HOTEL_THRESHOLD = 5; // 5 houses = hotel
 export const STOCK_TRADE_FEE = 0.03; // 3%
 export const MIN_STOCK_FEE = 5;
-export const QUIZ_TRIGGER_CHANCE = 0.12; // 12% chance at turn start
 
 // ---- Room Codes ----
 

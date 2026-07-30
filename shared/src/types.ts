@@ -10,7 +10,6 @@ export type GamePhase =
   | 'buying'
   | 'stock'
   | 'wheel'
-  | 'quiz'
   | 'debt'
   | 'awaitEnd'
   | 'ended';
@@ -249,14 +248,6 @@ export type WheelEffect =
   | { kind: 'freeHouse' }
   | { kind: 'freeStock'; symbol: string; shares: number };
 
-export interface QuizQuestion {
-  id: number;
-  question: string;
-  options: string[];
-  correctIndex: number;
-  category: string;
-}
-
 // ---- Game Event Notification (for card popups) ----
 
 export type GameEvent =
@@ -289,8 +280,6 @@ export interface GameState {
   weather: WeatherType;
   weatherTimer: number;
   dayTime: number; // 0-1, position in day/night cycle
-  quizActive: boolean;
-  quizQuestion: QuizQuestion | null;
   wheelResult: number | null; // sector index
   lastCardDrawn: { type: CardType; card: Card } | null;
   gameEvent: GameEvent | null;
@@ -322,7 +311,6 @@ export interface ClientToServerEvents {
   buyStock: (data: { symbol: string; shares: number }) => void;
   sellStock: (data: { symbol: string; shares: number }) => void;
   spinWheel: () => void;
-  answerQuiz: (optionIndex: number) => void;
   takeHighSpeedRail: (targetTheme: ThemeId) => void;
   enterInnerCity: (sector: number) => void;
   exitInnerCity: () => void;
@@ -343,6 +331,5 @@ export interface ServerToClientEvents {
   playerJoined: (player: Player) => void;
   playerLeft: (playerId: string) => void;
   chatMessage: (data: { playerId: string; playerName: string; message: string }) => void;
-  quizResult: (result: { correct: boolean; reward?: number; penalty?: number }) => void;
   pong: () => void;
 }

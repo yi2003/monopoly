@@ -92,16 +92,6 @@ export function connectSocket(): Socket {
     uiStore().addToast(message, 'error');
   });
 
-  // ---- Quiz Result (direct response, no need to detect state transition) ----
-
-  socket.on('quizResult', (result: { correct: boolean; reward?: number; penalty?: number }) => {
-    if (result.correct) {
-      uiStore().setQuizResult('correct', result.reward);
-    } else {
-      uiStore().setQuizResult('wrong', result.penalty);
-    }
-  });
-
   // ---- Game State ----
 
   socket.on('gameState', (state: GameState) => {
@@ -125,21 +115,7 @@ export function connectSocket(): Socket {
       if (store.showStockPanel) store.toggleStockPanel();
     }
 
-    // Detect quiz result from log (when quiz transitions active→inactive)
-    if (prevState?.quizActive && !state.quizActive) {
-      const lastLog = state.logs[state.logs.length - 1];
-      if (lastLog && lastLog.message.includes('答对了')) {
-        const match = lastLog.message.match(/\$(\d+)/);
-        const amount = match ? Number(match[1]) : undefined;
-        uiStore().setQuizResult('correct', amount);
-      } else if (lastLog && lastLog.message.includes('答错了')) {
-        const match = lastLog.message.match(/\$(\d+)/);
-        const amount = match ? Number(match[1]) : undefined;
-        uiStore().setQuizResult('wrong', amount);
-      }
-    }
-
-    // Delay card/wheel/quiz until character finishes walking
+    // Delay card/wheel until character finishes walking
     const DICE_ANIM_BASE = 2500;
     const walkSteps = state.dice ? state.dice.total : 0;
     const walkTimeMs = walkSteps > 0 ? (walkSteps / 5.5) * 1000 : 0;
@@ -165,16 +141,6 @@ export function connectSocket(): Socket {
       // Check for wheel result — skip for spectators
       if (!liveIsSpectator && state.wheelResult !== null) {
         uiStore().setWheelResult(state.wheelResult);
-      }
-
-      // Check for quiz — skip for spectators
-      if (!liveIsSpectator && liveState?.quizActive && liveState.quizQuestion) {
-        uiStore().setQuizData({
-          question: liveState.quizQuestion.question,
-          options: liveState.quizQuestion.options,
-          reward: '租金倍率奖励',
-          penalty: '税费倍率惩罚',
-        });
       }
 
       // Check for generic game event (rent, tax, go_salary, jail, dividend, weather, maintenance) — skip for spectators

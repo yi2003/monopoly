@@ -7,7 +7,6 @@ import BuyModal from './components/Modals/BuyModal';
 import BuildModal from './components/Modals/BuildModal';
 import StockModal from './components/Modals/StockModal';
 import PortfolioModal from './components/Modals/PortfolioModal';
-import QuizModal from './components/Modals/QuizModal';
 import BankruptcyModal from './components/Modals/BankruptcyModal';
 import GameOverModal from './components/Modals/GameOverModal';
 import CardFlip from './components/Special/CardFlip';
@@ -43,7 +42,6 @@ export default function App() {
       <BuildModal />
       <StockModal />
       <PortfolioModal />
-      <QuizModal />
       <BankruptcyModal />
       <GameOverModal />
       <CardFlip />

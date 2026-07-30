@@ -49,11 +49,6 @@ export declare class GameManager {
     };
     drawCard(type: 'chance' | 'community_chest'): void;
     private applyCardEffect;
-    answerQuiz(optionIndex: number): {
-        correct: boolean;
-        reward?: number;
-        penalty?: number;
-    };
     spinWheel(): number;
     buyStock(symbol: string, shares: number): {
         success: boolean;

@@ -349,22 +349,6 @@ html, body, #root {
 .portfolio-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
 .portfolio-stats div { padding: 8px; background: rgba(255,255,255,0.03); border-radius: 6px; }
 
-/* Quiz Modal */
-
-.quiz-question { font-size: 17px; text-align: center; padding: 20px; line-height: 1.6; }
-.quiz-options { display: flex; flex-direction: column; gap: 10px; }
-.quiz-option { text-align: left; padding: 14px; font-size: 15px; }
-.quiz-option:disabled { opacity: 0.6; cursor: not-allowed; }
-.quiz-option.selected { border-color: var(--accent-yellow); background: rgba(255,215,0,0.15); }
-.quiz-info { text-align: center; color: var(--text-secondary); margin-top: 12px; }
-.quiz-waiting { text-align: center; padding: 16px; color: var(--accent-yellow); }
-.quiz-result { text-align: center; }
-.quiz-result-icon { font-size: 56px; margin-bottom: 12px; animation: popIn 0.4s ease-out; }
-.quiz-result.correct { border: 2px solid #4CAF50; }
-.quiz-result.wrong { border: 2px solid #E53935; }
-.quiz-result-amount { margin: 8px 0; }
-.quiz-result-hint { margin-top: 8px; }
-
 @keyframes popIn {
   0% { transform: scale(0.3); opacity: 0; }
   70% { transform: scale(1.1); }

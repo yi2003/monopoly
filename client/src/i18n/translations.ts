@@ -58,7 +58,6 @@ export const translations = {
     'phase.buying': '购买决策',
     'phase.stock': '股票交易',
     'phase.wheel': '大转盘',
-    'phase.quiz': '知识问答',
     'phase.debt': '债务处理',
     'phase.awaitEnd': '回合结束',
     'phase.ended': '游戏结束',
@@ -173,15 +172,6 @@ export const translations = {
     'bankrupt.declare': '💀 宣布破产',
     'bankrupt.tip': '提示: 使用右侧建造面板出售房屋',
 
-    // Quiz Modal
-    'quiz.title': '🧠 知识问答',
-    'quiz.correct': '回答正确！',
-    'quiz.wrong': '回答错误！',
-    'quiz.rewardGiven': '奖励已发放',
-    'quiz.penaltyTaken': '罚金已扣除',
-    'quiz.waiting': '⏳ 等待结果...',
-    'quiz.hint': '✅ 正确: 获得奖励 (租金倍率) | ❌ 错误: 支付罚金 (税费倍率)',
-
     // Card Flip
     'card.chance': '机会',
     'card.community': '公益金',
@@ -266,7 +256,6 @@ export const translations = {
     'phase.buying': 'Buy Decision',
     'phase.stock': 'Stock Trading',
     'phase.wheel': 'Wheel of Fortune',
-    'phase.quiz': 'Quiz',
     'phase.debt': 'Debt Settlement',
     'phase.awaitEnd': 'End Turn',
     'phase.ended': 'Game Over',
@@ -371,14 +360,6 @@ export const translations = {
     'bankrupt.hint': 'Try selling houses or stocks to raise funds.',
     'bankrupt.declare': '💀 Declare Bankruptcy',
     'bankrupt.tip': 'Tip: Use the build panel to sell houses',
-
-    'quiz.title': '🧠 Quiz',
-    'quiz.correct': 'Correct!',
-    'quiz.wrong': 'Wrong!',
-    'quiz.rewardGiven': 'Reward granted',
-    'quiz.penaltyTaken': 'Penalty deducted',
-    'quiz.waiting': '⏳ Waiting for result...',
-    'quiz.hint': '✅ Correct: earn reward | ❌ Wrong: pay penalty',
 
     'card.chance': 'Chance',
     'card.community': 'Community Chest',

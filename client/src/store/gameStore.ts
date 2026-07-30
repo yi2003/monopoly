@@ -69,8 +69,6 @@ const defaultGameState: GameState = {
   weather: 'clear',
   weatherTimer: 30,
   dayTime: 0.3,
-  quizActive: false,
-  quizQuestion: null,
   wheelResult: null,
   lastCardDrawn: null,
   gameEvent: null,

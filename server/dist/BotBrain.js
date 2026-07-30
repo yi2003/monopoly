@@ -19,8 +19,6 @@ export function decideBotAction(state, player) {
             return decideStockAction(state, player);
         case 'wheel':
             return { action: 'spinWheel', delay: REGULAR_DELAY };
-        case 'quiz':
-            return decideQuizAction(state, player);
         default:
             return { action: 'pass', delay: REGULAR_DELAY };
     }
@@ -106,15 +104,6 @@ function decideStockAction(state, player) {
         }
     }
     return { action: 'endTurn', delay: REGULAR_DELAY };
-}
-function decideQuizAction(state, _player) {
-    if (state.quizQuestion) {
-        // Bot randomly guesses — correct ~25% of the time
-        const answer = Math.floor(Math.random() * state.quizQuestion.options.length);
-        return { action: 'answerQuiz', quizAnswer: answer, delay: REGULAR_DELAY };
-    }
-    // No question loaded — skip
-    return { action: 'pass', delay: REGULAR_DELAY };
 }
 function findBestBuild(state, player) {
     const buildable = [];

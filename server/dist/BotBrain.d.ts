@@ -1,8 +1,7 @@
 import type { GameState, Player } from '@monopoly/shared';
 export interface BotDecision {
-    action: 'roll' | 'buy' | 'pass' | 'build' | 'sellHouse' | 'endTurn' | 'payJail' | 'useCard' | 'tryDoubles' | 'spinWheel' | 'answerQuiz';
+    action: 'roll' | 'buy' | 'pass' | 'build' | 'sellHouse' | 'endTurn' | 'payJail' | 'useCard' | 'tryDoubles' | 'spinWheel';
     tileIndex?: number;
-    quizAnswer?: number;
     stockAction?: {
         symbol: string;
         shares: number;

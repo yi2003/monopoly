@@ -95,9 +95,6 @@ export class AudioManager {
   playVictory(): void { this.playFanfare(); }
   playDividend(): void { this.playTone(1000, 0.15, 'sine'); }
   playWheelSpin(): void { this.playNoiseBurst(0.4, 300, 900, 0.35); }
-  playQuizCorrect(): void { this.playMelody([523, 784, 1047], 0.1); }
-  playQuizWrong(): void { this.playNoiseBurst(0.2, 150, 300, 0.4); }
-
   // ---- City & Environmental Sounds ----
 
   /** Car horn: two-tone honk */
