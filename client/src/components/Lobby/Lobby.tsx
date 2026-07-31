@@ -152,7 +152,7 @@ export default function Lobby() {
                       onClick={() => setEra(eraId)}
                       title={eraDef.tagline}
                     >
-                      {ERA_NAMES[eraId]}
+                      {lang === 'zh' ? ERA_NAMES[eraId] : eraDef.title}
                     </button>
                   );
                 })}
@@ -243,7 +243,7 @@ export default function Lobby() {
         <div className="room-header">
           <h1>{t('lobby.roomTitle')}: <span className="room-code">{roomCode}</span></h1>
           <div className="room-config">
-            {localName(THEMES[theme])} · {ERA_NAMES[era]} · {localName(DIFFICULTIES[difficulty])}
+            {localName(THEMES[theme])} · {lang === 'zh' ? ERA_NAMES[era] : ERAS[era].title} · {localName(DIFFICULTIES[difficulty])}
           </div>
         </div>
 

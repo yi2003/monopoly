@@ -229,6 +229,7 @@ export interface LogEntry {
   round: number;
   timestamp: number;
   message: string;
+  messageEN?: string;
   type: 'info' | 'rent' | 'card' | 'buy' | 'sell' | 'dividend' | 'bankrupt' | 'victory' | 'jail';
 }
 

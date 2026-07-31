@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
+import { useI18n } from '../../i18n/useI18n';
 
 const CATEGORY_COLORS: Record<string, string> = {
   rent: '#E53935',
@@ -19,6 +20,7 @@ const MAX_VISIBLE = 4;
 
 export default function EventToast() {
   const logs = useGameStore(s => s.logs);
+  const { lang } = useI18n();
   const [toasts, setToasts] = useState<{ id: number; message: string; type: string }[]>([]);
   const lastLogId = useRef(-1);
   const timers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
@@ -38,7 +40,7 @@ export default function EventToast() {
 
     for (const log of newLogs) {
       setToasts(prev => {
-        const next = [...prev, { id: log.id, message: log.message, type: log.type }];
+        const next = [...prev, { id: log.id, message: (lang === 'en' && log.messageEN) ? log.messageEN : log.message, type: log.type }];
         // Keep only last MAX_VISIBLE
         if (next.length > MAX_VISIBLE) {
           const removed = next[next.length - MAX_VISIBLE - 1];
@@ -111,7 +113,7 @@ export default function EventToast() {
             return !v;
           });
         }}
-        title={logExpanded ? '收起日志' : '展开日志'}
+        title={lang === 'zh' ? (logExpanded ? '收起日志' : '展开日志') : (logExpanded ? 'Collapse log' : 'Expand log')}
         style={toasts.length > 0 ? { top: 80 + toasts.length * 50 + 10 } : { top: 80 }}
       >
         📋 {logs.length > 0 && <span className="event-log-badge">{logs.length}</span>}
@@ -121,26 +123,26 @@ export default function EventToast() {
       {logExpanded && (
         <div className="event-log-panel">
           <div className="event-log-header">
-            <span>📋 事件日志（{logs.length}条）</span>
+            <span>{lang === 'zh' ? `📋 事件日志（${logs.length}条）` : `📋 Event Log (${logs.length})`}</span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={() => {
-                  const text = logs.map(l => `[R${l.round}] ${l.message}`).join('\n');
+                  const text = logs.map(l => `[R${l.round}] ${(lang === 'en' && l.messageEN) ? l.messageEN : l.message}`).join('\n');
                   navigator.clipboard.writeText(text).then(() => {
-                    useUIStore.getState().addToast('已复制日志', 'info');
+                    useUIStore.getState().addToast(lang === 'zh' ? '已复制日志' : 'Log copied', 'info');
                   }).catch(() => {});
                 }}
-                title="复制全部日志"
+                title={lang === 'zh' ? '复制全部日志' : 'Copy all logs'}
                 style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', color: '#999', cursor: 'pointer', borderRadius: 4, padding: '2px 8px', fontSize: 12 }}
               >
-                📋 复制
+                {lang === 'zh' ? '📋 复制' : '📋 Copy'}
               </button>
               <button
                 onClick={() => useGameStore.getState().clearLogs()}
-                title="清空日志"
+                title={lang === 'zh' ? '清空日志' : 'Clear logs'}
                 style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', color: '#999', cursor: 'pointer', borderRadius: 4, padding: '2px 8px', fontSize: 12 }}
               >
-                🗑️ 清空
+                {lang === 'zh' ? '🗑️ 清空' : '🗑️ Clear'}
               </button>
               <button onClick={() => setLogExpanded(false)}>✕</button>
             </div>
@@ -153,7 +155,7 @@ export default function EventToast() {
                 style={{ borderLeftColor: CATEGORY_COLORS[log.type] || CATEGORY_COLORS.info }}
               >
                 <span className="event-log-round">R{log.round}</span>
-                <span className="event-log-msg">{log.message}</span>
+                <span className="event-log-msg">{(lang === 'en' && log.messageEN) ? log.messageEN : log.message}</span>
               </div>
             ))}
           </div>

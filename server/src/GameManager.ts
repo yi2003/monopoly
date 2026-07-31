@@ -139,9 +139,9 @@ export class GameManager {
     this.state.dice = null;
     this.state.diceRolled = false;
 
-    this.addLog('游戏开始！');
-    this.addLog(`主题: ${THEMES[this.state.config.theme].nameCN} | 难度: ${eff.drainPct > 0 ? `${Math.round(eff.drainPct * 100)}%维护费` : '无维护费'}`);
-    this.addLog(`轮到 ${this.currentPlayer.name}`);
+    this.addLog('游戏开始！', 'info', 'Game started!');
+    this.addLog(`主题: ${THEMES[this.state.config.theme].nameCN} | 难度: ${eff.drainPct > 0 ? `${Math.round(eff.drainPct * 100)}%维护费` : '无维护费'}`, 'info', `Theme: ${THEMES[this.state.config.theme].name} | Difficulty: ${eff.drainPct > 0 ? `${Math.round(eff.drainPct * 100)}% maint` : 'no maint'}`);
+    this.addLog(`轮到 ${this.currentPlayer.name}`, 'info', `${this.currentPlayer.name}'s turn`);
     this.emitChange();
 
     // Kick off bot/autoPilot if first player is AI
@@ -168,11 +168,11 @@ export class GameManager {
     this.state.diceRolled = true;
 
     const result = this.engine.processDiceResult(dice);
-    this.addLog(`${this.currentPlayer.name} 掷出 ${dice.total} 点`);
+    this.addLog(`${this.currentPlayer.name} 掷出 ${dice.total} 点`, 'info', `${this.currentPlayer.name} rolled ${dice.total}`);
 
     if (result.passedGo) {
       const eff = getEffectiveConfig(this.state.config.theme, this.state.config.difficulty);
-      this.addLog(`💰 ${this.currentPlayer.name} 经过起点，银行发放工资 $${eff.goSalary}`, 'info');
+      this.addLog(`💰 ${this.currentPlayer.name} 经过起点，银行发放工资 $${eff.goSalary}`, 'info', `💰 ${this.currentPlayer.name} passed GO, collect $${eff.goSalary}`);
       this.emitEvent({ kind: 'go_salary', playerId: this.currentPlayer.id, amount: eff.goSalary });
     }
 
@@ -193,11 +193,11 @@ export class GameManager {
         this.currentPlayer.jailTurns = 1;
         this.currentPlayer.status = 'jailed';
         this.currentPlayer.consecutiveDoubles = 0;
-        this.addLog(`${this.currentPlayer.name} 连续三次掷出对子，被送进监狱！`, 'jail');
+        this.addLog(`${this.currentPlayer.name} 连续三次掷出对子，被送进监狱！`, 'jail', `${this.currentPlayer.name} rolled 3 doubles — jail!`);
         this.emitEvent({ kind: 'jail_in', playerId: this.currentPlayer.id, reason: 'three_doubles' });
         this.state.phase = 'awaitEnd';
       } else {
-        this.addLog(`${this.currentPlayer.name} 掷出对子，再掷一次！`, 'info');
+        this.addLog(`${this.currentPlayer.name} 掷出对子，再掷一次！`, 'info', `${this.currentPlayer.name} rolled doubles — roll again!`);
         this.state.diceRolled = false; // allow re-roll
         this.emitChange();
         return { dice, result };
@@ -280,7 +280,7 @@ export class GameManager {
       if (winner) {
         this.state.winner = winner.id;
         this.state.phase = 'ended';
-        this.addLog(`${winner.name} 获胜！`, 'victory');
+        this.addLog(`${winner.name} 获胜！`, 'victory', `${winner.name} wins!`);
         this.emitEvent({ kind: 'game_over', winnerId: winner.id, winnerName: winner.name });
         this.emitChange();
         return;
@@ -292,7 +292,7 @@ export class GameManager {
     if (winner) {
       this.state.winner = winner.id;
       this.state.phase = 'ended';
-      this.addLog(`${winner.name} 获胜！`, 'victory');
+      this.addLog(`${winner.name} 获胜！`, 'victory', `${winner.name} wins!`);
       this.emitEvent({ kind: 'game_over', winnerId: winner.id, winnerName: winner.name });
       this.emitChange();
       return;
@@ -305,7 +305,7 @@ export class GameManager {
         const drain = Math.round(this.currentPlayer.cash * eff.drainPct);
         this.currentPlayer.cash -= drain;
         if (drain > 0) {
-          this.addLog(`🔧 ${this.currentPlayer.name} → 银行 资产维护费 $${drain}（${Math.round(eff.drainPct * 100)}%）`, 'info');
+          this.addLog(`🔧 ${this.currentPlayer.name} → 银行 资产维护费 $${drain}（${Math.round(eff.drainPct * 100)}%）`, 'info', `🔧 ${this.currentPlayer.name} → Bank maintenance $${drain} (${Math.round(eff.drainPct * 100)}%)`);
           this.emitEvent({ kind: 'maintenance', playerId: this.currentPlayer.id, amount: drain, rate: Math.round(eff.drainPct * 100) });
         }
       }
@@ -369,7 +369,7 @@ export class GameManager {
     // Day/night progression
     this.state.dayTime = (this.state.dayTime + 0.008) % 1;
 
-    this.addLog(`轮到 ${this.currentPlayer.name}`);
+    this.addLog(`轮到 ${this.currentPlayer.name}`, 'info', `${this.currentPlayer.name}'s turn`);
 
     // If next player is bot, schedule their turn
     if (this.currentPlayer.isBot || this.currentPlayer.autoPilot) {
@@ -388,7 +388,7 @@ export class GameManager {
     this.currentPlayer.cash -= JAIL_FINE;
     this.currentPlayer.jailTurns = 0;
     this.currentPlayer.status = 'active';
-    this.addLog(`🔓 ${this.currentPlayer.name} 向银行缴纳 $${JAIL_FINE} 保释出狱`, 'info');
+    this.addLog(`🔓 ${this.currentPlayer.name} 向银行缴纳 $${JAIL_FINE} 保释出狱`, 'info', `🔓 ${this.currentPlayer.name} paid $${JAIL_FINE} bail`);
     this.emitEvent({ kind: 'jail_out', playerId: this.currentPlayer.id, method: 'pay_fine' });
     this.emitChange();
     return { success: true };
@@ -400,7 +400,7 @@ export class GameManager {
     this.currentPlayer.getOutOfJailCards--;
     this.currentPlayer.jailTurns = 0;
     this.currentPlayer.status = 'active';
-    this.addLog(`🃏 ${this.currentPlayer.name} 使用出狱卡出狱`, 'info');
+    this.addLog(`🃏 ${this.currentPlayer.name} 使用出狱卡出狱`, 'info', `🃏 ${this.currentPlayer.name} used Get Out of Jail card`);
     this.emitEvent({ kind: 'jail_out', playerId: this.currentPlayer.id, method: 'use_card' });
     this.emitChange();
     return { success: true };
@@ -417,16 +417,16 @@ export class GameManager {
       this.currentPlayer.status = 'active';
       this.currentPlayer.consecutiveDoubles = 0;
       this.state.phase = 'rolling';
-      this.addLog(`🎲 ${this.currentPlayer.name} 掷出 ${dice.die1} 点，越狱成功！`, 'info');
+      this.addLog(`🎲 ${this.currentPlayer.name} 掷出 ${dice.die1} 点，越狱成功！`, 'info', `🎲 ${this.currentPlayer.name} rolled ${dice.die1} — broke out of jail!`);
       this.emitEvent({ kind: 'jail_out', playerId: this.currentPlayer.id, method: 'doubles' });
     } else {
       this.currentPlayer.jailTurns++;
-      this.addLog(`🔒 ${this.currentPlayer.name} 掷出 ${dice.die1} 点，未能出狱（${this.currentPlayer.jailTurns}/3回合）`, 'info');
+      this.addLog(`🔒 ${this.currentPlayer.name} 掷出 ${dice.die1} 点，未能出狱（${this.currentPlayer.jailTurns}/3回合）`, 'info', `🔒 ${this.currentPlayer.name} rolled ${dice.die1} — still in jail (${this.currentPlayer.jailTurns}/3 turns)`);
       if (this.currentPlayer.jailTurns >= 3) {
         this.currentPlayer.cash -= JAIL_FINE;
         this.currentPlayer.jailTurns = 0;
         this.currentPlayer.status = 'active';
-        this.addLog(`${this.currentPlayer.name} 关押3回，强制付 $${JAIL_FINE} 出狱`);
+        this.addLog(`${this.currentPlayer.name} 关押3回，强制付 $${JAIL_FINE} 出狱`, 'info', `${this.currentPlayer.name} jailed 3 turns — forced bail $${JAIL_FINE}`);
         this.emitEvent({ kind: 'jail_out', playerId: this.currentPlayer.id, method: 'forced' });
       }
     }
@@ -456,7 +456,7 @@ export class GameManager {
 
     // Apply effect
     this.applyCardEffect(card);
-    this.addLog(`${this.currentPlayer.name} 抽到: ${card.descriptionCN}`, 'card');
+    this.addLog(`${this.currentPlayer.name} 抽到: ${card.descriptionCN}`, 'card', `${this.currentPlayer.name} drew: ${card.description}`);
     this.emitChange();
   }
 
@@ -612,7 +612,7 @@ export class GameManager {
       }
     }
 
-    this.addLog(`${player.name} 转到了: ${sector.label}`, 'info');
+    this.addLog(`${player.name} 转到了: ${sector.label}`, 'info', `${player.name} spun: ${sector.label}`);
     this.state.phase = 'awaitEnd';
     this.emitChange();
     return sectorIndex;
@@ -649,7 +649,7 @@ export class GameManager {
 
     player.cash -= cost;
     this.state.config.theme = targetTheme;
-    this.addLog(`🚄 ${player.name} 乘坐高铁切换到 ${THEMES[targetTheme].nameCN}（费用 $200）`, 'info');
+    this.addLog(`🚄 ${player.name} 乘坐高铁切换到 ${THEMES[targetTheme].nameCN}（费用 $200）`, 'info', `🚄 ${player.name} took HSR to ${THEMES[targetTheme].name} (fee $200)`);
     this.emitChange();
     return { success: true };
   }
@@ -669,7 +669,7 @@ export class GameManager {
     player.innerCityRing = 1; // outer ring (1-based: 1=outer, 2=middle, 3=inner)
     player.innerCitySector = sector;
     player.position = 48 + sector; // First tile of outer ring
-    this.addLog(`${player.name} 进入内城`, 'info');
+    this.addLog(`${player.name} 进入内城`, 'info', `${player.name} entered inner city`);
     this.emitChange();
     return { success: true };
   }
@@ -682,7 +682,7 @@ export class GameManager {
     // Exit to nearest railway on inner ground ring
     const railways = [5, 11, 17, 29, 35, 41];
     player.position = railways[Math.floor(Math.random() * railways.length)];
-    this.addLog(`${player.name} 离开内城`, 'info');
+    this.addLog(`${player.name} 离开内城`, 'info', `${player.name} left inner city`);
     this.emitChange();
     return { success: true };
   }
@@ -712,7 +712,7 @@ export class GameManager {
     const landing = this.engine.processLanding(player.position);
     this.state.phase = landing.phase === 'buying' ? 'buying' : 'awaitEnd';
     this.state.ringTransferred = true;
-    this.addLog(`${player.name} 换乘到${toRing === 'outer' ? '外环' : '内环'} (费用 $${fee})`, 'info');
+    this.addLog(`${player.name} 换乘到${toRing === 'outer' ? '外环' : '内环'} (费用 $${fee})`, 'info', `${player.name} transferred to ${toRing === 'outer' ? 'outer' : 'inner'} ring (fee $${fee})`);
     this.emitChange();
     return { success: true };
   }
@@ -845,12 +845,13 @@ export class GameManager {
     this.onStateChange(this.state.config.roomCode, this.state);
   }
 
-  private addLog(message: string, type: 'info' | 'rent' | 'card' | 'buy' | 'sell' | 'dividend' | 'bankrupt' | 'victory' | 'jail' = 'info'): void {
+  private addLog(message: string, type: 'info' | 'rent' | 'card' | 'buy' | 'sell' | 'dividend' | 'bankrupt' | 'victory' | 'jail' = 'info', messageEN?: string): void {
     this.state.logs.push({
       id: this.logIdCounter++, // monotonically increasing, never collides
       round: this.state.round,
       timestamp: Date.now(),
       message,
+      messageEN: messageEN || message,
       type,
     });
     // Keep last 50

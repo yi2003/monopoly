@@ -101,7 +101,7 @@ export class RuleEngine {
           rentTarget = owner.id;
           player.cash -= rentAmount;
           owner.cash += rentAmount;
-          this.addLog(`💸 ${player.name} → ${owner.name} 租金 $${rentAmount}`, 'rent');
+          this.addLog(`💸 ${player.name} → ${owner.name} 租金 $${rentAmount}`, 'rent', `💸 ${player.name} → ${owner.name} rent $${rentAmount}`);
           return {
             phase: 'awaitEnd', rentAmount, rentTarget, cardType: null,
             gameEvent: { kind: 'rent', playerId: player.id, targetId: owner.id, amount: rentAmount, tileIndex: position, tileName: tile.name, tileNameCN: tile.nameCN },
@@ -123,7 +123,7 @@ export class RuleEngine {
           rentTarget = owner.id;
           player.cash -= rentAmount;
           owner.cash += rentAmount;
-          this.addLog(`🚂 ${player.name} → ${owner.name} 铁路费 $${rentAmount}（${railwayCount}条铁路）`, 'rent');
+          this.addLog(`🚂 ${player.name} → ${owner.name} 铁路费 $${rentAmount}（${railwayCount}条铁路）`, 'rent', `🚂 ${player.name} → ${owner.name} railway fee $${rentAmount} (${railwayCount} railways)`);
           return {
             phase: 'awaitEnd', rentAmount, rentTarget, cardType: null,
             gameEvent: { kind: 'rent', playerId: player.id, targetId: owner.id, amount: rentAmount, tileIndex: position, tileName: tile.name, tileNameCN: tile.nameCN },
@@ -143,7 +143,7 @@ export class RuleEngine {
           rentTarget = owner.id;
           player.cash -= rentAmount;
           owner.cash += rentAmount;
-          this.addLog(`🔌 ${player.name} → ${owner.name} 公共事业费 $${rentAmount}（骰子${diceSum}×${utilityCount}处）`, 'rent');
+          this.addLog(`🔌 ${player.name} → ${owner.name} 公共事业费 $${rentAmount}（骰子${diceSum}×${utilityCount}处）`, 'rent', `🔌 ${player.name} → ${owner.name} utility fee $${rentAmount} (dice ${diceSum}×${utilityCount})`);
           return {
             phase: 'awaitEnd', rentAmount, rentTarget, cardType: null,
             gameEvent: { kind: 'rent', playerId: player.id, targetId: owner.id, amount: rentAmount, tileIndex: position, tileName: tile.name, tileNameCN: tile.nameCN },
@@ -157,7 +157,7 @@ export class RuleEngine {
       case 'tax': {
         const taxAmount = Math.round(tile.amount * this.effConfig.taxMultiplier);
         player.cash -= taxAmount;
-        this.addLog(`🏛️ ${player.name} → 银行 缴纳税费 $${taxAmount}`, 'info');
+        this.addLog(`🏛️ ${player.name} → 银行 缴纳税费 $${taxAmount}`, 'info', `🏛️ ${player.name} → Bank tax $${taxAmount}`);
         return {
           phase: 'awaitEnd', rentAmount: taxAmount, rentTarget: null, cardType: null,
           gameEvent: { kind: 'tax', playerId: player.id, amount: taxAmount, isLuxury: tile.isLuxury },
@@ -186,7 +186,7 @@ export class RuleEngine {
         player.position = CORNER_JAIL;
         player.jailTurns = 1;
         player.status = 'jailed';
-        this.addLog(`${player.name} 被送进监狱！`, 'jail');
+        this.addLog(`${player.name} 被送进监狱！`, 'jail', `${player.name} sent to jail!`);
         return {
           phase: 'awaitEnd', rentAmount: 0, rentTarget: null, cardType: null,
           gameEvent: { kind: 'jail_in', playerId: player.id, reason: 'goto_jail' },
@@ -206,7 +206,8 @@ export class RuleEngine {
         player.cash += tile.fee;
         if (tile.fee > 0) {
           const verb = tile.fee > 0 ? '获得' : '支付给银行';
-          this.addLog(`${player.name} 在${tile.nameCN} ${verb} $${Math.abs(tile.fee)}`, 'info');
+          const verbEN = tile.fee > 0 ? 'earns' : 'pays bank';
+          this.addLog(`${player.name} 在${tile.nameCN} ${verb} $${Math.abs(tile.fee)}`, 'info', `${player.name} ${verbEN} $${Math.abs(tile.fee)} at ${tile.name}`);
         }
         break;
       }
@@ -250,7 +251,7 @@ export class RuleEngine {
 
     player.cash -= prop.price;
     player.properties.push(player.position);
-    this.addLog(`${player.name} 购买了 ${tile.nameCN} ($${prop.price})`, 'buy');
+    this.addLog(`${player.name} 购买了 ${tile.nameCN} ($${prop.price})`, 'buy', `${player.name} bought ${tile.name} ($${prop.price})`);
   }
 
   // ---- Building ----
@@ -268,7 +269,7 @@ export class RuleEngine {
     player.houses[tileIndex] = (player.houses[tileIndex] || 0) + 1;
     player.cash -= prop.houseCost;
     const count = player.houses[tileIndex];
-    this.addLog(`${player.name} 在 ${prop.nameCN} 建造了${count === 5 ? '酒店' : `第${count}栋房屋`} ($${prop.houseCost})`, 'buy');
+    this.addLog(`${player.name} 在 ${prop.nameCN} 建造了${count === 5 ? '酒店' : `第${count}栋房屋`} ($${prop.houseCost})`, 'buy', `${player.name} built ${count === 5 ? 'a hotel' : `${count} house(s)`} on ${prop.nameEN} ($${prop.houseCost})`);
   }
 
   validateSellHouse(tileIndex: number): string | null {
@@ -286,7 +287,7 @@ export class RuleEngine {
     player.houses[tileIndex] = (player.houses[tileIndex] || 0) - 1;
     if (player.houses[tileIndex] <= 0) delete player.houses[tileIndex];
     player.cash += value;
-    this.addLog(`${player.name} 出售了房屋，获得 $${value}`, 'sell');
+    this.addLog(`${player.name} 出售了房屋，获得 $${value}`, 'sell', `${player.name} sold house(s) for $${value}`);
   }
 
   // ---- Bankruptcy ----
@@ -318,14 +319,14 @@ export class RuleEngine {
       player.houses = {};
       player.stocks = [];
       player.cash = 0;
-      this.addLog(`💀 ${player.name} 破产！全部资产 → ${creditor.name}`, 'bankrupt');
+      this.addLog(`💀 ${player.name} 破产！全部资产 → ${creditor.name}`, 'bankrupt', `💀 ${player.name} bankrupt! Assets → ${creditor.name}`);
     } else {
       // Release properties back to market
       player.properties = [];
       player.houses = {};
       player.stocks = [];
       player.cash = 0;
-      this.addLog(`💀 ${player.name} 破产！资产回归银行`, 'bankrupt');
+      this.addLog(`💀 ${player.name} 破产！资产回归银行`, 'bankrupt', `💀 ${player.name} bankrupt! Assets returned to bank`);
     }
 
     return { creditor };
@@ -400,12 +401,13 @@ export class RuleEngine {
     return worth;
   }
 
-  private addLog(message: string, type: 'info' | 'rent' | 'card' | 'buy' | 'sell' | 'dividend' | 'bankrupt' | 'victory' | 'jail'): void {
+  private addLog(message: string, type: 'info' | 'rent' | 'card' | 'buy' | 'sell' | 'dividend' | 'bankrupt' | 'victory' | 'jail', messageEN?: string): void {
     this.state.logs.push({
       id: this.state.logs.length,
       round: this.state.round,
       timestamp: Date.now(),
       message,
+      messageEN: messageEN || message,
       type,
     });
     // Keep last 50 logs
