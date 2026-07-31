@@ -237,6 +237,24 @@ html, body, #root {
   font-size: 38px;
   border-radius: 14px;
 }
+.dice-spinning {
+  animation: dice-scroll 0.08s steps(1) infinite;
+  background: #FFFDE7;
+  border: 3px solid #FFD700;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+}
+@keyframes dice-scroll {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+.dice-stop-btn {
+  animation: pulse-stop 1.2s ease-in-out infinite;
+}
+@keyframes pulse-stop {
+  0%, 100% { box-shadow: 0 0 8px rgba(229, 57, 53, 0.4); }
+  50% { box-shadow: 0 0 22px rgba(229, 57, 53, 0.8); }
+}
 .dice-total-label {
   color: var(--accent-yellow);
   font-size: 13px; font-weight: 600;

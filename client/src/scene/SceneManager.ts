@@ -18,7 +18,8 @@ import { CityBuilder, PRELOAD_MODEL_URLS } from './CityBuilder';
 import { Pedestrians } from './Pedestrians';
 import { Vehicles } from './Vehicles';
 import { NightGlow } from './NightGlow';
-import { Dice3D } from './Dice3D';
+import { Dice3D, getDice3DInstance } from './Dice3D';
+import { getSocket } from '../network/socket';
 import { SkyEnvironment } from './SkyEnvironment';
 import { PostProcessing } from './PostProcessing';
 import { preloadModels } from './ModelLoader';
@@ -171,6 +172,14 @@ export class SceneManager {
     // 3D Dice
     this.dice3D = new Dice3D(this.scene);
     this.dice3D.setPosition(0, 0, 0);
+    this.dice3D.onManualStop = (die1, die2) => {
+      const socket = getSocket();
+      if (socket) {
+        socket.emit('rollDice', { die1, die2 });
+      }
+      // Set prevDiceVal so server echo doesn't re-animate
+      this.prevDiceVal = `${die1},${die2}`;
+    };
 
     // Sky environment (sun, moon, stars, clouds, birds)
     this.skyEnv = new SkyEnvironment(this.scene);

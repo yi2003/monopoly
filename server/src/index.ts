@@ -275,10 +275,10 @@ io.on('connection', (socket) => {
     game.startGame();
   });
 
-  socket.on('rollDice', () => {
+  socket.on('rollDice', (data) => {
     const game = getGame();
     if (!game) return;
-    game.rollDice();
+    game.rollDice(data.die1, data.die2);
   });
 
   socket.on('buyProperty', (accept) => {

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
 import { getSocket } from '../../network/socket';
+import { getDice3DInstance } from '../../scene/Dice3D';
 import type { CameraMode, QualityMode } from '@monopoly/shared';
 import { THEMES, DIFFICULTIES } from '@monopoly/shared';
 import { useI18n } from '../../i18n/useI18n';
@@ -32,6 +33,7 @@ export default function HUD() {
   const playerId = useGameStore(s => s.playerId);
   const isSpectator = useGameStore(s => s.isSpectator);
   const phaseDelayUntil = useGameStore(s => s.phaseDelayUntil);
+  const diceSpinning = useGameStore(s => s.diceSpinning);
 
   const { t, lang, switchLang } = useI18n();
   const socket = getSocket();
@@ -51,8 +53,40 @@ export default function HUD() {
   }, [phaseDelayUntil, delayTick]);
   const phaseReady = Date.now() >= phaseDelayUntil;
 
-  const handleRoll = () => socket?.emit('rollDice');
+  const handleRoll = () => socket?.emit('rollDice', { die1: Math.floor(Math.random() * 6) + 1, die2: 0 });
   const handleEndTurn = () => socket?.emit('endTurn');
+
+  // Scrolling dice number animation
+  const [scrollDie, setScrollDie] = useState(1);
+  const scrollTimerRef = useRef<ReturnType<typeof setInterval>>();
+  useEffect(() => {
+    if (diceSpinning) {
+      scrollTimerRef.current = setInterval(() => {
+        setScrollDie(Math.floor(Math.random() * 6) + 1);
+      }, 80);
+    } else {
+      if (scrollTimerRef.current) {
+        clearInterval(scrollTimerRef.current);
+        scrollTimerRef.current = undefined;
+      }
+    }
+    return () => {
+      if (scrollTimerRef.current) {
+        clearInterval(scrollTimerRef.current);
+      }
+    };
+  }, [diceSpinning]);
+
+  const handleStopDice = useCallback(() => {
+    const dice3D = getDice3DInstance();
+    if (dice3D?.isSpinning()) {
+      dice3D.manualStop(); // generates values → settles 3D dice → onManualStop sends to server
+    } else {
+      // Fallback if 3D dice isn't spinning
+      const d1 = Math.floor(Math.random() * 6) + 1;
+      socket?.emit('rollDice', { die1: d1, die2: 0 });
+    }
+  }, [socket]);
   const handleBuyProperty = (accept: boolean) => socket?.emit('buyProperty', accept);
   const handleSpinWheel = () => socket?.emit('spinWheel');
   const handleDeclareBankruptcy = () => socket?.emit('declareBankruptcy');
@@ -182,7 +216,11 @@ export default function HUD() {
 
       {/* Dice Panel */}
       <div className="dice-panel">
-        {dice !== null ? (
+        {diceSpinning ? (
+          <div className="dice-display">
+            <div className="dice-face dice-total dice-spinning">{scrollDie}</div>
+          </div>
+        ) : dice !== null ? (
           <div className="dice-display">
             <div className="dice-face dice-total">{dice.die1}</div>
           </div>
@@ -201,9 +239,15 @@ export default function HUD() {
 
         {!isSpectator && phase === 'rolling' && isMyTurn && !diceRolled && (
           <div className="action-buttons">
-            <button className="btn btn-primary btn-lg" onClick={handleRoll}>
-              {t('hud.rollDice')}
-            </button>
+            {diceSpinning ? (
+              <button className="btn btn-danger btn-lg dice-stop-btn" onClick={handleStopDice}>
+                ⏹ {t('hud.stopDice')}
+              </button>
+            ) : (
+              <button className="btn btn-primary btn-lg" onClick={handleRoll}>
+                {t('hud.rollDice')}
+              </button>
+            )}
             <button className="btn btn-sm btn-outline" onClick={toggleBuildPanel}>
               {t('hud.buildSell')}
             </button>

@@ -297,7 +297,7 @@ export interface ClientToServerEvents {
   removeBot: (botId: string) => void;
   toggleAutoPilot: (playerId: string) => void;
   startGame: () => void;
-  rollDice: () => void;
+  rollDice: (data: { die1: number; die2: number }) => void;
   buyProperty: (accept: boolean) => void;
   buildHouse: (tileIndex: number) => void;
   sellHouse: (tileIndex: number) => void;

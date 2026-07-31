@@ -34,6 +34,7 @@ interface GameStore {
   roamFov: number;
   phaseDelayUntil: number; // suppress action modals until character finishes walking
   logCutoffId: number; // hide logs with id <= this after clear
+  diceSpinning: boolean; // whether dice are in manual-stop spinning mode
 
   // Actions
   setConnected: (connected: boolean) => void;
@@ -42,6 +43,7 @@ interface GameStore {
   setCameraMode: (mode: CameraMode) => void;
   setQualityMode: (mode: QualityMode) => void;
   setRoamFov: (fov: number) => void;
+  setDiceSpinning: (spinning: boolean) => void;
   toggleStockPanel: () => void;
   togglePortfolio: () => void;
   toggleBuildPanel: () => void;
@@ -101,6 +103,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   roamFov: 75,
   phaseDelayUntil: 0,
   logCutoffId: 0,
+  diceSpinning: false,
 
   setConnected: (connected) => set({ connected }),
 
@@ -125,6 +128,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
       delayUntil = 0;
     }
 
+    // Determine diceSpinning: true when human player's turn in rolling phase, no dice yet
+    const cp = state.players[state.currentPlayerIndex];
+    const myId = prev.playerId;
+    const shouldSpin = state.phase === 'rolling'
+      && !state.diceRolled
+      && !state.dice
+      && cp
+      && !cp.isBot
+      && cp.id === myId;
+
     set({
       gameState: state,
       phase: state.phase,
@@ -136,12 +149,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
       winner: state.winner,
       logs: state.logs.filter(l => l.id > prev.logCutoffId),
       phaseDelayUntil: delayUntil,
+      diceSpinning: shouldSpin,
     });
   },
 
   setCameraMode: (mode) => set({ cameraMode: mode }),
   setQualityMode: (mode) => set({ qualityMode: mode }),
   setRoamFov: (fov) => set({ roamFov: Math.max(65, Math.min(90, fov)) }),
+  setDiceSpinning: (spinning) => set({ diceSpinning: spinning }),
   toggleStockPanel: () => set(s => ({ showStockPanel: !s.showStockPanel })),
   togglePortfolio: () => set(s => ({ showPortfolio: !s.showPortfolio })),
   toggleBuildPanel: () => set(s => ({ showBuildPanel: !s.showBuildPanel })),
@@ -168,5 +183,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     logCutoffId: 0,
     selectedTile: null,
     isSpectator: false,
+    diceSpinning: false,
   }),
 }));

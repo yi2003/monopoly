@@ -62,6 +62,10 @@ interface DiePhysics {
   settleStartQuat: THREE.Quaternion;
 }
 
+// Global instance ref so HUD can trigger manualStop()
+let dice3DInstance: Dice3D | null = null;
+export function getDice3DInstance(): Dice3D | null { return dice3DInstance; }
+
 export class Dice3D {
   private scene: THREE.Scene;
   private group: THREE.Group;
@@ -82,6 +86,7 @@ export class Dice3D {
   isSpinning(): boolean { return this.spinning; }
 
   constructor(scene: THREE.Scene) {
+    dice3DInstance = this;
     this.scene = scene;
     this.group = new THREE.Group();
     this.group.name = 'dice3D';
@@ -519,6 +524,7 @@ export class Dice3D {
   }
 
   dispose(): void {
+    if (dice3DInstance === this) dice3DInstance = null;
     this.scene.remove(this.group);
     const disposeMesh = (m: THREE.Mesh) => {
       m.geometry.dispose();

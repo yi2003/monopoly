@@ -156,12 +156,14 @@ export class GameManager {
     return this.state.players[this.state.currentPlayerIndex];
   }
 
-  rollDice(): { dice: { die1: number; die2: number; total: number; isDoubles: boolean }; result: any } {
+  rollDice(die1?: number, die2?: number): { dice: { die1: number; die2: number; total: number; isDoubles: boolean }; result: any } {
     if (this.state.phase !== 'rolling') {
       return { dice: { die1: 0, die2: 0, total: 0, isDoubles: false }, result: { error: '现在不能掷骰子' } };
     }
 
-    const dice = rollDice();
+    const dice = (die1 !== undefined)
+      ? { die1, die2: die2 || 0, total: die1 + (die2 || 0), isDoubles: die1 === die2 && die2 !== 0 && die2 !== undefined }
+      : rollDice();
     this.state.dice = dice;
     this.state.diceRolled = true;
 
