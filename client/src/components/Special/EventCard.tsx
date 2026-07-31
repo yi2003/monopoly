@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useUIStore } from '../../store/uiStore';
+import { useGameStore } from '../../store/gameStore';
 import { useI18n } from '../../i18n/useI18n';
 import type { GameEvent } from '@monopoly/shared';
 
-const EVENT_CONFIG: Record<GameEvent['kind'], { icon: string; color: string }> = {
+const EVENT_CONFIG: Record<string, { icon: string; color: string }> = {
   rent:        { icon: '💸', color: '#E53935' },
   tax:         { icon: '🏛️', color: '#FF5722' },
   go_salary:   { icon: '💰', color: '#4CAF50' },
   jail_in:     { icon: '🔒', color: '#9E9E9E' },
   jail_out:    { icon: '🔓', color: '#FFD700' },
   dividend:    { icon: '📈', color: '#2196F3' },
+  card:        { icon: '🃏', color: '#8E24AA' },
   weather:     { icon: '🌤️', color: '#00BCD4' },
   maintenance: { icon: '🔧', color: '#FF9800' },
   game_over:   { icon: '🏆', color: '#FFD700' },
@@ -18,19 +20,21 @@ const EVENT_CONFIG: Record<GameEvent['kind'], { icon: string; color: string }> =
 function getEventMessage(
   event: GameEvent,
   lang: string,
+  getPlayerName?: (id: string) => string,
 ): { title: string; desc: string; amount?: { value: number; positive: boolean }; detail?: string } {
   const isZh = lang === 'zh';
 
   switch (event.kind) {
     case 'rent': {
       const tileName = isZh ? event.tileNameCN : event.tileName;
+      const targetName = getPlayerName?.(event.targetId) || event.targetId;
       return {
         title: isZh ? '支付租金' : 'Rent Paid',
         desc: isZh
           ? `支付 ${tileName} 的租金`
           : `Rent for ${tileName}`,
         amount: { value: event.amount, positive: false },
-        detail: isZh ? `收款人：付给了另一位玩家` : `Paid to another player`,
+        detail: isZh ? `💰 收款人：${targetName}` : `💰 Paid to ${targetName}`,
       };
     }
     case 'tax': {
@@ -95,6 +99,17 @@ function getEventMessage(
         desc: `${weatherNames[event.from] || event.from} → ${weatherNames[event.to] || event.to}`,
       };
     }
+    case 'card': {
+      const cardTypeLabel = event.cardType === 'chance'
+        ? (isZh ? '🎴 机会卡' : '🎴 Chance Card')
+        : (isZh ? '📦 公益卡' : '📦 Community Chest');
+      const playerName = getPlayerName?.(event.playerId) || event.playerId;
+      return {
+        title: cardTypeLabel,
+        desc: isZh ? event.descriptionCN : event.description,
+        detail: isZh ? `🎯 ${playerName} 抽到此卡` : `🎯 Drawn by ${playerName}`,
+      };
+    }
     case 'maintenance':
       return {
         title: isZh ? '资产维护费' : 'Maintenance Fee',
@@ -113,8 +128,14 @@ export default function EventCard() {
   const gameEvent = useUIStore(s => s.gameEvent);
   const showEventCard = useUIStore(s => s.showEventCard);
   const setGameEvent = useUIStore(s => s.setGameEvent);
+  const players = useGameStore(s => s.players);
   const { lang } = useI18n();
   const [visible, setVisible] = useState(false);
+
+  const getPlayerName = useMemo(() => (id: string) => {
+    const p = players.find(p => p.id === id);
+    return p ? p.name : id;
+  }, [players]);
 
   useEffect(() => {
     if (showEventCard && gameEvent) {
@@ -126,8 +147,8 @@ export default function EventCard() {
 
   if (!showEventCard || !gameEvent || gameEvent.kind === 'game_over') return null;
 
-  const config = EVENT_CONFIG[gameEvent.kind];
-  const msg = getEventMessage(gameEvent, lang);
+  const config = EVENT_CONFIG[gameEvent.kind] || { icon: '📋', color: '#607D8B' };
+  const msg = getEventMessage(gameEvent, lang, getPlayerName);
 
   return (
     <div

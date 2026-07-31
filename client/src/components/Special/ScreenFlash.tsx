@@ -14,6 +14,8 @@ function getFlashConfig(event: GameEvent, isPayer: boolean, isPayee: boolean) {
     case 'go_salary':
     case 'dividend':
       return { color: '#4CAF50', cssClass: 'green-flash' };
+    case 'card':
+      return { color: '#8E24AA', cssClass: 'purple-flash' };
     case 'jail_in':
       return { color: '#9E9E9E', cssClass: 'gray-flash' };
     case 'jail_out':

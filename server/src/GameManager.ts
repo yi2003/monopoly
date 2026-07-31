@@ -454,6 +454,15 @@ export class GameManager {
     const card = cards[cardIdx];
     this.state.lastCardDrawn = { type, card };
 
+    // Emit gameEvent so all players see who drew which card
+    this.state.gameEvent = {
+      kind: 'card',
+      playerId: this.currentPlayer.id,
+      cardType: type,
+      description: card.description,
+      descriptionCN: card.descriptionCN,
+    };
+
     // Apply effect
     this.applyCardEffect(card);
     this.addLog(`${this.currentPlayer.name} 抽到: ${card.descriptionCN}`, 'card', `${this.currentPlayer.name} drew: ${card.description}`);

@@ -1,14 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useUIStore } from '../../store/uiStore';
+import { useGameStore } from '../../store/gameStore';
 import { useI18n } from '../../i18n/useI18n';
 
 export default function CardFlip() {
   const lastCardDrawn = useUIStore(s => s.lastCardDrawn);
   const showCardModal = useUIStore(s => s.showCardModal);
   const setCardDrawn = useUIStore(s => s.setCardDrawn);
+  const gameEvent = useUIStore(s => s.gameEvent);
+  const players = useGameStore(s => s.players);
   const { t } = useI18n();
 
   const [flipped, setFlipped] = useState(false);
+
+  // Figure out who drew the card from gameEvent (if available)
+  const drawerName = useMemo(() => {
+    if (gameEvent?.kind === 'card') {
+      const p = players.find(p => p.id === gameEvent.playerId);
+      return p ? p.name : null;
+    }
+    return null;
+  }, [gameEvent, players]);
 
   useEffect(() => {
     if (showCardModal) {
@@ -38,10 +50,12 @@ export default function CardFlip() {
           <div className={`card-front ${isChance ? 'chance' : 'community'}`}>
             <div className="card-symbol">?</div>
             <div className="card-type">{cardType}</div>
+            {drawerName && <div className="card-drawer">🎯 {drawerName}</div>}
           </div>
           {/* Back (content) */}
           <div className={`card-back ${isChance ? 'chance' : 'community'}`}>
             <div className="card-type-label">{cardType}</div>
+            {drawerName && <div className="card-drawer-back">🎯 {drawerName}</div>}
             <div className="card-text">{lastCardDrawn.descriptionCN}</div>
           </div>
         </div>

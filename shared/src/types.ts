@@ -258,6 +258,7 @@ export type GameEvent =
   | { kind: 'jail_in'; playerId: string; reason: 'goto_jail' | 'three_doubles' | 'wheel' | 'card' }
   | { kind: 'jail_out'; playerId: string; method: 'pay_fine' | 'use_card' | 'doubles' | 'forced' }
   | { kind: 'dividend'; playerId: string; symbol: string; stockName: string; stockNameCN: string; shares: number; amount: number }
+  | { kind: 'card'; playerId: string; cardType: 'chance' | 'community_chest'; description: string; descriptionCN: string }
   | { kind: 'weather'; from: string; to: string }
   | { kind: 'maintenance'; playerId: string; amount: number; rate: number }
   | { kind: 'game_over'; winnerId: string; winnerName: string };

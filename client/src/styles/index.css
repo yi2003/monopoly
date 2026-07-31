@@ -435,6 +435,15 @@ html, body, #root {
 .card-symbol { font-size: 100px; font-weight: bold; color: rgba(255,255,255,0.3); }
 .card-type { font-size: 24px; font-weight: 700; color: white; margin-top: 16px; }
 .card-type-label { font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 24px; text-transform: uppercase; }
+.card-drawer {
+  font-size: 13px; color: rgba(255,255,255,0.8);
+  margin-top: 12px; font-weight: 600;
+  background: rgba(0,0,0,0.25); padding: 4px 14px; border-radius: 12px;
+}
+.card-drawer-back {
+  font-size: 13px; color: rgba(255,255,255,0.7);
+  margin-bottom: 8px; font-weight: 600;
+}
 .card-text { font-size: 17px; text-align: center; color: white; line-height: 1.6; }
 
 /* ---- Wheel ---- */
@@ -672,6 +681,11 @@ html, body, #root {
 
 .screen-flash.blue-flash {
   background: radial-gradient(ellipse at center, rgba(33,150,243,0.25) 0%, rgba(33,150,243,0.05) 50%, transparent 80%);
+  animation: flashInOut 0.7s ease-out forwards;
+}
+
+.screen-flash.purple-flash {
+  background: radial-gradient(ellipse at center, rgba(142,36,170,0.28) 0%, rgba(142,36,170,0.05) 50%, transparent 80%);
   animation: flashInOut 0.7s ease-out forwards;
 }
 

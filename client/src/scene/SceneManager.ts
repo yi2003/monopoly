@@ -596,6 +596,18 @@ export class SceneManager {
         this.characters.playReaction(ev.playerId, 'celebrate');
         break;
       }
+      case 'card': {
+        // Purple glow pulse at the player's position
+        const playerPos = this.characters.getCharacterPosition(ev.playerId);
+        if (playerPos) {
+          const pos = playerPos.clone().add(new THREE.Vector3(0, 1.0, 0));
+          this.effects.spawnImpactRing(pos, '#8E24AA');
+          // Small burst of purple sparkles
+          this.effects.spawnBurstCoins(pos, '#CE93D8', 6);
+        }
+        this.cameraController.shake(0.3, 0.3); // subtle shake
+        break;
+      }
       case 'maintenance': {
         const playerPos = this.characters.getCharacterPosition(ev.playerId);
         if (playerPos) {
