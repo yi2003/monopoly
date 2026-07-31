@@ -391,7 +391,7 @@ export class Vehicles {
       if (segIdx < v.path.length - 1) {
         const dir = v.path[Math.floor(segIdx) + 1].clone().sub(v.path[Math.floor(segIdx)]).normalize();
         if (v.direction === 1) dir.negate();
-        v.group.rotation.y = Math.atan2(dir.x, dir.z);
+        v.group.rotation.y = Math.atan2(dir.x, dir.z) - Math.PI / 2;
       }
 
       v.hornCooldown -= dt;
