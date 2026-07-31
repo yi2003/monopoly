@@ -25,6 +25,7 @@ import { PostProcessing } from './PostProcessing';
 import { preloadModels } from './ModelLoader';
 import { useGameStore } from '../store/gameStore';
 import { audioManager } from '../audio/AudioManager';
+import { computeZoneWeights } from '../audio/ZoneDetector';
 
 export class SceneManager {
   private container: HTMLElement;
@@ -343,6 +344,13 @@ export class SceneManager {
     // Notify audio system of night factor
     audioManager.setNightFactor(this.dayNightCycle.nightFactor);
 
+    // Compute zone weights from camera position & update ambient layers
+    if (this.gameState) {
+      const zoneWeights = computeZoneWeights(this.camera.position, this.gameState);
+      audioManager.setZoneWeights(zoneWeights);
+    }
+    audioManager.update(dt);
+
     // Update camera
     this.cameraController.update(dt, this.board.boardGroup);
 
@@ -388,6 +396,7 @@ export class SceneManager {
       this.vehicles.setTheme(state.config.theme);
       this.vehicles.setEra(state.config.era);
       this.dayNightCycle.setEra(state.config.era);
+      audioManager.setEra(state.config.era);
 
       // Build city with real era
       this.cityBuilder.build();
@@ -465,6 +474,7 @@ export class SceneManager {
       const eraDef = getEra(state.config.era);
       this.post.setGrade(eraDef.palette.grade, false);
       this.post.setBloomStrength(eraDef.palette.bloom);
+      audioManager.setEra(state.config.era);
     }
 
     // Apply era to board base/frame/slabs and ground plane

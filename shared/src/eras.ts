@@ -72,6 +72,29 @@ export interface EraAd {
   color: string;
 }
 
+export interface EraAudio {
+  /** Base frequency for ambient drone (Hz) */
+  droneBaseFreq: number;
+  /** Oscillator waveform type for the drone */
+  droneType: OscillatorType;
+  /** Harmonic frequency multipliers layered on top of base */
+  droneHarmonics: number[];
+  /** Overall drone volume */
+  droneVolume: number;
+  /** Random sound events with relative weights */
+  events: EraAudioEvent[];
+}
+
+export interface EraAudioEvent {
+  name: string;
+  /** Relative probability weight */
+  weight: number;
+  /** Minimum interval between events of this type (seconds) */
+  minInterval: number;
+  /** Maximum interval between events of this type (seconds) */
+  maxInterval: number;
+}
+
 export interface EraDef {
   id: EraId;
   year: number;
@@ -84,6 +107,7 @@ export interface EraDef {
   people: EraPeople;
   shops: EraShop[];
   ads: EraAd[];
+  audio: EraAudio;
 }
 
 export const ERAS: Record<EraId, EraDef> = {
@@ -149,6 +173,19 @@ export const ERAS: Record<EraId, EraDef> = {
       { text: 'PEPSI-COLA', sub: 'HITS THE SPOT', style: 'neon', color: '#c02030' },
       { text: 'TRANSIT LINES', sub: 'RIDE THE TROLLEY', style: 'poster', color: '#2a4a7a' },
     ],
+    audio: {
+      droneBaseFreq: 55,
+      droneType: 'sawtooth',
+      droneHarmonics: [1.5, 2.0, 3.0],
+      droneVolume: 0.08,
+      events: [
+        { name: 'typewriter', weight: 3, minInterval: 8, maxInterval: 20 },
+        { name: 'steam_whistle', weight: 1, minInterval: 20, maxInterval: 45 },
+        { name: 'vinyl_crackle', weight: 4, minInterval: 4, maxInterval: 12 },
+        { name: 'old_car_engine', weight: 2, minInterval: 10, maxInterval: 25 },
+        { name: 'radio_jingle', weight: 1, minInterval: 20, maxInterval: 40 },
+      ],
+    },
   },
 
   '1985': {
@@ -213,6 +250,19 @@ export const ERAS: Record<EraId, EraDef> = {
       { text: 'APPLE', sub: 'THINK DIFFERENT', style: 'backlit', color: '#202020' },
       { text: 'PEPSI', sub: 'THE CHOICE', style: 'neon', color: '#2040c0' },
     ],
+    audio: {
+      droneBaseFreq: 80,
+      droneType: 'sawtooth',
+      droneHarmonics: [1.25, 2.5, 4.0],
+      droneVolume: 0.07,
+      events: [
+        { name: 'arcade_blip', weight: 4, minInterval: 5, maxInterval: 15 },
+        { name: 'synth_stab', weight: 2, minInterval: 10, maxInterval: 25 },
+        { name: 'cassette_click', weight: 3, minInterval: 8, maxInterval: 18 },
+        { name: 'neon_hum', weight: 2, minInterval: 6, maxInterval: 14 },
+        { name: 'dial_up', weight: 1, minInterval: 25, maxInterval: 50 },
+      ],
+    },
   },
 
   '2025': {
@@ -277,6 +327,19 @@ export const ERAS: Record<EraId, EraDef> = {
       { text: 'SPOTIFY', sub: 'LISTEN NOW', style: 'led', color: '#1db954' },
       { text: 'UBER', sub: 'GO ANYWHERE', style: 'led', color: '#000000' },
     ],
+    audio: {
+      droneBaseFreq: 65,
+      droneType: 'triangle',
+      droneHarmonics: [1.0, 2.0],
+      droneVolume: 0.06,
+      events: [
+        { name: 'notification_ping', weight: 4, minInterval: 6, maxInterval: 18 },
+        { name: 'ev_motor', weight: 3, minInterval: 8, maxInterval: 20 },
+        { name: 'coffee_shop', weight: 2, minInterval: 12, maxInterval: 28 },
+        { name: 'keyboard_typing', weight: 2, minInterval: 10, maxInterval: 22 },
+        { name: 'electric_scooter', weight: 2, minInterval: 10, maxInterval: 25 },
+      ],
+    },
   },
 
   '2055': {
@@ -341,6 +404,19 @@ export const ERAS: Record<EraId, EraDef> = {
       { text: 'AURORA', sub: 'CLEAN AIR CREDIT', style: 'biolume', color: '#20e080' },
       { text: 'SYNTHMEAT', sub: 'GROWN NOT RAISED', style: 'oled', color: '#e04080' },
     ],
+    audio: {
+      droneBaseFreq: 40,
+      droneType: 'sine',
+      droneHarmonics: [1.5, 3.0, 5.0],
+      droneVolume: 0.06,
+      events: [
+        { name: 'hover_whoosh', weight: 3, minInterval: 6, maxInterval: 16 },
+        { name: 'holo_chime', weight: 3, minInterval: 8, maxInterval: 20 },
+        { name: 'biolume_crackle', weight: 2, minInterval: 10, maxInterval: 24 },
+        { name: 'ai_voice_tone', weight: 2, minInterval: 12, maxInterval: 30 },
+        { name: 'quantum_pulse', weight: 1, minInterval: 20, maxInterval: 40 },
+      ],
+    },
   },
 };
 
