@@ -223,7 +223,7 @@ html, body, #root {
   position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%);
   z-index: 10;
 }
-.dice-display { display: flex; gap: 12px; }
+.dice-display { display: flex; gap: 12px; align-items: center; }
 .dice-face {
   width: 56px; height: 56px;
   display: flex; align-items: center; justify-content: center;
@@ -232,22 +232,51 @@ html, body, #root {
   border-radius: 10px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
-.dice-total {
+
+/* ── Dice cube with dot patterns ── */
+.dice-cube {
   width: 72px; height: 72px;
-  font-size: 38px;
+  background: linear-gradient(135deg, #FFFFF0 0%, #F5F0E0 50%, #E8E0C8 100%);
   border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.6);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.1s;
+  overflow: hidden;
 }
-.dice-spinning {
-  animation: dice-scroll 0.08s steps(1) infinite;
-  background: #FFFDE7;
+.dice-cube-spinning {
   border: 3px solid #FFD700;
-  box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+  box-shadow: 0 0 24px rgba(255, 215, 0, 0.55), 0 4px 16px rgba(0,0,0,0.3);
+  animation: dice-tumble 0.12s ease-in-out infinite;
 }
-@keyframes dice-scroll {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+@keyframes dice-tumble {
+  0%   { transform: translateY(0) rotate(0deg) scale(1); }
+  25%  { transform: translateY(-3px) rotate(-3deg) scale(1.06); }
+  50%  { transform: translateY(0) rotate(0deg) scale(1); }
+  75%  { transform: translateY(3px) rotate(3deg) scale(1.06); }
+  100% { transform: translateY(0) rotate(0deg) scale(1); }
 }
+
+.dice-cube-inner {
+  width: 52px; height: 52px;
+  display: flex; flex-direction: column;
+  justify-content: space-between;
+  padding: 6px;
+}
+.dice-dot-row {
+  display: flex; justify-content: space-between;
+  flex: 1;
+}
+.dice-dot-cell {
+  width: 14px; height: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+.dice-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #4a4a4a, #1a1a1a);
+  box-shadow: inset 0 -1px 2px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.2);
+}
+
 .dice-stop-btn {
   animation: pulse-stop 1.2s ease-in-out infinite;
 }

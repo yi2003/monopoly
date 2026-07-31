@@ -7,6 +7,38 @@ import type { CameraMode, QualityMode } from '@monopoly/shared';
 import { THEMES, DIFFICULTIES } from '@monopoly/shared';
 import { useI18n } from '../../i18n/useI18n';
 
+// ---- Dice dot patterns (3×3 grid, same as 3D dice) ----
+const DOT_GRID: Record<number, [number, number][]> = {
+  1: [[1, 1]],
+  2: [[0, 0], [2, 2]],
+  3: [[0, 0], [1, 1], [2, 2]],
+  4: [[0, 0], [0, 2], [2, 0], [2, 2]],
+  5: [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2]],
+  6: [[0, 0], [0, 2], [1, 0], [1, 2], [2, 0], [2, 2]],
+};
+
+function DiceFace({ value, spinning }: { value: number; spinning: boolean }) {
+  const dots = DOT_GRID[value] || [];
+  return (
+    <div className={`dice-cube ${spinning ? 'dice-cube-spinning' : ''}`}>
+      <div className="dice-cube-inner">
+        {[0, 1, 2].map(row => (
+          <div key={row} className="dice-dot-row">
+            {[0, 1, 2].map(col => {
+              const active = dots.some(([r, c]) => r === row && c === col);
+              return (
+                <div key={col} className="dice-dot-cell">
+                  {active && <div className="dice-dot" />}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const CAMERA_OPTIONS: { mode: CameraMode; key: string; emoji: string }[] = [
   { mode: 'orbit', key: 'camera.orbit', emoji: '🗺️' },
   { mode: 'thirdPerson', key: 'camera.thirdPerson', emoji: '👁' },
@@ -218,11 +250,11 @@ export default function HUD() {
       <div className="dice-panel">
         {diceSpinning ? (
           <div className="dice-display">
-            <div className="dice-face dice-total dice-spinning">{scrollDie}</div>
+            <DiceFace value={scrollDie} spinning={true} />
           </div>
         ) : dice !== null ? (
           <div className="dice-display">
-            <div className="dice-face dice-total">{dice.die1}</div>
+            <DiceFace value={dice.die1} spinning={false} />
           </div>
         ) : (
           <div className="dice-display">
