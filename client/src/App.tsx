@@ -12,6 +12,7 @@ import GameOverModal from './components/Modals/GameOverModal';
 import CardFlip from './components/Special/CardFlip';
 import WheelSpinner from './components/Special/WheelSpinner';
 import EventCard from './components/Special/EventCard';
+import ScreenFlash from './components/Special/ScreenFlash';
 import EventToast from './components/Special/EventToast';
 import Toast from './components/Special/Toast';
 import GameCanvas from './scene/GameCanvas';
@@ -46,6 +47,7 @@ export default function App() {
       <GameOverModal />
       <CardFlip />
       <WheelSpinner />
+      <ScreenFlash />
       <EventCard />
       <EventToast />
       <Toast />

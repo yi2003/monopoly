@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import type { GameState, CameraMode, QualityMode, WeatherType } from '@monopoly/shared';
-import { INNER_BOARD_HALF, TILE_D, OUTER_BOARD_HALF, OUTER_RING_OFFSET, getEra } from '@monopoly/shared';
+import { INNER_BOARD_HALF, TILE_D, OUTER_BOARD_HALF, OUTER_RING_OFFSET, getEra, getCharacterTilePos } from '@monopoly/shared';
 import { CameraController } from '../camera/CameraController';
 import { FirstPersonController } from '../roam/FirstPersonController';
 import { RoamCollision } from '../roam/RoamCollision';
@@ -24,6 +24,7 @@ import { SkyEnvironment } from './SkyEnvironment';
 import { PostProcessing } from './PostProcessing';
 import { preloadModels } from './ModelLoader';
 import { useGameStore } from '../store/gameStore';
+import { useUIStore } from '../store/uiStore';
 import { audioManager } from '../audio/AudioManager';
 import { computeZoneWeights } from '../audio/ZoneDetector';
 
@@ -67,6 +68,9 @@ export class SceneManager {
   private roadPaths: THREE.Vector3[][] = [];
   // Walk zones for pedestrians
   private walkZones: { start: THREE.Vector3; end: THREE.Vector3 }[] = [];
+
+  // Event trigger dedup counter (synced with uiStore.eventTriggerId)
+  private lastEventTriggerId = 0;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -369,6 +373,9 @@ export class SceneManager {
     // Update post-processing (grade transition, grain animation)
     this.post.update(dt);
 
+    // Trigger 3D effects for game events (camera shake, particles, reactions)
+    this.checkAndTriggerEventEffects();
+
     this.post.render();
   }
 
@@ -500,6 +507,106 @@ export class SceneManager {
         this.vehicles.setRoadPaths(this.roadPaths);
         this.pedestrians.rebuildWithEra();
       }
+    }
+  }
+
+  // ── Event-driven 3D effects orchestration ──
+  /** Called each frame to detect new game events and trigger coordinated effects */
+  private checkAndTriggerEventEffects(): void {
+    const ui = useUIStore.getState();
+    if (!ui.showEventCard || !ui.gameEvent || ui.eventTriggerId === this.lastEventTriggerId) return;
+    if (ui.gameEvent.kind === 'game_over') return;
+    this.lastEventTriggerId = ui.eventTriggerId;
+
+    const ev = ui.gameEvent;
+
+    switch (ev.kind) {
+      case 'rent': {
+        // 1. Impact ring + burst coins at the property tile position
+        const tilePos = getCharacterTilePos(ev.tileIndex);
+        const spawnPos = new THREE.Vector3(tilePos.x, 1.2, tilePos.z);
+        this.effects.spawnImpactRing(spawnPos, '#FFD700');
+        const coinCount = Math.min(8 + Math.floor(ev.amount / 50), 25);
+        this.effects.spawnBurstCoins(spawnPos, '#FFD700', coinCount);
+
+        // 2. Flying coins from payer to payee
+        const payerPos = this.characters.getCharacterPosition(ev.playerId);
+        const payeePos = this.characters.getCharacterPosition(ev.targetId);
+        if (payerPos && payeePos) {
+          const from = payerPos.clone().add(new THREE.Vector3(0, 1.2, 0));
+          const to = payeePos.clone().add(new THREE.Vector3(0, 1.2, 0));
+          this.effects.spawnFlyingCoins(from, to, '#E53935', 5);
+        }
+
+        // 3. Camera shake (intensity proportional to amount, capped)
+        const shakeIntensity = Math.min(ev.amount / 400, 2.0);
+        this.cameraController.shake(shakeIntensity, 0.6);
+
+        // 4. Character reactions
+        this.characters.playReaction(ev.playerId, 'hurt');
+        this.characters.playReaction(ev.targetId, 'celebrate');
+        break;
+      }
+      case 'tax': {
+        const playerPos = this.characters.getCharacterPosition(ev.playerId);
+        if (playerPos) {
+          const pos = playerPos.clone().add(new THREE.Vector3(0, 1.2, 0));
+          this.effects.spawnBurstCoins(pos, '#FF5722', 8);
+        }
+        this.cameraController.shake(Math.min(ev.amount / 300, 1.5), 0.5);
+        this.characters.playReaction(ev.playerId, 'hurt');
+        break;
+      }
+      case 'go_salary': {
+        const playerPos = this.characters.getCharacterPosition(ev.playerId);
+        if (playerPos) {
+          const pos = playerPos.clone().add(new THREE.Vector3(0, 1.2, 0));
+          this.effects.spawnBurstCoins(pos, '#4CAF50', 10);
+        }
+        this.characters.playReaction(ev.playerId, 'celebrate');
+        break;
+      }
+      case 'jail_in': {
+        this.cameraController.shake(1.0, 0.4);
+        const playerPos = this.characters.getCharacterPosition(ev.playerId);
+        if (playerPos) {
+          this.effects.spawnImpactRing(
+            playerPos.clone().add(new THREE.Vector3(0, 0.5, 0)),
+            '#9E9E9E',
+          );
+        }
+        this.characters.playReaction(ev.playerId, 'hurt');
+        break;
+      }
+      case 'jail_out': {
+        const playerPos = this.characters.getCharacterPosition(ev.playerId);
+        if (playerPos) {
+          const pos = playerPos.clone().add(new THREE.Vector3(0, 1.2, 0));
+          this.effects.spawnBurstCoins(pos, '#FFD700', 6);
+        }
+        this.characters.playReaction(ev.playerId, 'celebrate');
+        break;
+      }
+      case 'dividend': {
+        const playerPos = this.characters.getCharacterPosition(ev.playerId);
+        if (playerPos) {
+          const pos = playerPos.clone().add(new THREE.Vector3(0, 1.2, 0));
+          this.effects.spawnBurstCoins(pos, '#2196F3', 8);
+        }
+        this.characters.playReaction(ev.playerId, 'celebrate');
+        break;
+      }
+      case 'maintenance': {
+        const playerPos = this.characters.getCharacterPosition(ev.playerId);
+        if (playerPos) {
+          this.effects.spawnImpactRing(
+            playerPos.clone().add(new THREE.Vector3(0, 0.5, 0)),
+            '#FF9800',
+          );
+        }
+        break;
+      }
+      // weather — no 3D effects needed
     }
   }
 

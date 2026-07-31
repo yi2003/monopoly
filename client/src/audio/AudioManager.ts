@@ -107,7 +107,12 @@ export class AudioManager {
   playBuy(): void { this.playMelody([523, 659, 784], 0.08); }
   playSell(): void { this.playMelody([784, 659, 523], 0.08); }
   playBuild(): void { this.playNoiseBurst(0.15, 400, 600, 0.4); }
-  playRent(): void { this.playMelody([440, 350, 300], 0.1); }
+  playRent(): void {
+    // Low-frequency thud for physical impact feel
+    this.playNoiseBurst(0.12, 40, 100, 0.15);
+    // Descending melody — money lost
+    this.playMelody([440, 330, 260], 0.12);
+  }
   playCard(): void { this.playSweep(600, 1200, 0.2); }
   playJail(): void { this.playNoiseBurst(0.3, 100, 300, 0.5); }
   playPassGO(): void { this.playMelody([523, 659, 784, 1047], 0.07); }

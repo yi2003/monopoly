@@ -85,6 +85,29 @@ export default function HUD() {
   }, [phaseDelayUntil, delayTick]);
   const phaseReady = Date.now() >= phaseDelayUntil;
 
+  // ── Cash pulse animation tracking ──
+  const prevCashRef = useRef<Map<string, number>>(new Map());
+  const [cashFlash, setCashFlash] = useState<Record<string, 'gain' | 'loss' | null>>({});
+
+  // Detect cash changes and trigger pulse
+  useEffect(() => {
+    if (!gameState) return;
+    for (const p of gameState.players) {
+      if (p.isSpectator || p.status === 'bankrupt') continue;
+      const prev = prevCashRef.current.get(p.id);
+      if (prev !== undefined && prev !== p.cash) {
+        const dir = p.cash > prev ? 'gain' : 'loss';
+        if (cashFlash[p.id] !== dir) {
+          setCashFlash(prev => ({ ...prev, [p.id]: dir as 'gain' | 'loss' }));
+          setTimeout(() => {
+            setCashFlash(prevF => ({ ...prevF, [p.id]: null }));
+          }, 550);
+        }
+      }
+      prevCashRef.current.set(p.id, p.cash);
+    }
+  }, [gameState?.players]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleRoll = () => socket?.emit('rollDice', { die1: Math.floor(Math.random() * 6) + 1, die2: 0 });
   const handleEndTurn = () => socket?.emit('endTurn');
 
@@ -218,7 +241,7 @@ export default function HUD() {
                 {p.autoPilot && ' 🔄'}
                 {p.status === 'jailed' && ' 🔒'}
               </span>
-              <span className="player-card-cash">${p.cash.toLocaleString()}</span>
+              <span className={`player-card-cash ${cashFlash[p.id] ? 'pulse-' + cashFlash[p.id] : ''}`}>${p.cash.toLocaleString()}</span>
             </div>
             <div className="player-card-props">
               {t('hud.player.props', { props: p.properties.length })} | 🏠 {t('hud.player.houses', { houses: Object.values(p.houses).reduce((a, b) => a + b, 0) })}

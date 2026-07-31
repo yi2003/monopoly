@@ -31,6 +31,11 @@ export class CameraController {
   private gameState: GameState | null = null;
   private isSpectator = false;
 
+  // Camera shake
+  private shakeIntensity = 0;
+  private shakeDuration = 0;
+  private shakeElapsed = 0;
+
   // Roam mode
   private fpsController: FirstPersonController | null = null;
   private wasRoaming = false;
@@ -168,6 +173,13 @@ export class CameraController {
     this.isSpectator = spectator;
   }
 
+  /** Trigger camera shake. intensity: clamped to 2.5 max. duration: seconds. */
+  shake(intensity: number, duration: number): void {
+    this.shakeIntensity = Math.min(intensity, 2.5);
+    this.shakeDuration = duration;
+    this.shakeElapsed = 0;
+  }
+
   update(dt: number, boardGroup?: THREE.Group): void {
     if (this.mode === 'roam' && this.fpsController) {
       if (this.gameState) {
@@ -209,6 +221,16 @@ export class CameraController {
       case 'thirdPerson':
         this.updateThirdPerson();
         break;
+    }
+
+    // Apply camera shake offset (post all camera position calculations)
+    if (this.shakeElapsed < this.shakeDuration) {
+      const progress = this.shakeElapsed / this.shakeDuration;
+      const decay = 1 - progress;
+      this.camera.position.x += (Math.random() - 0.5) * 2 * this.shakeIntensity * decay;
+      this.camera.position.y += (Math.random() - 0.5) * 2 * this.shakeIntensity * decay * 0.6;
+      this.camera.position.z += (Math.random() - 0.5) * 2 * this.shakeIntensity * decay;
+      this.shakeElapsed += dt;
     }
   }
 

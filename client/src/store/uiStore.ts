@@ -26,6 +26,7 @@ interface UIStore {
   // Event card
   gameEvent: GameEvent | null;
   showEventCard: boolean;
+  eventTriggerId: number; // monotonic counter for SceneManager dedup
 
   // Toast
   toasts: { id: number; message: string; type: string }[];
@@ -61,6 +62,7 @@ export const useUIStore = create<UIStore>((set) => ({
 
   gameEvent: null,
   showEventCard: false,
+  eventTriggerId: 0,
   lastCardDrawn: null,
   wheelResult: null,
   diceRolledAt: 0,
@@ -71,7 +73,7 @@ export const useUIStore = create<UIStore>((set) => ({
 
   setGameEvent: (event) => {
     if (event) {
-      set({ gameEvent: event, showEventCard: true });
+      set(s => ({ gameEvent: event, showEventCard: true, eventTriggerId: s.eventTriggerId + 1 }));
       // Auto-dismiss after 3.5s
       setTimeout(() => {
         set(s => s.showEventCard ? { showEventCard: false } : {});

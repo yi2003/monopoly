@@ -138,6 +138,7 @@ export default function EventCard() {
         className="event-card"
         style={{ '--event-color': config.color } as React.CSSProperties}
       >
+        <div className="event-card-glow" style={{ '--event-color': config.color } as React.CSSProperties} />
         <div className="event-card-color-bar" style={{ backgroundColor: config.color }} />
         <div className="event-card-icon">{config.icon}</div>
         <div className="event-card-title" style={{ color: config.color }}>

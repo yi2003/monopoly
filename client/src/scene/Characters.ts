@@ -22,12 +22,20 @@ interface CharacterData {
 
 const WALK_SPEED = 5.5; // tiles per second
 const WAYPOINT_THRESHOLD = 0.08;
+const REACTION_DURATION = 0.6;
+
+interface ReactionState {
+  type: 'hurt' | 'celebrate';
+  elapsed: number;
+  duration: number;
+}
 
 export class Characters {
   private scene: THREE.Scene;
   private group: THREE.Group;
   private characters: Map<string, CharacterData> = new Map();
   private prevPositions: Map<string, number> = new Map();
+  private reactions: Map<string, ReactionState> = new Map();
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -331,6 +339,47 @@ export class Characters {
       // Walk animation
       this.animateWalk(charData, dt);
     }
+
+    // ── Process character reactions ──
+    for (const [playerId, reaction] of this.reactions) {
+      reaction.elapsed += dt;
+      const cd = this.characters.get(playerId);
+      if (!cd) { this.reactions.delete(playerId); continue; }
+
+      const t = Math.min(reaction.elapsed / reaction.duration, 1);
+
+      // Find the body mesh (first child = torso cylinder)
+      const body = cd.group.children[0] as THREE.Mesh;
+      if (body?.material instanceof THREE.MeshStandardMaterial) {
+        if (!cd.group.userData.origEmissive) {
+          cd.group.userData.origEmissive = body.material.emissive ? body.material.emissive.getHex() : 0;
+        }
+        if (reaction.type === 'hurt') {
+          body.material.emissive = new THREE.Color('#ff0000');
+          body.material.emissiveIntensity = 0.5 * (1 - t);
+        } else if (reaction.type === 'celebrate') {
+          body.material.emissive = new THREE.Color('#4CAF50');
+          body.material.emissiveIntensity = 0.4 * (1 - t);
+        }
+      }
+
+      // Vertical bounce/squish (on top of walk bounce)
+      if (reaction.type === 'hurt') {
+        cd.group.position.y += -(1 - t) * 0.2; // squish down
+      } else if (reaction.type === 'celebrate') {
+        const hop = Math.sin(t * Math.PI) * 0.35; // hop up
+        cd.group.position.y += hop;
+      }
+
+      // Cleanup when done
+      if (reaction.elapsed >= reaction.duration) {
+        if (body?.material instanceof THREE.MeshStandardMaterial) {
+          body.material.emissive = new THREE.Color(0x000000);
+          body.material.emissiveIntensity = 0;
+        }
+        this.reactions.delete(playerId);
+      }
+    }
   }
 
   private animateWalk(charData: CharacterData, dt: number): void {
@@ -397,6 +446,11 @@ export class Characters {
     const cd = this.characters.get(playerId);
     if (!cd) return null;
     return cd.group.position.clone();
+  }
+
+  /** Trigger a reaction animation on a character */
+  playReaction(playerId: string, type: 'hurt' | 'celebrate'): void {
+    this.reactions.set(playerId, { type, elapsed: 0, duration: REACTION_DURATION });
   }
 
   /** Get world position for a tile on the ground ring */
