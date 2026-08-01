@@ -378,6 +378,10 @@ html, body, #root {
   font-size: 10px; background: rgba(33,150,243,0.2); color: #64B5F6;
   padding: 1px 6px; border-radius: 8px; margin-left: 4px;
 }
+.stock-watch { font-size: 12px; color: var(--text-secondary); }
+.stock-wait-hint {
+  font-size: 13px; color: #FFD54F; text-align: center; margin-bottom: 10px;
+}
 .pagination { display: flex; gap: 12px; justify-content: center; align-items: center; margin: 8px 0; }
 .trade-panel {
   margin-top: 12px; padding: 14px; background: rgba(255,255,255,0.04);

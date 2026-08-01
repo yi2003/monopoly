@@ -673,16 +673,20 @@ export class GameManager {
 
   // ---- Stock Trading ----
 
-  buyStock(symbol: string, shares: number): { success: boolean; error?: string } {
-    const err = executeBuyStock(this.state, this.currentPlayer.id, symbol, shares);
+  buyStock(playerId: string, symbol: string, shares: number): { success: boolean; error?: string } {
+    // Only the current player may trade on their stock-market turn — attribute
+    // the trade to the requester, not whoever happens to be the current player.
+    if (playerId !== this.currentPlayer.id) return { success: false, error: '现在不能交易股票' };
+    const err = executeBuyStock(this.state, playerId, symbol, shares);
     if (err) return { success: false, error: err };
     // Private: only log for the trading player, not broadcast as public event
     this.emitChange();
     return { success: true };
   }
 
-  sellStock(symbol: string, shares: number): { success: boolean; error?: string } {
-    const err = executeSellStock(this.state, this.currentPlayer.id, symbol, shares);
+  sellStock(playerId: string, symbol: string, shares: number): { success: boolean; error?: string } {
+    if (playerId !== this.currentPlayer.id) return { success: false, error: '现在不能交易股票' };
+    const err = executeSellStock(this.state, playerId, symbol, shares);
     if (err) return { success: false, error: err };
     // Private: only log for the trading player, not broadcast as public event
     this.emitChange();
@@ -829,13 +833,13 @@ export class GameManager {
         if (this.state.phase === 'buying') {
           this.passBuyProperty();
         }
-        // Execute stock action if present
+        // Execute stock action if present (the bot is the current player)
         if (decision.stockAction) {
           const { symbol, shares, action } = decision.stockAction;
           if (action === 'buy') {
-            this.buyStock(symbol, shares);
+            this.buyStock(this.currentPlayer.id, symbol, shares);
           } else if (action === 'sell') {
-            this.sellStock(symbol, shares);
+            this.sellStock(this.currentPlayer.id, symbol, shares);
           }
         }
         setTimeout(() => this.endTurn(), 1000);

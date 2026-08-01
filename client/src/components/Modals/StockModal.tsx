@@ -22,6 +22,10 @@ export default function StockModal() {
   const player = players.find(p => p.id === playerId);
   if (!player) return null;
 
+  // Only the current player may trade; everyone else can watch prices
+  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+  const isMyTurn = !!currentPlayer && currentPlayer.id === playerId;
+
   const totalPages = Math.ceil(gameState.stocks.length / PAGE_SIZE);
   const pageStocks = gameState.stocks.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
@@ -51,6 +55,10 @@ export default function StockModal() {
     <div className="modal-overlay" onClick={toggleStockPanel}>
       <div className="modal stock-modal" onClick={e => e.stopPropagation()}>
         <h2>{t('stock.title')}</h2>
+
+        {!isMyTurn && currentPlayer && (
+          <p className="stock-wait-hint">{t('stock.waitingFor', { name: currentPlayer.name })}</p>
+        )}
 
         <div className="stock-cash">
           {t('stock.cash')}: <strong>${player.cash.toLocaleString()}</strong>
@@ -88,12 +96,16 @@ export default function StockModal() {
                   {up ? '▲' : '▼'} {Math.abs(Number(pct))}%
                 </div>
                 <div className="stock-actions">
-                  <button
-                    className="btn btn-xs btn-primary"
-                    onClick={() => setSelectedSymbol(stock.symbol)}
-                  >
-                    {t('stock.trade')}
-                  </button>
+                  {isMyTurn ? (
+                    <button
+                      className="btn btn-xs btn-primary"
+                      onClick={() => setSelectedSymbol(stock.symbol)}
+                    >
+                      {t('stock.trade')}
+                    </button>
+                  ) : (
+                    <span className="stock-watch">{t('stock.watching')}</span>
+                  )}
                 </div>
               </div>
             );
@@ -108,7 +120,7 @@ export default function StockModal() {
           </div>
         )}
 
-        {selectedStock && (
+        {isMyTurn && selectedStock && (
           <div className="trade-panel">
             <h4>{t('stock.tradeTitle')} {selectedStock.symbol} (${selectedStock.price})</h4>
             {holding && <p>{t('stock.holding')}: {holding.shares}{t('stock.shares')} · {t('stock.avgCost')}: ${holding.avgCost.toFixed(1)}</p>}

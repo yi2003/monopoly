@@ -150,6 +150,8 @@ export const translations = {
     'stock.fee': '手续费: 3% (最低$5)',
     'stock.holding': '持仓',
     'stock.holdingFormat': '{shares}股',
+    'stock.watching': '查看',
+    'stock.waitingFor': '⏳ {name} 正在交易股票...',
 
     // Portfolio Modal
     'portfolio.title': '{name} 的资产组合',
@@ -347,6 +349,8 @@ export const translations = {
     'stock.fee': 'Fee: 3% (min $5)',
     'stock.holding': 'Holding',
     'stock.holdingFormat': '{shares} shares',
+    'stock.watching': 'Watch',
+    'stock.waitingFor': '⏳ {name} is trading stocks...',
 
     'portfolio.title': "{name}'s Portfolio",
     'portfolio.netWorth': 'Net Worth',

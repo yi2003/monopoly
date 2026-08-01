@@ -343,14 +343,14 @@ io.on('connection', (socket) => {
 
   socket.on('buyStock', (data) => {
     const game = getGame();
-    if (!game) return;
-    game.buyStock(data.symbol, data.shares);
+    if (!game || !data) return;
+    game.buyStock(currentPlayerId || '', data.symbol, data.shares);
   });
 
   socket.on('sellStock', (data) => {
     const game = getGame();
-    if (!game) return;
-    game.sellStock(data.symbol, data.shares);
+    if (!game || !data) return;
+    game.sellStock(currentPlayerId || '', data.symbol, data.shares);
   });
 
   socket.on('spinWheel', () => {
