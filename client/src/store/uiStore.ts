@@ -13,6 +13,7 @@ interface UIStore {
   showPortfolioModal: boolean;
   showWheelModal: boolean;
   showCardModal: boolean;
+  showHandModal: boolean;
   showBankruptcyModal: boolean;
   showGameOverModal: boolean;
 
@@ -38,6 +39,7 @@ interface UIStore {
   setWheelResult: (index: number | null) => void;
   markDiceRolled: () => void;
   setGameEvent: (event: GameEvent | null) => void;
+  toggleHandModal: () => void;
   addToast: (message: string, type?: string) => void;
   removeToast: (id: number) => void;
 }
@@ -57,6 +59,7 @@ export const useUIStore = create<UIStore>((set) => ({
   showPortfolioModal: false,
   showWheelModal: false,
   showCardModal: false,
+  showHandModal: false,
   showBankruptcyModal: false,
   showGameOverModal: false,
 
@@ -87,6 +90,7 @@ export const useUIStore = create<UIStore>((set) => ({
   setCardDrawn: (card) => set({ lastCardDrawn: card, showCardModal: card !== null }),
   setWheelResult: (index) => set({ wheelResult: index, showWheelModal: index !== null }),
   markDiceRolled: () => set({ diceRolledAt: Date.now() }),
+  toggleHandModal: () => set(s => ({ showHandModal: !s.showHandModal })),
 
   addToast: (message, type = 'info') => {
     const id = ++toastId;

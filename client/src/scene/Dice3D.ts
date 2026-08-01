@@ -137,6 +137,10 @@ export class Dice3D {
     this.group.add(this.die1.group);
     this.group.add(this.die2.group);
 
+    // The game rolls a single die (1-6). Keep die2 in the scene for physics
+    // simplicity but hide it so the visible result always matches the log/HUD.
+    this.die2.group.visible = false;
+
     // ---- Lighting ----
     const spotGeo = new THREE.SphereGeometry(0.3, 16, 16);
     const spotMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.1, emissive: '#FFFFFF', emissiveIntensity: 2.5 });
@@ -330,13 +334,12 @@ export class Dice3D {
     this.started = true;
   }
 
-  /** Player clicked stop — generate random values and settle, then callback */
+  /** Player clicked stop — generate the single die result and settle, then callback */
   manualStop(): void {
     if (!this.spinning) return;
     const d1 = Math.floor(Math.random() * 6) + 1;
-    const d2 = Math.floor(Math.random() * 6) + 1;
-    this.settleTo(d1, d2);
-    this.onManualStop?.(d1, d2);
+    this.settleTo(d1, 0);
+    this.onManualStop?.(d1, 0);
   }
 
   private resetDie(d: DiePhysics, x: number, y: number, z: number): void {

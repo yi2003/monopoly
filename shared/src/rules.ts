@@ -2,7 +2,7 @@
 // 家庭大富翁 — Pure Game Rule Functions
 // ============================================================
 
-import type { Player, PropertyTile, Tile, ColorGroup, Stock } from './types';
+import type { Player, PropertyTile, Tile, ColorGroup, Stock, Card, CardEffect } from './types';
 import { ALL_PROPERTIES, ALL_RAILWAYS, ALL_UTILITIES, STOCKS, OUTER_RING_OFFSET } from './constants';
 
 // ---- Helper: find property definition by tile index ----
@@ -261,7 +261,7 @@ export function advancePosition(
       position: ringOffset + newLocalPos,
       passedGo: false,
       ring: innerCityRing,
-      sector: innerCitySector,
+      sector: newLocalPos,
       groundRing,
     };
   }
@@ -300,6 +300,35 @@ export function findNearestTile(
     if (idx > currentPos) return idx;
   }
   return sorted[0]; // wrap around
+}
+
+// ---- Held action card helpers ----
+
+export function findCardById(
+  cards: { chance: Card[]; community_chest: Card[] },
+  id: number,
+): Card | undefined {
+  return cards.chance.find(c => c.id === id) ?? cards.community_chest.find(c => c.id === id);
+}
+
+export function playerHasHeldCardKind(
+  player: Player,
+  cards: { chance: Card[]; community_chest: Card[] },
+  kind: CardEffect['kind'],
+): boolean {
+  return findHeldCardId(player, cards, kind) !== undefined;
+}
+
+export function findHeldCardId(
+  player: Player,
+  cards: { chance: Card[]; community_chest: Card[] },
+  kind: CardEffect['kind'],
+): number | undefined {
+  for (const id of player.heldCards) {
+    const card = findCardById(cards, id);
+    if (card && card.effect.kind === kind) return id;
+  }
+  return undefined;
 }
 
 // ---- Stock Cost Basis (weighted average) ----

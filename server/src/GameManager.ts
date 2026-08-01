@@ -12,7 +12,7 @@ import {
   PLAYER_COLORS, DEFAULT_AVATAR,
 } from '@monopoly/shared';
 import { getEffectiveConfig, THEMES } from '@monopoly/shared';
-import { rollDice, findNearestTile, moveToTile } from '@monopoly/shared';
+import { rollDice, findNearestTile, moveToTile, findCardById, playerHasHeldCardKind } from '@monopoly/shared';
 import { shuffle } from './utils/shuffle';
 import { generatePlayerId } from './utils/random';
 import { RuleEngine } from './RuleEngine';
@@ -22,6 +22,8 @@ import { decideBotAction } from './BotBrain';
 
 // How many face-down cards are offered for a chance/community-chest pick
 const CARD_CHOICE_COUNT = 4;
+// Max held action cards a player can carry (beyond this, drawn ones are discarded)
+const MAX_HELD_CARDS = 5;
 
 export class GameManager {
   state: GameState;
@@ -61,6 +63,7 @@ export class GameManager {
       dayTime: 0.3, // start at daytime
       wheelResult: null,
       cardChoice: null,
+      actionCardPrompt: null,
       lastCardDrawn: null,
       gameEvent: null,
       ringTransferred: false,
@@ -93,6 +96,7 @@ export class GameManager {
       stocks: [],
       jailTurns: 0,
       getOutOfJailCards: 0,
+      heldCards: [],
       consecutiveDoubles: 0,
       skipNextTurn: false,
       status: 'active',
@@ -166,8 +170,10 @@ export class GameManager {
       return { dice: { die1: 0, die2: 0, total: 0, isDoubles: false }, result: { error: '现在不能掷骰子' } };
     }
 
+    // Single-die game: only die1 counts. Ignore any client-supplied die2 so the
+    // log total always equals the visible die (1-6) and matches bot rolls.
     const dice = (die1 !== undefined)
-      ? { die1, die2: die2 || 0, total: die1 + (die2 || 0), isDoubles: die1 === die2 && die2 !== 0 && die2 !== undefined }
+      ? { die1, die2: 0, total: die1, isDoubles: false }
       : rollDice();
     this.state.dice = dice;
     this.state.diceRolled = true;
@@ -209,27 +215,9 @@ export class GameManager {
       }
     }
 
-    // Process landing
-    const landing = this.engine.processLanding(result.newPosition);
+    // Process landing (rent, tax, card draw, rentChoice, etc.)
+    this.consumeLanding(this.engine.processLanding(result.newPosition));
 
-    // Forward gameEvent from landing (rent, tax, jail_in from goto_jail)
-    if (landing.gameEvent) {
-      this.state.gameEvent = landing.gameEvent;
-    }
-
-    // Set phase BEFORE offering cards — card effect may override it (e.g. move to property → buying)
-    this.state.phase = landing.phase;
-
-    if (landing.cardType && this.currentPlayer.cash >= 0) {
-      this.offerCardChoice(landing.cardType);
-    }
-
-    // Check bankruptcy (card effect may have taken cash)
-    if (this.currentPlayer.cash < 0) {
-      this.state.phase = 'debt';
-    }
-
-    this.emitChange();
     return { dice, result };
   }
 
@@ -358,6 +346,7 @@ export class GameManager {
     this.state.lastCardDrawn = null;
     this.state.wheelResult = null;
     this.state.cardChoice = null;
+    this.state.actionCardPrompt = null;
     this.state.gameEvent = null;
     this.state.ringTransferred = false;
 
@@ -496,9 +485,19 @@ export class GameManager {
       descriptionCN: card.descriptionCN,
     };
 
-    // Apply effect (move-family cards set phase to buying/awaitEnd)
-    this.applyCardEffect(card);
     this.addLog(`${this.currentPlayer.name} 抽到: ${card.descriptionCN}`, 'card', `${this.currentPlayer.name} drew: ${card.description}`);
+
+    // Held action cards go into the hand instead of resolving immediately
+    if (card.hold) {
+      if (this.currentPlayer.heldCards.length < MAX_HELD_CARDS) {
+        this.currentPlayer.heldCards.push(card.id);
+        this.addLog(`${this.currentPlayer.name} 的行动卡已入手牌`, 'card', `${this.currentPlayer.name} added action card to hand`);
+      } else {
+        this.addLog(`${this.currentPlayer.name} 手牌已满,${card.descriptionCN} 被丢弃`, 'card', `${this.currentPlayer.name}'s hand full — ${card.description} discarded`);
+      }
+    } else {
+      this.applyCardEffect(card);
+    }
 
     // Resolve the turn stage: if the card effect didn't change the phase, end it
     if (this.state.phase === 'cardChoice') {
@@ -524,9 +523,8 @@ export class GameManager {
         if (passedGo && effect.collectGo) {
           player.cash += GO_SALARY[this.state.config.theme];
         }
-        // Re-process landing
-        const landing = this.engine.processLanding(position);
-        this.state.phase = landing.phase === 'buying' ? 'buying' : 'awaitEnd';
+        // Re-process landing (may enter buying / rentChoice)
+        this.consumeLanding(this.engine.processLanding(position), { emit: false, keepGameEvent: true });
         break;
       }
 
@@ -534,8 +532,7 @@ export class GameManager {
         const nearest = findNearestTile(player.position, effect.tileType);
         player.position = nearest;
         const payMultiplier = effect.payMultiplier || 1;
-        const landing = this.engine.processLanding(nearest, payMultiplier);
-        this.state.phase = landing.phase === 'buying' ? 'buying' : 'awaitEnd';
+        this.consumeLanding(this.engine.processLanding(nearest, payMultiplier), { emit: false, keepGameEvent: true });
         break;
       }
 
@@ -586,11 +583,225 @@ export class GameManager {
         const localPos = player.position - ringStart;
         const newLocalPos = localPos - effect.spaces;
         player.position = newLocalPos < 0 ? ringStart + ringSize + newLocalPos : ringStart + newLocalPos;
-        const landing = this.engine.processLanding(player.position);
-        this.state.phase = landing.phase === 'buying' ? 'buying' : 'awaitEnd';
+        this.consumeLanding(this.engine.processLanding(player.position), { emit: false, keepGameEvent: true });
         break;
       }
     }
+  }
+
+  // ---- Landing resolution (shared by dice, card-move and ring transfer) ----
+
+  private consumeLanding(
+    landing: ReturnType<RuleEngine['processLanding']>,
+    opts: { emit?: boolean; keepGameEvent?: boolean } = {},
+  ): void {
+    if (landing.gameEvent && !opts.keepGameEvent) {
+      this.state.gameEvent = landing.gameEvent;
+    }
+    this.state.phase = landing.phase;
+
+    if (landing.phase === 'rentChoice' && landing.holdPrompt && landing.rentTarget) {
+      this.buildRentChoicePrompt(landing);
+    } else if (landing.cardType && this.currentPlayer.cash >= 0) {
+      this.offerCardChoice(landing.cardType);
+    }
+
+    // Check bankruptcy (card effect may have taken cash)
+    if (this.currentPlayer.cash < 0) {
+      this.state.phase = 'debt';
+    }
+
+    if (opts.emit !== false) this.emitChange();
+    if (this.state.phase === 'rentChoice') this.maybeScheduleRentChoiceBot();
+  }
+
+  private buildRentChoicePrompt(landing: ReturnType<RuleEngine['processLanding']>): void {
+    const prompt = landing.holdPrompt!;
+    const owner = this.state.players.find(p => p.id === landing.rentTarget);
+    if (!owner) return;
+    const tile = this.state.tiles[this.currentPlayer.position];
+    this.state.actionCardPrompt = {
+      kind: prompt.kind,
+      actorId: prompt.actorId,
+      payerId: this.currentPlayer.id,
+      ownerId: owner.id,
+      baseRent: landing.rentAmount,
+      tileIndex: this.currentPlayer.position,
+      tileName: tile.name,
+      tileNameCN: tile.nameCN,
+    };
+    this.addLog(`${this.currentPlayer.name} 租金待结算`, 'info', `${this.currentPlayer.name} rent pending`);
+  }
+
+  // ---- Held Action Cards ----
+
+  /**
+   * Play a held action card.
+   * - In the rentChoice phase: the card must match the pending prompt (rentFree / doubleRent).
+   * - Otherwise: the rob card — active on the current player's own turn, targeting another player.
+   */
+  useHeldCard(requesterId: string, cardId: number, targetId?: string): { success: boolean; error?: string } {
+    if (this.state.phase === 'rentChoice' && this.state.actionCardPrompt) {
+      return this.resolveRentChoiceCard(requesterId, cardId);
+    }
+
+    // Rob path — only the current player, on their own turn
+    const player = this.state.players.find(p => p.id === requesterId);
+    if (!player || player.id !== this.currentPlayer.id) return { success: false, error: '现在不能使用' };
+    if (this.state.phase !== 'rolling' && this.state.phase !== 'awaitEnd') return { success: false, error: '现在不能使用' };
+
+    const card = findCardById(this.state.cards, cardId);
+    if (!card || card.effect.kind !== 'rob') return { success: false, error: '无效的卡片' };
+    if (!player.heldCards.includes(cardId)) return { success: false, error: '你没有这张卡' };
+
+    const target = this.state.players.find(p => p.id === targetId);
+    if (!target || target.id === player.id || target.status === 'bankrupt' || target.isSpectator) {
+      return { success: false, error: '无效的目标玩家' };
+    }
+
+    const stolen = Math.min(card.effect.amount, target.cash);
+    target.cash -= stolen;
+    player.cash += stolen;
+    player.heldCards = player.heldCards.filter(id => id !== cardId);
+    this.addLog(`🦹 ${player.name} 偷走了 ${target.name} 的 $${stolen}`, 'info', `🦹 ${player.name} stole $${stolen} from ${target.name}`);
+    this.emitEvent({ kind: 'rob', actorId: player.id, targetId: target.id, amount: stolen });
+    this.emitChange();
+    return { success: true };
+  }
+
+  private resolveRentChoiceCard(requesterId: string, cardId: number): { success: boolean; error?: string } {
+    const prompt = this.state.actionCardPrompt!;
+    if (requesterId !== prompt.actorId) return { success: false, error: '不是你的决策' };
+
+    const actor = this.state.players.find(p => p.id === prompt.actorId)!;
+    const card = findCardById(this.state.cards, cardId);
+    if (!card || !actor.heldCards.includes(cardId)) return { success: false, error: '你没有这张卡' };
+
+    const matches = (card.effect.kind === 'rentFree' && prompt.kind === 'rentFree')
+      || (card.effect.kind === 'doubleRent' && prompt.kind === 'doubleRent');
+    if (!matches) return { success: false, error: '此卡不能在此使用' };
+
+    // Consume the card
+    actor.heldCards = actor.heldCards.filter(id => id !== cardId);
+
+    const payer = this.state.players.find(p => p.id === prompt.payerId)!;
+    const owner = this.state.players.find(p => p.id === prompt.ownerId)!;
+
+    let amount: number | undefined;
+    if (prompt.kind === 'rentFree') {
+      amount = prompt.baseRent; // rent saved
+      this.addLog(`🃏 ${payer.name} 使用免租卡，免付 ${owner.name} 的租金 $${prompt.baseRent}`, 'info', `🃏 ${payer.name} used Rent-Free card to skip $${prompt.baseRent} rent to ${owner.name}`);
+    } else {
+      const rent = prompt.baseRent * 2;
+      amount = rent;
+      this.addLog(`💸 ${payer.name} → ${owner.name} 双倍租金 $${rent}`, 'rent', `💸 ${payer.name} → ${owner.name} double rent $${rent}`);
+      this.transferRent(payer, owner, rent, prompt);
+    }
+
+    this.emitEvent({
+      kind: 'cardUsed',
+      playerId: actor.id,
+      cardId: card.id,
+      description: card.description,
+      descriptionCN: card.descriptionCN,
+      amount,
+    });
+    this.finalizeRentChoice(payer);
+    return { success: true };
+  }
+
+  /** Decline the action card — pay the normal rent (or re-offer the payer's rent-free card if the owner declined double-rent). */
+  payRentNow(requesterId: string): { success: boolean; error?: string } {
+    if (this.state.phase !== 'rentChoice' || !this.state.actionCardPrompt) {
+      return { success: false, error: '当前没有待决租金' };
+    }
+    const prompt = this.state.actionCardPrompt;
+    if (requesterId !== prompt.actorId) return { success: false, error: '不是你的决策' };
+
+    // Owner declined double-rent → offer the payer's rent-free card next
+    if (prompt.kind === 'doubleRent') {
+      const payer = this.state.players.find(p => p.id === prompt.payerId)!;
+      if (playerHasHeldCardKind(payer, this.state.cards, 'rentFree')) {
+        this.state.actionCardPrompt = { ...prompt, kind: 'rentFree', actorId: payer.id };
+        this.emitChange();
+        this.maybeScheduleRentChoiceBot();
+        return { success: true };
+      }
+    }
+
+    const payer = this.state.players.find(p => p.id === prompt.payerId)!;
+    const owner = this.state.players.find(p => p.id === prompt.ownerId)!;
+    this.addLog(`💸 ${payer.name} → ${owner.name} 租金 $${prompt.baseRent}`, 'rent', `💸 ${payer.name} → ${owner.name} rent $${prompt.baseRent}`);
+    this.transferRent(payer, owner, prompt.baseRent, prompt);
+    this.finalizeRentChoice(payer);
+    return { success: true };
+  }
+
+  private transferRent(
+    payer: Player,
+    owner: Player,
+    amount: number,
+    prompt: { tileIndex: number; tileName: string; tileNameCN: string },
+  ): void {
+    payer.cash -= amount;
+    owner.cash += amount;
+    if (amount > 0) {
+      this.emitEvent({
+        kind: 'rent',
+        playerId: payer.id,
+        targetId: owner.id,
+        amount,
+        tileIndex: prompt.tileIndex,
+        tileName: prompt.tileName,
+        tileNameCN: prompt.tileNameCN,
+      });
+    }
+  }
+
+  private finalizeRentChoice(payer: Player): void {
+    this.state.phase = payer.cash < 0 ? 'debt' : 'awaitEnd';
+    this.state.actionCardPrompt = null;
+    this.emitChange();
+    // Resume the current player's bot/auto-pilot turn (the payer, who is always the current player)
+    if (this.currentPlayer.isBot || this.currentPlayer.autoPilot) {
+      this.scheduleBotAfterRoll();
+    }
+  }
+
+  // ---- Rent-choice bot interrupt (the actor may NOT be the current player) ----
+
+  private maybeScheduleRentChoiceBot(): void {
+    if (this.state.phase !== 'rentChoice' || !this.state.actionCardPrompt) return;
+    const actor = this.state.players.find(p => p.id === this.state.actionCardPrompt!.actorId);
+    if (!actor || (!actor.isBot && !actor.autoPilot)) return;
+    const existing = this.botTimers.get(actor.id);
+    if (existing) clearTimeout(existing);
+    const delay = actor.isBot ? 1000 : 1500;
+    const timer = setTimeout(() => {
+      this.botTimers.delete(actor.id);
+      this.executeRentChoiceAction();
+    }, delay);
+    this.botTimers.set(actor.id, timer);
+  }
+
+  private executeRentChoiceAction(): void {
+    if (this.state.phase !== 'rentChoice' || !this.state.actionCardPrompt) return;
+    const prompt = this.state.actionCardPrompt;
+    const actor = this.state.players.find(p => p.id === prompt.actorId);
+    if (!actor || (!actor.isBot && !actor.autoPilot)) return;
+
+    const decision = decideBotAction(this.state, actor);
+    if (decision.action === 'useHeldCard') {
+      this.useHeldCard(actor.id, decision.cardId!, decision.targetId);
+    } else if (decision.action === 'payRentNow') {
+      this.payRentNow(actor.id);
+    }
+
+    if (this.state.phase === 'rentChoice') {
+      // Owner declined double-rent → re-offer the payer's rent-free card
+      this.maybeScheduleRentChoiceBot();
+    }
+    // Otherwise finalizeRentChoice already resumed the current player's bot turn.
   }
 
   // ---- Wheel ----
@@ -765,12 +976,10 @@ export class GameManager {
     const localIdx = (player.position >= 72) ? player.position - 72 : player.position;
     player.position = toRing === 'outer' ? 72 + localIdx : localIdx;
 
-    // Process landing on new tile
-    const landing = this.engine.processLanding(player.position);
-    this.state.phase = landing.phase === 'buying' ? 'buying' : 'awaitEnd';
+    // Process landing on new tile (may enter buying / rentChoice)
     this.state.ringTransferred = true;
     this.addLog(`${player.name} 换乘到${toRing === 'outer' ? '外环' : '内环'} (费用 $${fee})`, 'info', `${player.name} transferred to ${toRing === 'outer' ? 'outer' : 'inner'} ring (fee $${fee})`);
-    this.emitChange();
+    this.consumeLanding(this.engine.processLanding(player.position));
     return { success: true };
   }
 
@@ -880,6 +1089,18 @@ export class GameManager {
         }, 1000);
         break;
 
+      case 'useHeldCard': {
+        // Rob card used on the current player's turn (rent-choice is handled by executeRentChoiceAction)
+        this.useHeldCard(player.id, decision.cardId!, decision.targetId);
+        if (this.state.phase === 'rolling') {
+          this.rollDice();
+          this.scheduleBotAfterRoll();
+        } else {
+          setTimeout(() => this.endTurn(), 1000);
+        }
+        break;
+      }
+
       case 'tryDoubles':
         this.tryJailDice();
         setTimeout(() => this.executeBotAction(), 1500);
@@ -906,6 +1127,9 @@ export class GameManager {
     } else if (phase === 'rolling') {
       // Extra roll (doubles) — re-roll
       setTimeout(() => this.executeBotAction(), 1500);
+    } else if (phase === 'rentChoice') {
+      // Decision may belong to a non-current player (double-rent owner)
+      this.maybeScheduleRentChoiceBot();
     }
     // 'ended' → nothing needed
   }

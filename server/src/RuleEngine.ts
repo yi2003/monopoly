@@ -9,9 +9,10 @@ import {
   canBuildHouse, canSellHouse, getSellHouseValue,
   canMortgage, getMortgageValue, getUnmortgageCost,
   ownsFullGroup,
+  playerHasHeldCardKind,
   CORNER_GO, CORNER_JAIL, CORNER_GOTO_JAIL,
-  OUTER_RING_OFFSET,
   JAIL_FINE, MAX_JAIL_TURNS,
+  advancePosition,
 } from '@monopoly/shared';
 import { getEffectiveConfig, THEMES } from '@monopoly/shared';
 
@@ -59,30 +60,34 @@ export class RuleEngine {
       return { passedGo: false, newPosition: player.position, extraRoll: false };
     }
 
-    // Calculate new position on ground ring (ring-aware)
+    // Advance on the current ring (ground rings wrap at 48, inner-city rings
+    // wrap circularly at 8 tiles per ring).
     const steps = dice.total;
-    const ringStart = player.groundRing === 'inner' ? 0 : OUTER_RING_OFFSET;
-    const ringSize = 48;
-    const localPos = player.position - ringStart;
-    let newLocalPos = localPos + steps;
-    if (newLocalPos >= ringSize) {
+    const moved = advancePosition(
+      player.position, steps,
+      player.innerCityRing, player.innerCitySector, player.groundRing,
+    );
+    if (moved.passedGo) {
       passedGo = true;
       player.cash += this.effConfig.goSalary;
     }
-    newLocalPos = newLocalPos % ringSize;
-    const newPos = ringStart + newLocalPos;
+    if (moved.ring !== 0) {
+      player.innerCityRing = moved.ring;
+      player.innerCitySector = moved.sector;
+    }
 
-    return { passedGo, newPosition: newPos, extraRoll };
+    return { passedGo, newPosition: moved.position, extraRoll };
   }
 
   // ---- Landing on tile ----
 
   processLanding(position: number, extraRentMultiplier = 1): {
-    phase: 'buying' | 'stock' | 'wheel' | 'debt' | 'awaitEnd';
+    phase: 'buying' | 'stock' | 'wheel' | 'debt' | 'rentChoice' | 'awaitEnd';
     rentAmount: number;
     rentTarget: string | null;
     cardType: 'chance' | 'community_chest' | null;
     gameEvent?: GameEvent;
+    holdPrompt?: { kind: 'rentFree' | 'doubleRent'; actorId: string };
   } {
     const tile = this.state.tiles[position];
     const player = this.currentPlayer;
@@ -99,6 +104,17 @@ export class RuleEngine {
             0, this.effConfig.rentMultiplier,
           );
           rentTarget = owner.id;
+          // Defer the transfer if the payer holds a rent-free card or the owner a
+          // double-rent card — the decision happens in the rentChoice phase.
+          const payerHasFree = playerHasHeldCardKind(player, this.state.cards, 'rentFree');
+          const ownerHasDouble = playerHasHeldCardKind(owner, this.state.cards, 'doubleRent');
+          if (rentAmount > 0 && (payerHasFree || ownerHasDouble)) {
+            const kind = ownerHasDouble ? 'doubleRent' : 'rentFree';
+            return {
+              phase: 'rentChoice', rentAmount, rentTarget: owner.id, cardType: null,
+              holdPrompt: { kind, actorId: kind === 'doubleRent' ? owner.id : player.id },
+            };
+          }
           player.cash -= rentAmount;
           owner.cash += rentAmount;
           this.addLog(`💸 ${player.name} → ${owner.name} 租金 $${rentAmount}`, 'rent', `💸 ${player.name} → ${owner.name} rent $${rentAmount}`);
@@ -121,6 +137,15 @@ export class RuleEngine {
           const theme = THEMES[this.state.config.theme];
           rentAmount = Math.round(calcRailwayRent(owner, railwayCount, theme) * extraRentMultiplier);
           rentTarget = owner.id;
+          const payerHasFreeR = playerHasHeldCardKind(player, this.state.cards, 'rentFree');
+          const ownerHasDoubleR = playerHasHeldCardKind(owner, this.state.cards, 'doubleRent');
+          if (rentAmount > 0 && (payerHasFreeR || ownerHasDoubleR)) {
+            const kind = ownerHasDoubleR ? 'doubleRent' : 'rentFree';
+            return {
+              phase: 'rentChoice', rentAmount, rentTarget: owner.id, cardType: null,
+              holdPrompt: { kind, actorId: kind === 'doubleRent' ? owner.id : player.id },
+            };
+          }
           player.cash -= rentAmount;
           owner.cash += rentAmount;
           this.addLog(`🚂 ${player.name} → ${owner.name} 铁路费 $${rentAmount}（${railwayCount}条铁路）`, 'rent', `🚂 ${player.name} → ${owner.name} railway fee $${rentAmount} (${railwayCount} railways)`);
@@ -141,6 +166,15 @@ export class RuleEngine {
           const diceSum = this.state.dice?.total || 0;
           rentAmount = Math.round(calcUtilityRent(utilityCount, diceSum) * extraRentMultiplier);
           rentTarget = owner.id;
+          const payerHasFreeU = playerHasHeldCardKind(player, this.state.cards, 'rentFree');
+          const ownerHasDoubleU = playerHasHeldCardKind(owner, this.state.cards, 'doubleRent');
+          if (rentAmount > 0 && (payerHasFreeU || ownerHasDoubleU)) {
+            const kind = ownerHasDoubleU ? 'doubleRent' : 'rentFree';
+            return {
+              phase: 'rentChoice', rentAmount, rentTarget: owner.id, cardType: null,
+              holdPrompt: { kind, actorId: kind === 'doubleRent' ? owner.id : player.id },
+            };
+          }
           player.cash -= rentAmount;
           owner.cash += rentAmount;
           this.addLog(`🔌 ${player.name} → ${owner.name} 公共事业费 $${rentAmount}（骰子${diceSum}×${utilityCount}处）`, 'rent', `🔌 ${player.name} → ${owner.name} utility fee $${rentAmount} (dice ${diceSum}×${utilityCount})`);
@@ -318,6 +352,7 @@ export class RuleEngine {
       player.properties = [];
       player.houses = {};
       player.stocks = [];
+      player.heldCards = [];
       player.cash = 0;
       this.addLog(`💀 ${player.name} 破产！全部资产 → ${creditor.name}`, 'bankrupt', `💀 ${player.name} bankrupt! Assets → ${creditor.name}`);
     } else {
@@ -325,6 +360,7 @@ export class RuleEngine {
       player.properties = [];
       player.houses = {};
       player.stocks = [];
+      player.heldCards = [];
       player.cash = 0;
       this.addLog(`💀 ${player.name} 破产！资产回归银行`, 'bankrupt', `💀 ${player.name} bankrupt! Assets returned to bank`);
     }

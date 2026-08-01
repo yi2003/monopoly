@@ -195,6 +195,7 @@ io.on('connection', (socket) => {
       stocks: [],
       jailTurns: 0,
       getOutOfJailCards: 0,
+      heldCards: [],
       consecutiveDoubles: 0,
       skipNextTurn: false,
       status: 'active',
@@ -274,6 +275,7 @@ io.on('connection', (socket) => {
         gamePlayer.stocks = [];
         gamePlayer.jailTurns = 0;
         gamePlayer.getOutOfJailCards = 0;
+        gamePlayer.heldCards = [];
         gamePlayer.consecutiveDoubles = 0;
         gamePlayer.skipNextTurn = false;
         gamePlayer.status = 'active';
@@ -390,6 +392,18 @@ io.on('connection', (socket) => {
     const cp = game.state.players[game.state.currentPlayerIndex];
     if (!cp || cp.id !== currentPlayerId) return;
     game.pickCard(data.choiceIndex);
+  });
+
+  socket.on('useHeldCard', (data) => {
+    const game = getGame();
+    if (!game || !data) return;
+    game.useHeldCard(currentPlayerId || '', data.cardId, data.targetId);
+  });
+
+  socket.on('payRentNow', () => {
+    const game = getGame();
+    if (!game) return;
+    game.payRentNow(currentPlayerId || '');
   });
 
   socket.on('chat', (message) => {

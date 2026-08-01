@@ -3,6 +3,7 @@ import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
 import { getSocket } from '../../network/socket';
 import { getDice3DInstance } from '../../scene/Dice3D';
+import DicePreview from './DicePreview';
 import type { CameraMode, QualityMode } from '@monopoly/shared';
 import { THEMES, DIFFICULTIES } from '@monopoly/shared';
 import { useI18n } from '../../i18n/useI18n';
@@ -62,6 +63,7 @@ export default function HUD() {
   const toggleStockPanel = useGameStore(s => s.toggleStockPanel);
   const togglePortfolio = useGameStore(s => s.togglePortfolio);
   const toggleBuildPanel = useGameStore(s => s.toggleBuildPanel);
+  const toggleHandModal = useUIStore(s => s.toggleHandModal);
   const playerId = useGameStore(s => s.playerId);
   const isSpectator = useGameStore(s => s.isSpectator);
   const phaseDelayUntil = useGameStore(s => s.phaseDelayUntil);
@@ -73,6 +75,7 @@ export default function HUD() {
   const isMyTurn = !isSpectator && !!(gameState && gameState.players[gameState.currentPlayerIndex]?.id === playerId);
   const currentPlayer = players[currentPlayerIndex];
   const weather = gameState?.weather || 'clear';
+  const handCount = myPlayer?.heldCards.length ?? 0;
 
   // Force re-render when phase delay expires
   const [delayTick, setDelayTick] = useState(0);
@@ -269,6 +272,9 @@ export default function HUD() {
         </div>
       )}
 
+      {/* Dice outcome preview (shown before rolling) */}
+      <DicePreview />
+
       {/* Dice Panel */}
       <div className="dice-panel">
         {diceSpinning ? (
@@ -301,6 +307,11 @@ export default function HUD() {
             ) : (
               <button className="btn btn-primary btn-lg" onClick={handleRoll}>
                 {t('hud.rollDice')}
+              </button>
+            )}
+            {handCount > 0 && (
+              <button className="btn btn-sm btn-outline hand-btn" onClick={toggleHandModal}>
+                {t('hand.button')} <span className="hand-badge">{handCount}</span>
               </button>
             )}
             <button className="btn btn-sm btn-outline" onClick={toggleBuildPanel}>
@@ -356,6 +367,11 @@ export default function HUD() {
 
         {phase === 'awaitEnd' && isMyTurn && phaseReady && (
           <div className="action-buttons">
+            {handCount > 0 && (
+              <button className="btn btn-sm btn-outline hand-btn" onClick={toggleHandModal}>
+                {t('hand.button')} <span className="hand-badge">{handCount}</span>
+              </button>
+            )}
             <button className="btn btn-sm btn-outline" onClick={toggleBuildPanel}>
               {t('hud.buildSell')}
             </button>

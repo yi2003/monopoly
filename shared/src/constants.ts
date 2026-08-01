@@ -408,6 +408,9 @@ export const CHANCE_CARDS: Card[] = [
   { id: 11, type: 'chance', description: 'Make general repairs: $25 per house, $100 per hotel', descriptionCN: '房屋维修：每栋$25，酒店$100', effect: { kind: 'repairs', perHouse: 25, perHotel: 100 } },
   { id: 12, type: 'chance', description: 'Go back 3 spaces', descriptionCN: '后退3格', effect: { kind: 'moveBack', spaces: 3 } },
   { id: 13, type: 'chance', description: 'Building loan matures: collect $150', descriptionCN: '建筑贷款到期：获得$150', effect: { kind: 'cash', amount: 150 } },
+  // Held action cards — drawn into hand, played later
+  { id: 501, type: 'chance', hold: true, description: 'Double-Rent Card: collect 2× rent once', descriptionCN: '双倍租金卡：收取一次双倍租金', effect: { kind: 'doubleRent' } },
+  { id: 502, type: 'chance', hold: true, description: 'Rob Card: steal $100 from any player', descriptionCN: '偷钱卡：偷走一名玩家$100', effect: { kind: 'rob', amount: 100 } },
 ];
 
 // ---- Theme-specific Extra Chance Cards ----
@@ -453,6 +456,8 @@ export const COMMUNITY_CHEST_CARDS: Card[] = [
   { id: 113, type: 'community_chest', description: 'Beauty contest second prize: collect $10', descriptionCN: '选美比赛二等奖：获得$10', effect: { kind: 'cash', amount: 10 } },
   { id: 114, type: 'community_chest', description: 'Inheritance: collect $100', descriptionCN: '遗产继承：获得$100', effect: { kind: 'cash', amount: 100 } },
   { id: 115, type: 'community_chest', description: 'Birthday: collect $10 from each player', descriptionCN: '生日：向每位玩家收取$10', effect: { kind: 'cashPerPlayer', amount: 10 } },
+  // Held action card — drawn into hand, played later
+  { id: 500, type: 'community_chest', hold: true, description: 'Rent-Free Card: skip one rent payment', descriptionCN: '免租卡：免付一次租金', effect: { kind: 'rentFree' } },
 ];
 
 // ---- Stock Market ----

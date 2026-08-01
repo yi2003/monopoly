@@ -3,12 +3,14 @@
 // ============================================================
 
 import type { GameState, Player } from '@monopoly/shared';
-import { getPropertyDef, getRailwayDef, getUtilityDef, canBuildHouse, getGroupTiles } from '@monopoly/shared';
+import { getPropertyDef, getRailwayDef, getUtilityDef, canBuildHouse, getGroupTiles, findHeldCardId } from '@monopoly/shared';
 
 export interface BotDecision {
-  action: 'roll' | 'buy' | 'pass' | 'build' | 'sellHouse' | 'endTurn' | 'payJail' | 'useCard' | 'tryDoubles' | 'spinWheel' | 'pickCard';
+  action: 'roll' | 'buy' | 'pass' | 'build' | 'sellHouse' | 'endTurn' | 'payJail' | 'useCard' | 'tryDoubles' | 'spinWheel' | 'pickCard' | 'useHeldCard' | 'payRentNow';
   tileIndex?: number;
   choiceIndex?: number;
+  cardId?: number;
+  targetId?: string;
   stockAction?: { symbol: string; shares: number; action: 'buy' | 'sell' };
   delay: number; // ms before executing
 }
@@ -36,6 +38,8 @@ export function decideBotAction(state: GameState, player: Player): BotDecision {
       const n = state.cardChoice ? state.cardChoice.options.length : 0;
       return { action: 'pickCard', choiceIndex: Math.floor(Math.random() * Math.max(n, 1)), delay: REGULAR_DELAY };
     }
+    case 'rentChoice':
+      return decideRentChoiceAction(state, player);
     default:
       return { action: 'pass', delay: REGULAR_DELAY };
   }
@@ -53,6 +57,10 @@ function decideRollingAction(state: GameState, player: Player): BotDecision {
     // Try doubles
     return { action: 'roll', delay: REGULAR_DELAY };
   }
+
+  // Consider using a rob card
+  const rob = maybeRob(state, player);
+  if (rob) return rob;
 
   // Consider building before rolling
   const buildTarget = findBestBuild(state, player);
@@ -104,6 +112,10 @@ function decideDebtAction(state: GameState, player: Player): BotDecision {
 }
 
 function decideAwaitEndAction(state: GameState, player: Player): BotDecision {
+  // Consider using a rob card
+  const rob = maybeRob(state, player);
+  if (rob) return rob;
+
   // Try to build
   const buildTarget = findBestBuild(state, player);
   if (buildTarget !== null && Math.random() < 0.5) {
@@ -111,6 +123,43 @@ function decideAwaitEndAction(state: GameState, player: Player): BotDecision {
   }
 
   return { action: 'endTurn', delay: REGULAR_DELAY };
+}
+
+// ---- Held action cards ----
+
+function decideRentChoiceAction(state: GameState, actor: Player): BotDecision {
+  const prompt = state.actionCardPrompt;
+  if (!prompt) return { action: 'payRentNow', delay: REGULAR_DELAY };
+
+  if (prompt.kind === 'rentFree') {
+    const cardId = findHeldCardId(actor, state.cards, 'rentFree');
+    if (cardId !== undefined) return { action: 'useHeldCard', cardId, delay: REGULAR_DELAY };
+    return { action: 'payRentNow', delay: REGULAR_DELAY };
+  }
+
+  // doubleRent — use it most of the time (pure upside for the owner)
+  const cardId = findHeldCardId(actor, state.cards, 'doubleRent');
+  if (cardId !== undefined && Math.random() < 0.6) {
+    return { action: 'useHeldCard', cardId, delay: REGULAR_DELAY };
+  }
+  return { action: 'payRentNow', delay: REGULAR_DELAY };
+}
+
+function maybeRob(state: GameState, player: Player): BotDecision | null {
+  const cardId = findHeldCardId(player, state.cards, 'rob');
+  if (cardId === undefined || Math.random() >= 0.3) return null;
+  const target = pickRichestActiveOpponent(state, player.id);
+  if (!target) return null;
+  return { action: 'useHeldCard', cardId, targetId: target.id, delay: REGULAR_DELAY };
+}
+
+function pickRichestActiveOpponent(state: GameState, selfId: string): Player | null {
+  let best: Player | null = null;
+  for (const p of state.players) {
+    if (p.id === selfId || p.isSpectator || p.status === 'bankrupt') continue;
+    if (!best || p.cash > best.cash) best = p;
+  }
+  return best;
 }
 
 function decideStockAction(state: GameState, player: Player): BotDecision {

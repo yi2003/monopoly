@@ -12,6 +12,8 @@ const EVENT_CONFIG: Record<string, { icon: string; color: string }> = {
   jail_out:    { icon: '🔓', color: '#FFD700' },
   dividend:    { icon: '📈', color: '#2196F3' },
   card:        { icon: '🃏', color: '#8E24AA' },
+  cardUsed:    { icon: '🃏', color: '#8E24AA' },
+  rob:         { icon: '🦹', color: '#E53935' },
   weather:     { icon: '🌤️', color: '#00BCD4' },
   maintenance: { icon: '🔧', color: '#FF9800' },
   game_over:   { icon: '🏆', color: '#FFD700' },
@@ -108,6 +110,24 @@ function getEventMessage(
         title: cardTypeLabel,
         desc: isZh ? event.descriptionCN : event.description,
         detail: isZh ? `🎯 ${playerName} 抽到此卡` : `🎯 Drawn by ${playerName}`,
+      };
+    }
+    case 'cardUsed': {
+      const playerName = getPlayerName?.(event.playerId) || event.playerId;
+      return {
+        title: isZh ? '🃏 使用行动卡' : '🃏 Action Card Used',
+        desc: isZh ? event.descriptionCN : event.description,
+        amount: event.amount !== undefined ? { value: event.amount, positive: true } : undefined,
+        detail: isZh ? `🎯 ${playerName}` : `🎯 ${playerName}`,
+      };
+    }
+    case 'rob': {
+      const actorName = getPlayerName?.(event.actorId) || event.actorId;
+      const targetName = getPlayerName?.(event.targetId) || event.targetId;
+      return {
+        title: isZh ? '🦹 偷钱' : '🦹 Robbed',
+        desc: isZh ? `${actorName} 偷走了 ${targetName} 的钱` : `${actorName} robbed ${targetName}`,
+        amount: { value: event.amount, positive: true },
       };
     }
     case 'maintenance':

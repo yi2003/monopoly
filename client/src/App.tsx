@@ -11,6 +11,8 @@ import BankruptcyModal from './components/Modals/BankruptcyModal';
 import GameOverModal from './components/Modals/GameOverModal';
 import CardFlip from './components/Special/CardFlip';
 import CardPicker from './components/Special/CardPicker';
+import RentChoicePrompt from './components/Special/RentChoicePrompt';
+import HandPanel from './components/Special/HandPanel';
 import WheelSpinner from './components/Special/WheelSpinner';
 import EventCard from './components/Special/EventCard';
 import ScreenFlash from './components/Special/ScreenFlash';
@@ -48,6 +50,8 @@ export default function App() {
       <GameOverModal />
       <CardFlip />
       <CardPicker />
+      <RentChoicePrompt />
+      <HandPanel />
       <WheelSpinner />
       <ScreenFlash />
       <EventCard />

@@ -11,6 +11,7 @@ export type GamePhase =
   | 'stock'
   | 'wheel'
   | 'cardChoice'
+  | 'rentChoice'
   | 'debt'
   | 'awaitEnd'
   | 'ended';
@@ -108,6 +109,7 @@ export interface Player {
   stocks: StockHolding[];
   jailTurns: number; // turns spent in jail, 0=not jailed
   getOutOfJailCards: number;
+  heldCards: number[]; // ids of held action cards (rentFree / doubleRent / rob)
   consecutiveDoubles: number;
   skipNextTurn: boolean;
   status: PlayerStatus;
@@ -181,6 +183,7 @@ export interface Card {
   description: string;
   descriptionCN: string;
   effect: CardEffect;
+  hold?: boolean; // if true, drawing adds the card to the player's hand instead of resolving immediately
 }
 
 export type CardEffect =
@@ -191,7 +194,11 @@ export type CardEffect =
   | { kind: 'jail' }
   | { kind: 'getOutOfJail' }
   | { kind: 'repairs'; perHouse: number; perHotel: number }
-  | { kind: 'moveBack'; spaces: number };
+  | { kind: 'moveBack'; spaces: number }
+  // Held action cards (played later, not resolved on draw)
+  | { kind: 'rentFree' } // skip the next rent you owe
+  | { kind: 'doubleRent' } // charge 2× rent when an opponent lands on your property
+  | { kind: 'rob'; amount: number }; // steal from a target player on your turn
 
 // ---- Stocks ----
 
@@ -253,6 +260,19 @@ export type WheelEffect =
   | { kind: 'freeHouse' }
   | { kind: 'freeStock'; symbol: string; shares: number };
 
+// ---- Held action card prompt (rent decision) ----
+
+export interface ActionCardPrompt {
+  kind: 'rentFree' | 'doubleRent';
+  actorId: string; // who must decide (owner for doubleRent, payer for rentFree)
+  payerId: string; // the current player who owes rent
+  ownerId: string;
+  baseRent: number; // rent computed by processLanding (before the double-rent ×2)
+  tileIndex: number;
+  tileName: string;
+  tileNameCN: string;
+}
+
 // ---- Game Event Notification (for card popups) ----
 
 export type GameEvent =
@@ -263,6 +283,8 @@ export type GameEvent =
   | { kind: 'jail_out'; playerId: string; method: 'pay_fine' | 'use_card' | 'doubles' | 'forced' }
   | { kind: 'dividend'; playerId: string; symbol: string; stockName: string; stockNameCN: string; shares: number; amount: number }
   | { kind: 'card'; playerId: string; cardType: 'chance' | 'community_chest'; description: string; descriptionCN: string }
+  | { kind: 'cardUsed'; playerId: string; cardId: number; description: string; descriptionCN: string; targetId?: string; amount?: number }
+  | { kind: 'rob'; actorId: string; targetId: string; amount: number }
   | { kind: 'weather'; from: string; to: string }
   | { kind: 'maintenance'; playerId: string; amount: number; rate: number }
   | { kind: 'game_over'; winnerId: string; winnerName: string };
@@ -288,6 +310,7 @@ export interface GameState {
   dayTime: number; // 0-1, position in day/night cycle
   wheelResult: number | null; // sector index
   cardChoice: { type: 'chance' | 'community_chest'; options: { idx: number }[] } | null; // face-down cards offered to current player
+  actionCardPrompt: ActionCardPrompt | null; // pending rent decision (rentFree / doubleRent)
   lastCardDrawn: { type: CardType; card: Card } | null;
   gameEvent: GameEvent | null;
   ringTransferred: boolean; // prevent double-transfer spam
@@ -323,6 +346,8 @@ export interface ClientToServerEvents {
   exitInnerCity: () => void;
   transferRing: (toRing: 'inner' | 'outer') => void;
   pickCard: (data: { choiceIndex: number }) => void;
+  useHeldCard: (data: { cardId: number; targetId?: string }) => void;
+  payRentNow: () => void;
   chat: (message: string) => void;
   ping: () => void;
 }

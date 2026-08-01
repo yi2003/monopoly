@@ -308,6 +308,82 @@ html, body, #root {
   margin-top: 2px;
 }
 
+/* Dice Outcome Preview (1-6 landing prediction) */
+
+.dice-preview {
+  position: absolute; bottom: 205px; left: 50%; transform: translateX(-50%);
+  z-index: 9;
+  display: flex; gap: 8px;
+  padding: 6px 10px;
+  background: rgba(0,0,0,0.35);
+  border-radius: 14px;
+  backdrop-filter: blur(3px);
+}
+.dice-preview-card {
+  width: 92px; min-height: 104px;
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-top: 3px solid #9e9e9e;
+  border-radius: 10px;
+  padding: 6px 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  cursor: default;
+}
+.dice-preview-roll {
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #FFFFF0, #F0EAD8);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: inset 0 -1px 2px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.2);
+  position: relative;
+}
+.dice-preview-roll-num { color: #333; font-size: 14px; font-weight: 800; }
+.dice-preview-dot {
+  position: absolute; bottom: 2px; right: 2px;
+  width: 7px; height: 7px; border-radius: 50%;
+}
+.dice-preview-icon { font-size: 18px; line-height: 1; }
+.dice-preview-name {
+  font-size: 11px; font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+  line-height: 1.15;
+  max-height: 26px; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.dice-preview-action {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.1;
+  max-height: 22px; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.dice-preview-go {
+  display: inline-block;
+  margin-left: 3px;
+  font-size: 9px; font-weight: 700;
+  color: #4caf50;
+}
+.dice-preview-jailed {
+  position: absolute; bottom: 205px; left: 50%; transform: translateX(-50%);
+  z-index: 9;
+  background: rgba(33,33,33,0.85);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-size: 13px; font-weight: 600;
+  color: #ffcc80;
+  backdrop-filter: blur(3px);
+}
+
+@media (max-width: 1100px) {
+  .dice-preview-card { width: 74px; min-height: 96px; }
+  .dice-preview-name { font-size: 10px; }
+  .dice-preview-action { font-size: 9px; }
+}
+
 /* Action Panel */
 
 .action-panel {
@@ -504,6 +580,101 @@ html, body, #root {
 .card-choice-card:disabled { opacity: 1; }
 .card-choice-symbol { font-size: 60px; font-weight: bold; color: rgba(255,255,255,0.35); }
 .card-choice-label { font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 12px; font-weight: 600; }
+
+/* ---- Held action cards (hand button badge) ---- */
+
+.hand-btn { position: relative; }
+.hand-badge {
+  position: absolute; top: -6px; right: -6px;
+  min-width: 18px; height: 18px; border-radius: 9px;
+  background: #FFD700; color: #000;
+  font-size: 11px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+/* ---- Rent choice prompt ---- */
+
+.rent-choice-overlay {
+  position: fixed; inset: 0; z-index: 185;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55);
+}
+.rent-choice-card {
+  width: 360px; max-width: 90vw;
+  background: linear-gradient(160deg, #2A1E3F, #3D2B55);
+  border: 2px solid #FFD700;
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.55);
+  color: white;
+}
+.rent-choice-title {
+  font-size: 22px; font-weight: 800; color: #FFD700;
+  margin-bottom: 12px;
+}
+.rent-choice-desc {
+  font-size: 15px; line-height: 1.7; color: rgba(255,255,255,0.92);
+  margin-bottom: 8px;
+}
+.rent-choice-x2 {
+  font-size: 40px; font-weight: 900; color: #FF5252;
+  margin: 4px 0 8px; text-shadow: 0 2px 8px rgba(255,82,82,0.4);
+}
+.rent-choice-buttons {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-top: 16px;
+}
+
+/* ---- Hand panel ---- */
+
+.hand-overlay {
+  position: fixed; inset: 0; z-index: 190;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55);
+}
+.hand-panel {
+  width: 380px; max-width: 92vw; max-height: 80vh;
+  background: linear-gradient(160deg, #1B2333, #2A3550);
+  border: 1px solid rgba(255,215,0,0.4);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.55);
+  color: white;
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+}
+.hand-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.hand-title { font-size: 20px; font-weight: 800; color: #FFD700; }
+.hand-empty { text-align: center; color: rgba(255,255,255,0.5); padding: 24px 0; font-size: 14px; }
+.hand-list { display: flex; flex-direction: column; gap: 12px; }
+.hand-card {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.hand-card-name { font-size: 14px; font-weight: 700; line-height: 1.5; }
+.hand-use { align-self: flex-start; }
+.hand-passive { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.hand-passive-tag {
+  background: rgba(255,215,0,0.15); color: #FFD700;
+  border: 1px solid rgba(255,215,0,0.4);
+  border-radius: 6px; padding: 2px 8px; font-weight: 700;
+}
+.hand-passive-hint { color: rgba(255,255,255,0.55); }
+.rob-targets { display: flex; flex-direction: column; gap: 6px; }
+.rob-targets-title { font-size: 12px; color: rgba(255,255,255,0.6); }
+.rob-target {
+  display: flex; align-items: center; justify-content: space-between;
+  text-align: left;
+}
+.rob-target-cash { color: #FFD700; font-weight: 700; }
 
 /* ---- Wheel ---- */
 
