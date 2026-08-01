@@ -2,8 +2,8 @@
 // GameRoom — Room lifecycle management
 // ============================================================
 
-import type { Player, GameConfig, ThemeId, DifficultyId, EraId } from '@monopoly/shared';
-import { PLAYER_COLORS, MAX_PLAYERS, MIN_PLAYERS_TO_START } from '@monopoly/shared';
+import type { Player, GameConfig, ThemeId, DifficultyId, EraId, AvatarId } from '@monopoly/shared';
+import { PLAYER_COLORS, MAX_PLAYERS, MIN_PLAYERS_TO_START, DEFAULT_AVATAR } from '@monopoly/shared';
 import { generatePlayerId } from './utils/random';
 
 export interface RoomState {
@@ -20,6 +20,7 @@ export function createRoom(
   code: string,
   hostName: string,
   hostColor: string,
+  hostAvatar: AvatarId,
   theme: ThemeId,
   era: EraId,
   difficulty: DifficultyId,
@@ -28,6 +29,7 @@ export function createRoom(
     id: generatePlayerId(),
     name: hostName,
     color: hostColor || PLAYER_COLORS[0],
+    avatar: hostAvatar || DEFAULT_AVATAR,
     isBot: false,
     isSpectator: false,
     autoPilot: false,
@@ -74,6 +76,7 @@ export function joinRoom(
   code: string,
   name: string,
   color: string,
+  avatar: AvatarId,
   asSpectator: boolean,
 ): { room: RoomState; player: Player } | { error: string } {
   const room = rooms.get(code);
@@ -89,6 +92,7 @@ export function joinRoom(
     id: generatePlayerId(),
     name,
     color: color || PLAYER_COLORS[room.players.length % PLAYER_COLORS.length],
+    avatar: avatar || DEFAULT_AVATAR,
     isBot: false,
     isSpectator: asSpectator,
     autoPilot: false,

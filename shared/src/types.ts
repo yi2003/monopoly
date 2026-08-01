@@ -77,6 +77,8 @@ export type Direction = 'north' | 'south' | 'east' | 'west';
 
 export type PlayerStatus = 'active' | 'jailed' | 'bankrupt';
 
+export type AvatarId = 'tycoon' | 'chef' | 'explorer' | 'athlete' | 'royal' | 'cowboy' | 'artist' | 'wizard';
+
 // ---- Player ----
 
 export interface StockHolding {
@@ -89,6 +91,7 @@ export interface Player {
   id: string;
   name: string;
   color: string; // hex color
+  avatar: AvatarId; // character appearance
   isBot: boolean;
   isSpectator: boolean;
   autoPilot: boolean; // human player enabled auto-play
@@ -292,10 +295,10 @@ export interface GameState {
 // ---- Socket Events (client -> server) ----
 
 export interface ClientToServerEvents {
-  createRoom: (data: { playerName: string; playerColor: string; theme: ThemeId; era: EraId; difficulty: DifficultyId }) => void;
-  joinRoom: (data: { roomCode: string; playerName: string; playerColor: string; asSpectator?: boolean }) => void;
+  createRoom: (data: { playerName: string; playerColor: string; avatar: AvatarId; theme: ThemeId; era: EraId; difficulty: DifficultyId }) => void;
+  joinRoom: (data: { roomCode: string; playerName: string; playerColor: string; avatar: AvatarId; asSpectator?: boolean }) => void;
   leaveRoom: () => void;
-  addBot: (data: { name: string; color: string }) => void;
+  addBot: (data: { name: string; color: string; avatar?: AvatarId }) => void;
   removeBot: (botId: string) => void;
   toggleAutoPilot: (playerId: string) => void;
   startGame: () => void;

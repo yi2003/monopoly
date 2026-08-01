@@ -2,7 +2,7 @@
 // 家庭大富翁 — Game Constants
 // ============================================================
 
-import type { Tile, Card, Stock, WheelSector, ColorGroup, ThemeId } from './types';
+import type { Tile, Card, Stock, WheelSector, ColorGroup, ThemeId, AvatarId } from './types';
 
 // ---- Board Layout (48 inner ground + 48 outer ground + 24 inner city) ----
 
@@ -518,6 +518,47 @@ export const PLAYER_COLORS = [
 ];
 
 export const PLAYER_COLOR_NAMES = ['红', '蓝', '绿', '橙', '紫', '青'];
+
+// ---- Player Avatars ----
+
+export const AVATAR_IDS: AvatarId[] = [
+  'tycoon', 'chef', 'explorer', 'athlete', 'royal', 'cowboy', 'artist', 'wizard',
+];
+
+export const AVATAR_NAMES: Record<AvatarId, string> = {
+  tycoon: '大亨',
+  chef: '大厨',
+  explorer: '探险家',
+  athlete: '运动员',
+  royal: '皇室',
+  cowboy: '牛仔',
+  artist: '艺术家',
+  wizard: '魔法师',
+};
+
+export const AVATAR_NAMES_EN: Record<AvatarId, string> = {
+  tycoon: 'Tycoon',
+  chef: 'Chef',
+  explorer: 'Explorer',
+  athlete: 'Athlete',
+  royal: 'Royal',
+  cowboy: 'Cowboy',
+  artist: 'Artist',
+  wizard: 'Wizard',
+};
+
+export const AVATAR_ICONS: Record<AvatarId, string> = {
+  tycoon: '🎩',
+  chef: '👨‍🍳',
+  explorer: '🧭',
+  athlete: '🏃',
+  royal: '👑',
+  cowboy: '🤠',
+  artist: '🎨',
+  wizard: '🧙',
+};
+
+export const DEFAULT_AVATAR: AvatarId = 'tycoon';
 
 // ---- Default Game Config ----
 

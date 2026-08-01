@@ -2,14 +2,14 @@
 // GameManager — Authoritative game state & turn machine
 // ============================================================
 
-import type { GameState, GameConfig, Player, ThemeId, DifficultyId, GameEvent } from '@monopoly/shared';
+import type { GameState, GameConfig, Player, ThemeId, DifficultyId, GameEvent, AvatarId } from '@monopoly/shared';
 import {
   createTiles, CHANCE_CARDS, COMMUNITY_CHEST_CARDS,
   SHANGHAI_EXTRA_CHANCE_CARDS, SHANGHAI_EXTRA_COMMUNITY_CHEST_CARDS,
   TOKYO_EXTRA_CHANCE_CARDS, TOKYO_EXTRA_COMMUNITY_CHEST_CARDS,
   GO_SALARY,
   JAIL_FINE, CORNER_GO, CORNER_JAIL,
-  PLAYER_COLORS,
+  PLAYER_COLORS, DEFAULT_AVATAR,
 } from '@monopoly/shared';
 import { getEffectiveConfig, THEMES } from '@monopoly/shared';
 import { rollDice, findNearestTile, moveToTile } from '@monopoly/shared';
@@ -70,11 +70,12 @@ export class GameManager {
 
   // ---- Player Management ----
 
-  addPlayer(name: string, color?: string, isBot = false): Player {
+  addPlayer(name: string, color?: string, isBot = false, avatar?: AvatarId): Player {
     const player: Player = {
       id: isBot ? `bot_${generatePlayerId()}` : generatePlayerId(),
       name,
       color: color || PLAYER_COLORS[this.state.players.length % PLAYER_COLORS.length],
+      avatar: avatar || DEFAULT_AVATAR,
       isBot,
       isSpectator: false,
       autoPilot: false,

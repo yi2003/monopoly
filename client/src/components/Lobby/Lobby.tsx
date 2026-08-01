@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { getSocket } from '../../network/socket';
-import { THEMES, DIFFICULTIES, PLAYER_COLORS, PLAYER_COLOR_NAMES, MAX_PLAYERS, ERAS, ERA_IDS, ERA_NAMES } from '@monopoly/shared';
-import type { ThemeId, DifficultyId, EraId } from '@monopoly/shared';
+import { THEMES, DIFFICULTIES, PLAYER_COLORS, PLAYER_COLOR_NAMES, MAX_PLAYERS, ERAS, ERA_IDS, ERA_NAMES, AVATAR_IDS, AVATAR_NAMES, AVATAR_NAMES_EN, AVATAR_ICONS, DEFAULT_AVATAR } from '@monopoly/shared';
+import type { ThemeId, DifficultyId, EraId, AvatarId } from '@monopoly/shared';
 import { useI18n } from '../../i18n/useI18n';
+import CharacterPreview from './CharacterPreview';
 
 const BOT_COLORS = ['#FB8C00', '#8E24AA', '#00ACC1', '#E91E63', '#FF6F00', '#5C6BC0'];
 
@@ -21,6 +22,7 @@ export default function Lobby() {
     return saved || '';
   });
   const [playerColor, setPlayerColor] = useState(PLAYER_COLORS[0]);
+  const [playerAvatar, setPlayerAvatar] = useState<AvatarId>(DEFAULT_AVATAR);
   const [theme, setTheme] = useState<ThemeId>('classic');
   const [era, setEra] = useState<EraId>('2025');
   const [difficulty, setDifficulty] = useState<DifficultyId>('normal');
@@ -32,6 +34,31 @@ export default function Lobby() {
   const isHost = roomCode !== null && players.length > 0;
   const canStart = players.filter(p => !p.isSpectator).length >= 2;
 
+  const localAvatarName = (id: AvatarId) => lang === 'zh' ? AVATAR_NAMES[id] : AVATAR_NAMES_EN[id];
+
+  // Shared avatar picker UI
+  const avatarPickerUI = (
+    <>
+      <label>{t('lobby.avatar')}</label>
+      <div style={{ marginBottom: '0.5rem' }}>
+        <CharacterPreview avatar={playerAvatar} color={playerColor} size={160} />
+      </div>
+      <div className="avatar-picker">
+        {AVATAR_IDS.map(id => (
+          <button
+            key={id}
+            className={`avatar-card ${playerAvatar === id ? 'selected' : ''}`}
+            onClick={() => setPlayerAvatar(id)}
+            title={localAvatarName(id)}
+          >
+            <span className="avatar-emoji">{AVATAR_ICONS[id]}</span>
+            <span className="avatar-label">{localAvatarName(id)}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+
   // Save name
   useEffect(() => {
     if (playerName) localStorage.setItem('monopoly_playerName', playerName);
@@ -41,7 +68,7 @@ export default function Lobby() {
     if (!playerName.trim()) { setError(t('lobby.nameRequired')); return; }
     if (playerName.length > 12) { setError(t('lobby.nameTooLong')); return; }
     setError('');
-    socket?.emit('createRoom', { playerName: playerName.trim(), playerColor, theme, era, difficulty });
+    socket?.emit('createRoom', { playerName: playerName.trim(), playerColor, avatar: playerAvatar, theme, era, difficulty });
     setScreen('menu');
   };
 
@@ -49,7 +76,7 @@ export default function Lobby() {
     if (!playerName.trim()) { setError(t('lobby.nameRequired')); return; }
     if (!joinCode.trim() || joinCode.length !== 4) { setError(t('lobby.roomCodeInvalid')); return; }
     setError('');
-    socket?.emit('joinRoom', { roomCode: joinCode.toUpperCase(), playerName: playerName.trim(), playerColor, asSpectator });
+    socket?.emit('joinRoom', { roomCode: joinCode.toUpperCase(), playerName: playerName.trim(), playerColor, avatar: playerAvatar, asSpectator });
   };
 
   const handleStart = () => {
@@ -127,6 +154,8 @@ export default function Lobby() {
                   />
                 ))}
               </div>
+
+              {avatarPickerUI}
 
               <label>{t('lobby.theme')}</label>
               <div className="option-row">
@@ -206,6 +235,8 @@ export default function Lobby() {
                   />
                 ))}
               </div>
+
+              {avatarPickerUI}
 
               <label>
                 {t('lobby.roomCode')}

@@ -103,6 +103,23 @@ html, body, #root {
 .color-swatch { width: 32px; height: 32px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; transition: all 0.2s; }
 .color-swatch.selected { border-color: white; transform: scale(1.15); }
 
+/* Avatar Picker */
+.avatar-preview-canvas { display: block; margin: 0 auto; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+.avatar-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.avatar-card {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 4px; border-radius: 10px;
+  border: 2px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.02);
+  cursor: pointer; transition: all 0.2s;
+  font-family: inherit;
+}
+.avatar-card:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.25); }
+.avatar-card.selected { border-color: #FFD700; background: rgba(255,215,0,0.1); box-shadow: 0 0 12px rgba(255,215,0,0.15); }
+.avatar-emoji { font-size: 1.8rem; line-height: 1.2; }
+.avatar-label { font-size: 0.7rem; color: rgba(255,255,255,0.55); }
+.avatar-card.selected .avatar-label { color: #FFD700; font-weight: 600; }
+
 .option-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .error-msg { color: var(--accent-red); font-size: 13px; text-align: center; padding: 8px; background: rgba(229,57,53,0.1); border-radius: 6px; }

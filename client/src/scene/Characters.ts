@@ -3,9 +3,10 @@
 // ============================================================
 
 import * as THREE from 'three';
-import type { GameState, Player } from '@monopoly/shared';
+import type { GameState, Player, AvatarId } from '@monopoly/shared';
 import { getCharacterTilePos, OUTER_RING_OFFSET, GROUND_INNER_RING_SIZE } from '@monopoly/shared';
 import { audioManager } from '../audio/AudioManager';
+import { buildCharacterModel } from './CharacterModel';
 
 interface CharacterData {
   playerId: string;
@@ -54,7 +55,7 @@ export class Characters {
 
       // New character
       if (!charData) {
-        const charGroup = this.createCharacter(player.color, player.name);
+        const charGroup = this.createCharacter(player.color, player.avatar);
         this.group.add(charGroup);
         const pos = this.getTileWorldPos(player.position);
         charGroup.position.set(pos.x, 0.7, pos.z);
@@ -131,90 +132,8 @@ export class Characters {
     return waypoints;
   }
 
-  private createCharacter(color: string, name: string): THREE.Group {
-    const group = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.1 });
-    const pantsMat = new THREE.MeshStandardMaterial({ color: '#333333', roughness: 0.7 });
-    const shoeMat = new THREE.MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.8 });
-    const skinMat = new THREE.MeshStandardMaterial({ color: '#FFDAB9', roughness: 0.5 });
-
-    // Body (torso)
-    const bodyGeo = new THREE.CylinderGeometry(0.18, 0.22, 0.6, 8);
-    const body = new THREE.Mesh(bodyGeo, mat);
-    body.position.y = 0.55;
-    body.castShadow = true;
-    group.add(body);
-
-    // Head
-    const headGeo = new THREE.SphereGeometry(0.17, 10, 8);
-    const head = new THREE.Mesh(headGeo, skinMat);
-    head.position.y = 0.98;
-    head.castShadow = true;
-    group.add(head);
-
-    // Hat
-    const hatBrimGeo = new THREE.CylinderGeometry(0.2, 0.21, 0.08, 12);
-    const hatBrim = new THREE.Mesh(hatBrimGeo, mat);
-    hatBrim.position.y = 1.1;
-    group.add(hatBrim);
-    const hatTopGeo = new THREE.CylinderGeometry(0.12, 0.16, 0.14, 12);
-    const hatTop = new THREE.Mesh(hatTopGeo, mat);
-    hatTop.position.y = 1.2;
-    group.add(hatTop);
-
-    // Legs with pivot for animation
-    for (let s = -1; s <= 1; s += 2) {
-      const upperLegGroup = new THREE.Group();
-      upperLegGroup.position.set(s * 0.08, 0.28, 0);
-      upperLegGroup.name = s === -1 ? 'legL' : 'legR';
-
-      const upperLegGeo = new THREE.CylinderGeometry(0.06, 0.07, 0.28, 6);
-      const upperLeg = new THREE.Mesh(upperLegGeo, pantsMat);
-      upperLeg.position.y = 0;
-      upperLeg.castShadow = true;
-      upperLegGroup.add(upperLeg);
-
-      // Lower leg + foot pivot
-      const lowerGroup = new THREE.Group();
-      lowerGroup.position.y = -0.28;
-      const lowerLegGeo = new THREE.CylinderGeometry(0.05, 0.06, 0.26, 6);
-      const lowerLeg = new THREE.Mesh(lowerLegGeo, pantsMat);
-      lowerLeg.position.y = -0.13;
-      lowerGroup.add(lowerLeg);
-
-      const shoeGeo = new THREE.BoxGeometry(0.07, 0.06, 0.12);
-      const shoe = new THREE.Mesh(shoeGeo, shoeMat);
-      shoe.position.set(0, -0.27, 0.03);
-      lowerGroup.add(shoe);
-
-      upperLegGroup.add(lowerGroup);
-      group.add(upperLegGroup);
-    }
-
-    // Arms with pivot
-    for (let s = -1; s <= 1; s += 2) {
-      const armGroup = new THREE.Group();
-      armGroup.position.set(s * 0.22, 0.65, 0);
-      armGroup.name = s === -1 ? 'armL' : 'armR';
-
-      const upperArmGeo = new THREE.CylinderGeometry(0.045, 0.05, 0.28, 6);
-      const upperArm = new THREE.Mesh(upperArmGeo, mat);
-      upperArm.position.y = 0;
-      upperArm.castShadow = true;
-      armGroup.add(upperArm);
-
-      const lowerGroup = new THREE.Group();
-      lowerGroup.position.y = -0.28;
-      const lowerArmGeo = new THREE.CylinderGeometry(0.035, 0.04, 0.25, 6);
-      const lowerArm = new THREE.Mesh(lowerArmGeo, mat);
-      lowerArm.position.y = -0.12;
-      lowerGroup.add(lowerArm);
-
-      armGroup.add(lowerGroup);
-      group.add(armGroup);
-    }
-
-    return group;
+  private createCharacter(color: string, avatar?: AvatarId): THREE.Group {
+    return buildCharacterModel(color, avatar);
   }
 
   /** Create a canvas-based sprite label floating above the character */

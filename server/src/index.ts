@@ -9,7 +9,7 @@ import fs from 'fs';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents, Player } from '@monopoly/shared';
-import { THEMES, DIFFICULTIES, PLAYER_COLORS } from '@monopoly/shared';
+import { THEMES, DIFFICULTIES, PLAYER_COLORS, AVATAR_IDS, DEFAULT_AVATAR } from '@monopoly/shared';
 import { createRoom, joinRoom, leaveRoom, getRoom, canStartGame } from './GameRoom';
 import { GameManager } from './GameManager';
 import { generatePlayerId, generateRoomCode } from './utils/random';
@@ -74,10 +74,10 @@ io.on('connection', (socket) => {
   // ---- Room Management ----
 
   socket.on('createRoom', (data) => {
-    const { playerName, playerColor, theme, era, difficulty } = data;
+    const { playerName, playerColor, avatar, theme, era, difficulty } = data;
     const code = generateRoomCode();
 
-    const room = createRoom(code, playerName, playerColor, theme, era || '2025', difficulty);
+    const room = createRoom(code, playerName, playerColor, avatar || DEFAULT_AVATAR, theme, era || '2025', difficulty);
     const player = room.players[0];
 
     socket.join(code);
@@ -95,8 +95,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('joinRoom', (data) => {
-    const { roomCode, playerName, playerColor, asSpectator } = data;
-    const result = joinRoom(roomCode, playerName, playerColor, asSpectator || false);
+    const { roomCode, playerName, playerColor, avatar, asSpectator } = data;
+    const result = joinRoom(roomCode, playerName, playerColor, avatar || DEFAULT_AVATAR, asSpectator || false);
 
     if ('error' in result) {
       socket.emit('error', result.error);
@@ -166,11 +166,17 @@ io.on('connection', (socket) => {
     const game = games.get(currentRoom);
     if (game && game.state.phase !== 'lobby') return;
 
+    // Pick random avatar for bot, avoid duplicates with existing players
+    const usedAvatars = new Set(room.players.map(p => p.avatar));
+    const available = AVATAR_IDS.filter(a => !usedAvatars.has(a));
+    const botAvatar = data.avatar || (available.length > 0 ? available[Math.floor(Math.random() * available.length)] : AVATAR_IDS[Math.floor(Math.random() * AVATAR_IDS.length)]);
+
     // Create bot player
     const bot: Player = {
       id: `bot_${generatePlayerId()}`,
       name: data.name,
       color: data.color || PLAYER_COLORS[room.players.length % PLAYER_COLORS.length],
+      avatar: botAvatar,
       isBot: true,
       isSpectator: false,
       autoPilot: false,
