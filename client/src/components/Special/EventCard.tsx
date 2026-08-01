@@ -3,6 +3,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
 import { useI18n } from '../../i18n/useI18n';
 import type { GameEvent } from '@monopoly/shared';
+import { GOD_DURATION_TURNS } from '@monopoly/shared';
 
 const EVENT_CONFIG: Record<string, { icon: string; color: string }> = {
   rent:        { icon: '💸', color: '#E53935' },
@@ -14,6 +15,10 @@ const EVENT_CONFIG: Record<string, { icon: string; color: string }> = {
   card:        { icon: '🃏', color: '#8E24AA' },
   cardUsed:    { icon: '🃏', color: '#8E24AA' },
   rob:         { icon: '🦹', color: '#E53935' },
+  god_attach:  { icon: '✨', color: '#FFD700' },
+  god_dismiss: { icon: '🙏', color: '#4CAF50' },
+  god_wealth_collect: { icon: '💰', color: '#FFD700' },
+  god_card_lost:      { icon: '🗑️', color: '#8E24AA' },
   weather:     { icon: '🌤️', color: '#00BCD4' },
   maintenance: { icon: '🔧', color: '#FF9800' },
   game_over:   { icon: '🏆', color: '#FFD700' },
@@ -128,6 +133,39 @@ function getEventMessage(
         title: isZh ? '🦹 偷钱' : '🦹 Robbed',
         desc: isZh ? `${actorName} 偷走了 ${targetName} 的钱` : `${actorName} robbed ${targetName}`,
         amount: { value: event.amount, positive: true },
+      };
+    }
+    case 'god_attach': {
+      const isWealth = event.god === 'wealth';
+      const playerName = getPlayerName?.(event.playerId) || event.playerId;
+      const godLabel = isWealth ? (isZh ? '😇 财神' : '😇 Wealth God') : (isZh ? '👿 衰神' : '👿 Misfortune God');
+      return {
+        title: godLabel,
+        desc: isZh ? `${playerName} 被${isWealth ? '财神' : '衰神'}附身！` : `${playerName} is ${isWealth ? 'blessed' : 'cursed'} by the ${isWealth ? 'Wealth' : 'Misfortune'} God!`,
+        detail: isZh ? `持续 ${GOD_DURATION_TURNS} 回合` : `Lasts ${GOD_DURATION_TURNS} turns`,
+      };
+    }
+    case 'god_dismiss': {
+      const isWealth = event.god === 'wealth';
+      const playerName = getPlayerName?.(event.playerId) || event.playerId;
+      return {
+        title: isZh ? '🙏 神仙已离开' : '🙏 God Dismissed',
+        desc: isZh ? `${playerName} 送走了${isWealth ? '财神' : '衰神'}` : `${playerName} dismissed the ${isWealth ? 'Wealth' : 'Misfortune'} God`,
+      };
+    }
+    case 'god_wealth_collect': {
+      const playerName = getPlayerName?.(event.playerId) || event.playerId;
+      return {
+        title: isZh ? '😇 财神赐财' : '😇 Wealth God Blessing',
+        desc: isZh ? `${playerName} 向每名对手收取 $${event.amountPer}` : `${playerName} collected $${event.amountPer} from each opponent`,
+        amount: { value: event.total, positive: true },
+      };
+    }
+    case 'god_card_lost': {
+      const playerName = getPlayerName?.(event.playerId) || event.playerId;
+      return {
+        title: isZh ? '👿 衰神作祟' : '👿 Misfortune God',
+        desc: isZh ? `${playerName} 丢失了 ${event.lost} 张手牌` : `${playerName} lost ${event.lost} card(s)`,
       };
     }
     case 'maintenance':

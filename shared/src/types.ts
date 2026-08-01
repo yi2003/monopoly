@@ -12,6 +12,7 @@ export type GamePhase =
   | 'wheel'
   | 'cardChoice'
   | 'rentChoice'
+  | 'god' // transient: god-pickup landing, consumed within the same turn step
   | 'debt'
   | 'awaitEnd'
   | 'ended';
@@ -79,6 +80,8 @@ export type Direction = 'north' | 'south' | 'east' | 'west';
 
 export type PlayerStatus = 'active' | 'jailed' | 'bankrupt';
 
+export type GodKind = 'wealth' | 'misfortune';
+
 export type AvatarId = 'tycoon' | 'chef' | 'explorer' | 'athlete' | 'royal' | 'cowboy' | 'artist' | 'wizard';
 
 // ---- Player ----
@@ -109,7 +112,8 @@ export interface Player {
   stocks: StockHolding[];
   jailTurns: number; // turns spent in jail, 0=not jailed
   getOutOfJailCards: number;
-  heldCards: number[]; // ids of held action cards (rentFree / doubleRent / rob)
+  heldCards: number[]; // ids of held action cards (rentFree / doubleRent / rob / dismissGod / summonGod)
+  god: { kind: GodKind; turnsLeft: number } | null; // attached god spirit
   consecutiveDoubles: number;
   skipNextTurn: boolean;
   status: PlayerStatus;
@@ -198,7 +202,9 @@ export type CardEffect =
   // Held action cards (played later, not resolved on draw)
   | { kind: 'rentFree' } // skip the next rent you owe
   | { kind: 'doubleRent' } // charge 2× rent when an opponent lands on your property
-  | { kind: 'rob'; amount: number }; // steal from a target player on your turn
+  | { kind: 'rob'; amount: number } // steal from a target player on your turn
+  | { kind: 'dismissGod' } // 送神卡 — dismiss the god attached to you
+  | { kind: 'summonGod' }; // 请神卡 — summon the nearest god within view onto yourself
 
 // ---- Stocks ----
 
@@ -260,6 +266,14 @@ export type WheelEffect =
   | { kind: 'freeHouse' }
   | { kind: 'freeStock'; symbol: string; shares: number };
 
+// ---- God spirits (财神 / 衰神) ----
+
+export interface GodEntity {
+  id: number;
+  kind: GodKind;
+  tileIndex: number; // ground tile (0-47 inner ring, 72-119 outer ring)
+}
+
 // ---- Held action card prompt (rent decision) ----
 
 export interface ActionCardPrompt {
@@ -285,6 +299,10 @@ export type GameEvent =
   | { kind: 'card'; playerId: string; cardType: 'chance' | 'community_chest'; description: string; descriptionCN: string }
   | { kind: 'cardUsed'; playerId: string; cardId: number; description: string; descriptionCN: string; targetId?: string; amount?: number }
   | { kind: 'rob'; actorId: string; targetId: string; amount: number }
+  | { kind: 'god_attach'; playerId: string; god: GodKind }
+  | { kind: 'god_dismiss'; playerId: string; god: GodKind }
+  | { kind: 'god_wealth_collect'; playerId: string; amountPer: number; targetIds: string[]; total: number }
+  | { kind: 'god_card_lost'; playerId: string; lost: number }
   | { kind: 'weather'; from: string; to: string }
   | { kind: 'maintenance'; playerId: string; amount: number; rate: number }
   | { kind: 'game_over'; winnerId: string; winnerName: string };
@@ -311,6 +329,7 @@ export interface GameState {
   wheelResult: number | null; // sector index
   cardChoice: { type: 'chance' | 'community_chest'; options: { idx: number }[] } | null; // face-down cards offered to current player
   actionCardPrompt: ActionCardPrompt | null; // pending rent decision (rentFree / doubleRent)
+  gods: GodEntity[]; // god spirits floating on the board
   lastCardDrawn: { type: CardType; card: Card } | null;
   gameEvent: GameEvent | null;
   ringTransferred: boolean; // prevent double-transfer spam

@@ -18,7 +18,6 @@ interface CharacterData {
   waypoints: THREE.Vector3[];
   waypointIndex: number;
   walkProgress: number; // 0-1 within current segment
-  footstepTimer: number; // accumulator for footstep sounds
 }
 
 const WALK_SPEED = 5.5; // tiles per second
@@ -70,7 +69,6 @@ export class Characters {
           waypoints: [],
           waypointIndex: 0,
           walkProgress: 1,
-          footstepTimer: 0,
         };
         this.characters.set(player.id, charData);
         this.prevPositions.set(player.id, player.position);
@@ -85,7 +83,6 @@ export class Characters {
         charData.waypoints = path;
         charData.waypointIndex = 0;
         charData.walkProgress = 0;
-        charData.footstepTimer = 0;
         charData.currentTile = player.position;
       }
 
@@ -241,13 +238,6 @@ export class Characters {
       const pos = new THREE.Vector3().lerpVectors(segFrom, segTo, t);
       charData.group.position.copy(pos);
 
-      // Footstep sounds: trigger every ~0.4s of walking
-      charData.footstepTimer += dt;
-      if (charData.footstepTimer >= 1.0) {
-        charData.footstepTimer -= 1.0;
-        audioManager.playFootstep();
-      }
-
       // Face movement direction
       const dir = segTo.clone().sub(segFrom);
       if (dir.lengthSq() > 0.001) {
@@ -316,13 +306,19 @@ export class Characters {
     const armSwing = Math.sin(newPhase) * swing * 0.8;
     const bounce = Math.abs(Math.sin(newPhase * 2)) * 0.06;
 
-    // Footstep trigger on sign change (foot hits ground)
+    // Footstep trigger on sign change (foot hits ground), paced to a natural
+    // cadence (~0.28s ≈ 3.5 steps/sec) instead of firing on every leg swing.
     const prevSinKey = `prevSin_${charData.playerId}`;
     const prevSin = (charData.group.userData[prevSinKey] as number) || 0;
     const newSin = Math.sin(newPhase);
-    // Trigger when sin crosses zero (foot strikes ground)
+    const stepTimerKey = `stepTimer_${charData.playerId}`;
+    const stepTimer = (charData.group.userData[stepTimerKey] as number) || 0;
+    charData.group.userData[stepTimerKey] = stepTimer + dt;
     if ((prevSin > 0 && newSin <= 0) || (prevSin < 0 && newSin >= 0)) {
-      audioManager.playFootstep();
+      if (stepTimer >= 0.28) {
+        charData.group.userData[stepTimerKey] = 0;
+        audioManager.playFootstep();
+      }
     }
     charData.group.userData[prevSinKey] = newSin;
 

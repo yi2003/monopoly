@@ -2,17 +2,23 @@
 // GameManager — Authoritative game state & turn machine
 // ============================================================
 
-import type { GameState, GameConfig, Player, ThemeId, DifficultyId, GameEvent, AvatarId } from '@monopoly/shared';
+import type { GameState, GameConfig, Player, ThemeId, DifficultyId, GameEvent, AvatarId, GodKind } from '@monopoly/shared';
 import {
   createTiles, CHANCE_CARDS, COMMUNITY_CHEST_CARDS,
   SHANGHAI_EXTRA_CHANCE_CARDS, SHANGHAI_EXTRA_COMMUNITY_CHEST_CARDS,
   TOKYO_EXTRA_CHANCE_CARDS, TOKYO_EXTRA_COMMUNITY_CHEST_CARDS,
   GO_SALARY,
-  JAIL_FINE, CORNER_GO, CORNER_JAIL,
+  JAIL_FINE, CORNER_GO, CORNER_JAIL, CORNER_GOTO_JAIL,
   PLAYER_COLORS, DEFAULT_AVATAR,
 } from '@monopoly/shared';
 import { getEffectiveConfig, THEMES } from '@monopoly/shared';
-import { rollDice, findNearestTile, moveToTile, findCardById, playerHasHeldCardKind } from '@monopoly/shared';
+import {
+  rollDice, findNearestTile, moveToTile, findCardById, playerHasHeldCardKind,
+  nearestGodWithin, isGroundTile,
+} from '@monopoly/shared';
+import {
+  GOD_DURATION_TURNS, GOD_WEALTH_AMOUNT, GOD_START_COUNT, GOD_RESPAWN_ROUNDS, GOD_MAX_ON_BOARD,
+} from '@monopoly/shared';
 import { shuffle } from './utils/shuffle';
 import { generatePlayerId } from './utils/random';
 import { RuleEngine } from './RuleEngine';
@@ -30,6 +36,7 @@ export class GameManager {
   private botTimers: Map<string, NodeJS.Timeout> = new Map();
   private onStateChange: (roomCode: string, state: GameState) => void;
   private logIdCounter = 0;
+  private godIdCounter = 0;
 
   constructor(config: GameConfig, onStateChange: (roomCode: string, state: GameState) => void) {
     this.onStateChange = onStateChange;
@@ -64,6 +71,7 @@ export class GameManager {
       wheelResult: null,
       cardChoice: null,
       actionCardPrompt: null,
+      gods: [],
       lastCardDrawn: null,
       gameEvent: null,
       ringTransferred: false,
@@ -97,6 +105,7 @@ export class GameManager {
       jailTurns: 0,
       getOutOfJailCards: 0,
       heldCards: [],
+      god: null,
       consecutiveDoubles: 0,
       skipNextTurn: false,
       status: 'active',
@@ -135,11 +144,19 @@ export class GameManager {
       player.properties = [];
       player.houses = {};
       player.stocks = [];
+      player.god = null;
       player.status = 'active';
     }
 
     // Shuffle turn order
     this.state.players = shuffle(this.state.players);
+
+    // Spawn the initial god spirits on the board
+    this.state.gods = [];
+    this.godIdCounter = 0;
+    for (let i = 0; i < GOD_START_COUNT; i++) {
+      this.spawnGod();
+    }
 
     this.state.phase = 'rolling';
     this.state.round = 1;
@@ -365,6 +382,22 @@ export class GameManager {
     this.state.dayTime = (this.state.dayTime + 0.008) % 1;
 
     this.addLog(`轮到 ${this.currentPlayer.name}`, 'info', `${this.currentPlayer.name}'s turn`);
+
+    // God spirit turn countdown — a god leaves after its duration expires
+    if (this.currentPlayer.god) {
+      this.currentPlayer.god.turnsLeft--;
+      if (this.currentPlayer.god.turnsLeft <= 0) {
+        const g = this.currentPlayer.god.kind;
+        this.currentPlayer.god = null;
+        this.emitEvent({ kind: 'god_dismiss', playerId: this.currentPlayer.id, god: g });
+        this.addLog(`👋 ${this.currentPlayer.name} 身上的${g === 'wealth' ? '财神' : '衰神'}离开了`, 'info', `👋 ${g === 'wealth' ? 'Wealth' : 'Misfortune'} God left ${this.currentPlayer.name}`);
+      }
+    }
+
+    // Periodically respawn gods so the board stays populated
+    if (this.state.round % GOD_RESPAWN_ROUNDS === 0 && this.state.gods.length < GOD_MAX_ON_BOARD) {
+      this.spawnGod();
+    }
 
     // If next player is bot, schedule their turn
     if (this.currentPlayer.isBot || this.currentPlayer.autoPilot) {
@@ -600,7 +633,18 @@ export class GameManager {
     }
     this.state.phase = landing.phase;
 
-    if (landing.phase === 'rentChoice' && landing.holdPrompt && landing.rentTarget) {
+    if (landing.phase === 'god' && landing.godPickup) {
+      // A god occupies this tile — pick it up and attach it.
+      if (this.currentPlayer.god) {
+        // Already has a god → leave the entity in place and process the tile normally.
+        this.consumeLanding(this.engine.processLanding(landing.godPickup.tileIndex, 1, true), opts);
+        return;
+      }
+      const god = landing.godPickup;
+      this.state.gods = this.state.gods.filter(g => g.id !== god.id); // consume the entity
+      this.attachGod(this.currentPlayer, god.kind);
+      this.state.phase = 'awaitEnd';
+    } else if (landing.phase === 'rentChoice' && landing.holdPrompt && landing.rentTarget) {
       this.buildRentChoicePrompt(landing);
     } else if (landing.cardType && this.currentPlayer.cash >= 0) {
       this.offerCardChoice(landing.cardType);
@@ -638,21 +682,50 @@ export class GameManager {
   /**
    * Play a held action card.
    * - In the rentChoice phase: the card must match the pending prompt (rentFree / doubleRent).
-   * - Otherwise: the rob card — active on the current player's own turn, targeting another player.
+   * - Otherwise: active cards on the current player's own turn — rob (target another player),
+   *   dismissGod (send away your attached god), summonGod (attract the nearest god within view).
    */
   useHeldCard(requesterId: string, cardId: number, targetId?: string): { success: boolean; error?: string } {
     if (this.state.phase === 'rentChoice' && this.state.actionCardPrompt) {
       return this.resolveRentChoiceCard(requesterId, cardId);
     }
 
-    // Rob path — only the current player, on their own turn
+    // Active cards — only the current player, on their own turn
     const player = this.state.players.find(p => p.id === requesterId);
     if (!player || player.id !== this.currentPlayer.id) return { success: false, error: '现在不能使用' };
     if (this.state.phase !== 'rolling' && this.state.phase !== 'awaitEnd') return { success: false, error: '现在不能使用' };
 
     const card = findCardById(this.state.cards, cardId);
-    if (!card || card.effect.kind !== 'rob') return { success: false, error: '无效的卡片' };
+    if (!card) return { success: false, error: '无效的卡片' };
     if (!player.heldCards.includes(cardId)) return { success: false, error: '你没有这张卡' };
+
+    // 送神卡 — dismiss the god attached to you
+    if (card.effect.kind === 'dismissGod') {
+      if (!player.god) return { success: false, error: '你身上没有神仙' };
+      const god = player.god.kind;
+      player.god = null;
+      player.heldCards = player.heldCards.filter(id => id !== cardId);
+      this.addLog(`🙏 ${player.name} 使用送神卡，送走了${god === 'wealth' ? '财神' : '衰神'}`, 'info', `🙏 ${player.name} used Send-Away card to dismiss the ${god === 'wealth' ? 'Wealth' : 'Misfortune'} God`);
+      this.emitEvent({ kind: 'god_dismiss', playerId: player.id, god });
+      this.emitChange();
+      return { success: true };
+    }
+
+    // 请神卡 — summon the nearest god within view onto yourself
+    if (card.effect.kind === 'summonGod') {
+      if (player.god) return { success: false, error: '已有神仙附身' };
+      const god = nearestGodWithin(this.state.gods, player.position);
+      if (!god) return { success: false, error: '视野内没有神仙' };
+      this.state.gods = this.state.gods.filter(g => g.id !== god.id); // consume the entity
+      player.heldCards = player.heldCards.filter(id => id !== cardId);
+      this.addLog(`✨ ${player.name} 使用请神卡，请来了${god.kind === 'wealth' ? '财神' : '衰神'}`, 'info', `✨ ${player.name} used Invite card to summon the ${god.kind === 'wealth' ? 'Wealth' : 'Misfortune'} God`);
+      this.attachGod(player, god.kind);
+      this.emitChange();
+      return { success: true };
+    }
+
+    // Rob card — steal from a target player
+    if (card.effect.kind !== 'rob') return { success: false, error: '此卡不能在此使用' };
 
     const target = this.state.players.find(p => p.id === targetId);
     if (!target || target.id === player.id || target.status === 'bankrupt' || target.isSpectator) {
@@ -802,6 +875,56 @@ export class GameManager {
       this.maybeScheduleRentChoiceBot();
     }
     // Otherwise finalizeRentChoice already resumed the current player's bot turn.
+  }
+
+  // ---- God Spirits (财神 / 衰神) ----
+
+  private attachGod(player: Player, kind: GodKind): void {
+    player.god = { kind, turnsLeft: GOD_DURATION_TURNS };
+    this.emitEvent({ kind: 'god_attach', playerId: player.id, god: kind });
+
+    if (kind === 'wealth') {
+      const targets = this.state.players.filter(p => p.id !== player.id && p.status !== 'bankrupt' && !p.isSpectator);
+      let total = 0;
+      for (const t of targets) {
+        t.cash -= GOD_WEALTH_AMOUNT;
+        total += GOD_WEALTH_AMOUNT;
+      }
+      player.cash += total;
+      if (targets.length > 0) {
+        this.emitEvent({
+          kind: 'god_wealth_collect', playerId: player.id, amountPer: GOD_WEALTH_AMOUNT,
+          targetIds: targets.map(t => t.id), total,
+        });
+        this.addLog(`😇 ${player.name} 受财神庇佑，向每名对手收取 $${GOD_WEALTH_AMOUNT}`, 'info', `😇 ${player.name} blessed by Wealth God, collected $${GOD_WEALTH_AMOUNT} each`);
+      }
+    } else {
+      // 衰神:随机丢 2 张手牌(不足则丢光)
+      const lost = shuffle(player.heldCards).slice(0, Math.min(2, player.heldCards.length));
+      if (lost.length > 0) {
+        player.heldCards = player.heldCards.filter(id => !lost.includes(id));
+        this.emitEvent({ kind: 'god_card_lost', playerId: player.id, lost: lost.length });
+        this.addLog(`👿 ${player.name} 被衰神附身，丢失 ${lost.length} 张手牌`, 'info', `👿 ${player.name} cursed by Misfortune God, lost ${lost.length} card(s)`);
+      }
+    }
+  }
+
+  private spawnGod(): void {
+    // Valid tiles: ground rings, excluding corners and special action tiles, not already occupied
+    const excludedTypes = new Set(['go', 'jail', 'goto_jail', 'stock_market', 'wheel']);
+    const candidates: number[] = [];
+    for (let i = 0; i < this.state.tiles.length; i++) {
+      if (!isGroundTile(i)) continue;
+      const type = this.state.tiles[i].type;
+      if (excludedTypes.has(type)) continue;
+      if (this.state.gods.some(g => g.tileIndex === i)) continue;
+      candidates.push(i);
+    }
+    if (candidates.length === 0) return;
+
+    const kind: GodKind = Math.random() < 0.5 ? 'wealth' : 'misfortune';
+    const tileIndex = candidates[Math.floor(Math.random() * candidates.length)];
+    this.state.gods.push({ id: ++this.godIdCounter, kind, tileIndex });
   }
 
   // ---- Wheel ----

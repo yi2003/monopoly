@@ -167,40 +167,56 @@ export class AudioManager {
     }
   }
 
-  /** Footstep: short thud sound */
+  /**
+   * Footstep: soft low thump + a short filtered-noise scuff.
+   * Slight random pitch/level per step so consecutive steps don't
+   * sound like an identical robotic blip.
+   */
   playFootstep(surface?: string): void {
     const ctx = this.ensureContext();
     if (!ctx || !this.masterGain) return;
     const now = ctx.currentTime;
 
-    const baseFreq = 150;
-    const vol = 0.18;
+    // Randomize so consecutive steps vary a little (0.8–1.2)
+    const jitter = 0.8 + Math.random() * 0.4;
+    const vol = 0.09 * jitter;
 
-    // Short thud: low frequency burst
+    // 1) Low body thump — the weight of the foot landing
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(baseFreq, now);
-    osc.frequency.exponentialRampToValueAtTime(60, now + 0.06);
+    osc.frequency.setValueAtTime(90 + Math.random() * 30, now);
+    osc.frequency.exponentialRampToValueAtTime(45, now + 0.05);
     gain.gain.setValueAtTime(vol, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
     gain.connect(this.masterGain!);
     osc.connect(gain);
     osc.start(now);
-    osc.stop(now + 0.09);
+    osc.stop(now + 0.08);
 
-    // Click component for texture
-    const clickOsc = ctx.createOscillator();
-    const clickGain = ctx.createGain();
-    clickOsc.type = 'square';
-    clickOsc.frequency.setValueAtTime(400, now);
-    clickOsc.frequency.exponentialRampToValueAtTime(100, now + 0.03);
-    clickGain.gain.setValueAtTime(vol * 0.3, now);
-    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-    clickGain.connect(this.masterGain!);
-    clickOsc.connect(clickGain);
-    clickOsc.start(now);
-    clickOsc.stop(now + 0.05);
+    // 2) Short filtered-noise "scuff" — sole texture on the ground
+    const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * 0.05));
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize); // decaying noise
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'lowpass';
+    // Softer/rounder on grass/dirt, slightly brighter on hard ground
+    const isSoft = surface === 'dirt' || surface === 'grass';
+    noiseFilter.frequency.setValueAtTime(isSoft ? 650 : 900, now);
+    noiseFilter.frequency.exponentialRampToValueAtTime(200, now + 0.05);
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(vol * 0.7, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(this.masterGain!);
+    noise.start(now);
+    noise.stop(now + 0.06);
   }
 
   /** Walking on grass/dirt (softer) */

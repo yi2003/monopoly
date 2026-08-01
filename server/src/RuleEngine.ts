@@ -81,19 +81,27 @@ export class RuleEngine {
 
   // ---- Landing on tile ----
 
-  processLanding(position: number, extraRentMultiplier = 1): {
-    phase: 'buying' | 'stock' | 'wheel' | 'debt' | 'rentChoice' | 'awaitEnd';
+  processLanding(position: number, extraRentMultiplier = 1, ignoreGod = false): {
+    phase: 'buying' | 'stock' | 'wheel' | 'debt' | 'rentChoice' | 'god' | 'awaitEnd';
     rentAmount: number;
     rentTarget: string | null;
     cardType: 'chance' | 'community_chest' | null;
     gameEvent?: GameEvent;
     holdPrompt?: { kind: 'rentFree' | 'doubleRent'; actorId: string };
+    godPickup?: import('@monopoly/shared').GodEntity;
   } {
     const tile = this.state.tiles[position];
     const player = this.currentPlayer;
     let rentAmount = 0;
     let rentTarget: string | null = null;
     let cardType: 'chance' | 'community_chest' | null = null;
+
+    // A god spirit occupies this tile — landing on it attaches it (replaces the tile's normal effect).
+    // `ignoreGod` lets GameManager re-run normal landing when the player already has a god.
+    const god = this.state.gods.find(g => g.tileIndex === position);
+    if (god && !ignoreGod) {
+      return { phase: 'god', rentAmount: 0, rentTarget: null, cardType: null, godPickup: god };
+    }
 
     switch (tile.type) {
       case 'property': {
@@ -104,6 +112,11 @@ export class RuleEngine {
             0, this.effConfig.rentMultiplier,
           );
           rentTarget = owner.id;
+          // 财神附身 → 免付租金(覆盖双倍租金卡,不进 rentChoice)
+          if (player.god?.kind === 'wealth') {
+            this.addLog(`${player.name} 受财神庇佑，免付 ${owner.name} 的租金`, 'info', `${player.name} exempt from rent (Wealth God)`);
+            return { phase: 'awaitEnd', rentAmount: 0, rentTarget: owner.id, cardType: null };
+          }
           // Defer the transfer if the payer holds a rent-free card or the owner a
           // double-rent card — the decision happens in the rentChoice phase.
           const payerHasFree = playerHasHeldCardKind(player, this.state.cards, 'rentFree');
@@ -137,6 +150,10 @@ export class RuleEngine {
           const theme = THEMES[this.state.config.theme];
           rentAmount = Math.round(calcRailwayRent(owner, railwayCount, theme) * extraRentMultiplier);
           rentTarget = owner.id;
+          if (player.god?.kind === 'wealth') {
+            this.addLog(`${player.name} 受财神庇佑，免付 ${owner.name} 的过路费`, 'info', `${player.name} exempt from fee (Wealth God)`);
+            return { phase: 'awaitEnd', rentAmount: 0, rentTarget: owner.id, cardType: null };
+          }
           const payerHasFreeR = playerHasHeldCardKind(player, this.state.cards, 'rentFree');
           const ownerHasDoubleR = playerHasHeldCardKind(owner, this.state.cards, 'doubleRent');
           if (rentAmount > 0 && (payerHasFreeR || ownerHasDoubleR)) {
@@ -166,6 +183,10 @@ export class RuleEngine {
           const diceSum = this.state.dice?.total || 0;
           rentAmount = Math.round(calcUtilityRent(utilityCount, diceSum) * extraRentMultiplier);
           rentTarget = owner.id;
+          if (player.god?.kind === 'wealth') {
+            this.addLog(`${player.name} 受财神庇佑，免付 ${owner.name} 的公用事业费`, 'info', `${player.name} exempt from fee (Wealth God)`);
+            return { phase: 'awaitEnd', rentAmount: 0, rentTarget: owner.id, cardType: null };
+          }
           const payerHasFreeU = playerHasHeldCardKind(player, this.state.cards, 'rentFree');
           const ownerHasDoubleU = playerHasHeldCardKind(owner, this.state.cards, 'doubleRent');
           if (rentAmount > 0 && (payerHasFreeU || ownerHasDoubleU)) {
@@ -353,6 +374,7 @@ export class RuleEngine {
       player.houses = {};
       player.stocks = [];
       player.heldCards = [];
+      player.god = null;
       player.cash = 0;
       this.addLog(`💀 ${player.name} 破产！全部资产 → ${creditor.name}`, 'bankrupt', `💀 ${player.name} bankrupt! Assets → ${creditor.name}`);
     } else {
@@ -361,6 +383,7 @@ export class RuleEngine {
       player.houses = {};
       player.stocks = [];
       player.heldCards = [];
+      player.god = null;
       player.cash = 0;
       this.addLog(`💀 ${player.name} 破产！资产回归银行`, 'bankrupt', `💀 ${player.name} bankrupt! Assets returned to bank`);
     }

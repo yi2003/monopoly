@@ -17,6 +17,7 @@ import { WeatherEffects } from './WeatherEffects';
 import { CityBuilder, PRELOAD_MODEL_URLS } from './CityBuilder';
 import { Pedestrians } from './Pedestrians';
 import { Vehicles } from './Vehicles';
+import { GodSprites } from './GodSprites';
 import { NightGlow } from './NightGlow';
 import { Dice3D, getDice3DInstance } from './Dice3D';
 import { getSocket } from '../network/socket';
@@ -49,6 +50,7 @@ export class SceneManager {
   private cityBuilder!: CityBuilder;
   private pedestrians!: Pedestrians;
   private vehicles!: Vehicles;
+  private godSprites!: GodSprites;
   private nightGlow!: NightGlow;
   private dice3D!: Dice3D;
   private skyEnv!: SkyEnvironment;
@@ -144,9 +146,10 @@ export class SceneManager {
     await preloadModels([...PRELOAD_MODEL_URLS]);
     this.board.plantTrees();
 
-    // Pedestrians & Vehicles
+    // Pedestrians & Vehicles & God spirits
     this.pedestrians = new Pedestrians(this.scene);
     this.vehicles = new Vehicles(this.scene);
+    this.godSprites = new GodSprites(this.scene);
 
     // Camera controller
     this.cameraController = new CameraController(this.camera, this.renderer.domElement);
@@ -338,6 +341,7 @@ export class SceneManager {
     this.pedestrians.setNightFactor(this.dayNightCycle.nightFactor);
     this.pedestrians.update(dt);
     this.vehicles.update(dt);
+    this.godSprites.update(dt);
 
     // Night glow
     this.nightGlow.setNightFactor(this.dayNightCycle.nightFactor);
@@ -388,6 +392,7 @@ export class SceneManager {
     this.characters.updateState(state);
     this.houses.updateState(state);
     this.effects.updateState(state);
+    this.godSprites.updateState(state);
     this.cameraController.setGameState(state);
     // Sync spectator flag every state update so camera follows bots when spectating
     this.cameraController.setSpectator(useGameStore.getState().isSpectator);
@@ -677,6 +682,7 @@ export class SceneManager {
     this.post?.dispose();
     this.pedestrians?.dispose();
     this.vehicles?.dispose();
+    this.godSprites?.dispose();
     this.board?.dispose();
     this.characters?.dispose();
     this.houses?.dispose();

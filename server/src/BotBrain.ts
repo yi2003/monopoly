@@ -3,7 +3,7 @@
 // ============================================================
 
 import type { GameState, Player } from '@monopoly/shared';
-import { getPropertyDef, getRailwayDef, getUtilityDef, canBuildHouse, getGroupTiles, findHeldCardId } from '@monopoly/shared';
+import { getPropertyDef, getRailwayDef, getUtilityDef, canBuildHouse, getGroupTiles, findHeldCardId, nearestGodWithin } from '@monopoly/shared';
 
 export interface BotDecision {
   action: 'roll' | 'buy' | 'pass' | 'build' | 'sellHouse' | 'endTurn' | 'payJail' | 'useCard' | 'tryDoubles' | 'spinWheel' | 'pickCard' | 'useHeldCard' | 'payRentNow';
@@ -58,13 +58,17 @@ function decideRollingAction(state: GameState, player: Player): BotDecision {
     return { action: 'roll', delay: REGULAR_DELAY };
   }
 
+  // God card handling (dismiss 衰神 / summon 财神)
+  const godAction = maybeHandleGod(state, player);
+  if (godAction) return godAction;
+
   // Consider using a rob card
   const rob = maybeRob(state, player);
   if (rob) return rob;
 
   // Consider building before rolling
   const buildTarget = findBestBuild(state, player);
-  if (buildTarget !== null && Math.random() < 0.6) {
+  if (buildTarget !== null && Math.random() < 0.75) {
     return { action: 'build', tileIndex: buildTarget, delay: REGULAR_DELAY };
   }
 
@@ -112,13 +116,17 @@ function decideDebtAction(state: GameState, player: Player): BotDecision {
 }
 
 function decideAwaitEndAction(state: GameState, player: Player): BotDecision {
+  // God card handling (dismiss 衰神 / summon 财神)
+  const godAction = maybeHandleGod(state, player);
+  if (godAction) return godAction;
+
   // Consider using a rob card
   const rob = maybeRob(state, player);
   if (rob) return rob;
 
   // Try to build
   const buildTarget = findBestBuild(state, player);
-  if (buildTarget !== null && Math.random() < 0.5) {
+  if (buildTarget !== null && Math.random() < 0.7) {
     return { action: 'build', tileIndex: buildTarget, delay: REGULAR_DELAY };
   }
 
@@ -143,6 +151,27 @@ function decideRentChoiceAction(state: GameState, actor: Player): BotDecision {
     return { action: 'useHeldCard', cardId, delay: REGULAR_DELAY };
   }
   return { action: 'payRentNow', delay: REGULAR_DELAY };
+}
+
+function maybeHandleGod(state: GameState, player: Player): BotDecision | null {
+  // Get rid of 衰神 as soon as possible
+  if (player.god?.kind === 'misfortune') {
+    const dismissId = findHeldCardId(player, state.cards, 'dismissGod');
+    if (dismissId !== undefined) {
+      return { action: 'useHeldCard', cardId: dismissId, delay: REGULAR_DELAY };
+    }
+  }
+  // Summon 财神 if it's the nearest god within view (bots never self-summon 衰神)
+  if (!player.god) {
+    const summonId = findHeldCardId(player, state.cards, 'summonGod');
+    if (summonId !== undefined && Math.random() < 0.6) {
+      const nearest = nearestGodWithin(state.gods, player.position);
+      if (nearest && nearest.kind === 'wealth') {
+        return { action: 'useHeldCard', cardId: summonId, delay: REGULAR_DELAY };
+      }
+    }
+  }
+  return null;
 }
 
 function maybeRob(state: GameState, player: Player): BotDecision | null {
@@ -190,7 +219,7 @@ function findBestBuild(state: GameState, player: Player): number | null {
   for (const idx of player.properties) {
     const prop = getPropertyDef(idx);
     if (!prop) continue;
-    if (canBuildHouse(player, idx) && player.cash >= prop.houseCost * 2) {
+    if (canBuildHouse(player, idx) && player.cash >= prop.houseCost) {
       buildable.push(idx);
     }
   }

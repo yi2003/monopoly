@@ -411,6 +411,7 @@ export const CHANCE_CARDS: Card[] = [
   // Held action cards — drawn into hand, played later
   { id: 501, type: 'chance', hold: true, description: 'Double-Rent Card: collect 2× rent once', descriptionCN: '双倍租金卡：收取一次双倍租金', effect: { kind: 'doubleRent' } },
   { id: 502, type: 'chance', hold: true, description: 'Rob Card: steal $100 from any player', descriptionCN: '偷钱卡：偷走一名玩家$100', effect: { kind: 'rob', amount: 100 } },
+  { id: 504, type: 'chance', hold: true, description: 'Invite Card: summon the nearest god within view', descriptionCN: '请神卡：召唤视野内最近的神仙附身', effect: { kind: 'summonGod' } },
 ];
 
 // ---- Theme-specific Extra Chance Cards ----
@@ -456,9 +457,19 @@ export const COMMUNITY_CHEST_CARDS: Card[] = [
   { id: 113, type: 'community_chest', description: 'Beauty contest second prize: collect $10', descriptionCN: '选美比赛二等奖：获得$10', effect: { kind: 'cash', amount: 10 } },
   { id: 114, type: 'community_chest', description: 'Inheritance: collect $100', descriptionCN: '遗产继承：获得$100', effect: { kind: 'cash', amount: 100 } },
   { id: 115, type: 'community_chest', description: 'Birthday: collect $10 from each player', descriptionCN: '生日：向每位玩家收取$10', effect: { kind: 'cashPerPlayer', amount: 10 } },
-  // Held action card — drawn into hand, played later
+  // Held action cards — drawn into hand, played later
   { id: 500, type: 'community_chest', hold: true, description: 'Rent-Free Card: skip one rent payment', descriptionCN: '免租卡：免付一次租金', effect: { kind: 'rentFree' } },
+  { id: 503, type: 'community_chest', hold: true, description: 'Send-Away Card: dismiss a god attached to you', descriptionCN: '送神卡：送走附身在你身上的神仙', effect: { kind: 'dismissGod' } },
 ];
+
+// ---- God spirit constants ----
+
+export const GOD_DURATION_TURNS = 3; // turns a god stays attached before leaving
+export const GOD_VISION_RADIUS = 12; // world units (~4 tiles) for 请神卡 summon range
+export const GOD_WEALTH_AMOUNT = 100; // collected from each opponent by 财神
+export const GOD_START_COUNT = 2; // gods spawned when the game starts
+export const GOD_RESPAWN_ROUNDS = 4; // spawn a new god every N rounds if below cap
+export const GOD_MAX_ON_BOARD = 3; // max god entities at once
 
 // ---- Stock Market ----
 

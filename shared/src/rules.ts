@@ -2,8 +2,9 @@
 // 家庭大富翁 — Pure Game Rule Functions
 // ============================================================
 
-import type { Player, PropertyTile, Tile, ColorGroup, Stock, Card, CardEffect } from './types';
-import { ALL_PROPERTIES, ALL_RAILWAYS, ALL_UTILITIES, STOCKS, OUTER_RING_OFFSET } from './constants';
+import type { Player, PropertyTile, Tile, ColorGroup, Stock, Card, CardEffect, GodEntity } from './types';
+import { ALL_PROPERTIES, ALL_RAILWAYS, ALL_UTILITIES, STOCKS, OUTER_RING_OFFSET, GOD_VISION_RADIUS } from './constants';
+import { getCharacterTilePos } from './boardLayout';
 
 // ---- Helper: find property definition by tile index ----
 
@@ -92,6 +93,7 @@ export function calcUtilityRent(utilityCount: number, diceValue: number): number
 // ---- Build Validation ----
 
 export function canBuildHouse(player: Player, tileIndex: number): boolean {
+  if (player.god?.kind === 'misfortune') return false; // 衰神禁建
   const prop = getPropertyDef(tileIndex);
   if (!prop) return false;
   if (!ownsFullGroup(player, prop.group)) return false;
@@ -329,6 +331,35 @@ export function findHeldCardId(
     if (card && card.effect.kind === kind) return id;
   }
   return undefined;
+}
+
+// ---- God spirit helpers ----
+
+export function isGroundTile(index: number): boolean {
+  return index < 48 || index >= OUTER_RING_OFFSET;
+}
+
+export function findGodAt(gods: GodEntity[], tileIndex: number): GodEntity | undefined {
+  return gods.find(g => g.tileIndex === tileIndex);
+}
+
+/** Nearest god entity to the player's tile within `radius` world units (default GOD_VISION_RADIUS). */
+export function nearestGodWithin(
+  gods: GodEntity[],
+  playerTile: number,
+  radius: number = GOD_VISION_RADIUS,
+): GodEntity | null {
+  if (gods.length === 0) return null;
+  const playerPos = getCharacterTilePos(playerTile);
+  let best: GodEntity | null = null;
+  let bestDist = Infinity;
+  for (const god of gods) {
+    const p = getCharacterTilePos(god.tileIndex);
+    const d = Math.hypot(p.x - playerPos.x, p.z - playerPos.z);
+    if (d < bestDist) { bestDist = d; best = god; }
+  }
+  if (best && bestDist <= radius) return best;
+  return null;
 }
 
 // ---- Stock Cost Basis (weighted average) ----

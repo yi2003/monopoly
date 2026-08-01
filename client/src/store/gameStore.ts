@@ -74,6 +74,7 @@ const defaultGameState: GameState = {
   wheelResult: null,
   cardChoice: null,
   actionCardPrompt: null,
+  gods: [],
   lastCardDrawn: null,
   gameEvent: null,
   ringTransferred: false,

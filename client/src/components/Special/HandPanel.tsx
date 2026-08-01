@@ -57,6 +57,7 @@ export default function HandPanel() {
             {held.map(card => {
               const name = lang === 'zh' ? card.descriptionCN : card.description;
               const isRob = card.effect.kind === 'rob';
+              const isActiveNoTarget = card.effect.kind === 'dismissGod' || card.effect.kind === 'summonGod';
               return (
                 <div key={card.id} className="hand-card">
                   <div className="hand-card-name">{name}</div>
@@ -84,6 +85,16 @@ export default function HandPanel() {
                         {t('hand.use')} · {t('rob.steal')}
                       </button>
                     )
+                  ) : isActiveNoTarget ? (
+                    <button
+                      className="btn btn-sm btn-primary hand-use"
+                      onClick={() => {
+                        getSocket()?.emit('useHeldCard', { cardId: card.id });
+                        toggleHandModal();
+                      }}
+                    >
+                      {card.effect.kind === 'dismissGod' ? t('hand.dismiss') : t('hand.summon')}
+                    </button>
                   ) : (
                     <div className="hand-passive">
                       <span className="hand-passive-tag">{t('hand.passive')}</span>

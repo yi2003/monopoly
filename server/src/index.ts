@@ -196,6 +196,7 @@ io.on('connection', (socket) => {
       jailTurns: 0,
       getOutOfJailCards: 0,
       heldCards: [],
+      god: null,
       consecutiveDoubles: 0,
       skipNextTurn: false,
       status: 'active',
@@ -276,6 +277,7 @@ io.on('connection', (socket) => {
         gamePlayer.jailTurns = 0;
         gamePlayer.getOutOfJailCards = 0;
         gamePlayer.heldCards = [];
+        gamePlayer.god = null;
         gamePlayer.consecutiveDoubles = 0;
         gamePlayer.skipNextTurn = false;
         gamePlayer.status = 'active';

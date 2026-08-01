@@ -243,6 +243,8 @@ export default function HUD() {
                 {p.isBot && ' 🤖'}
                 {p.autoPilot && ' 🔄'}
                 {p.status === 'jailed' && ' 🔒'}
+                {p.god && (p.god.kind === 'wealth' ? ' 😇' : ' 👿')}
+                {p.god && ` ×${p.god.turnsLeft}`}
               </span>
               <span className={`player-card-cash ${cashFlash[p.id] ? 'pulse-' + cashFlash[p.id] : ''}`}>${p.cash.toLocaleString()}</span>
             </div>
