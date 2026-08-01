@@ -34,6 +34,8 @@ The entire city transforms when you switch eras — buildings, vehicles, pedestr
 - **Quiz System** — Knowledge questions trigger at turn start with rewards/penalties
 - **Wheel of Fortune** — Spin for cash, stocks, jail escape, and more
 - **Chance & Community Chest** — Card-based random events
+- **Held Action Cards** — Rent-Free, Double-Rent & Rob cards drawn into hand, played at the right moment
+- **God Spirits** — 财神 (Wealth God) / 衰神 (Misfortune God) float over the board; pick them up, or summon/dismiss with cards
 - **Bankruptcy System** — Asset transfer to creditor on bankruptcy
 - **3 Themes** — Classic (🏛️), Shanghai (🌃), Tokyo (🗼)
 - **4 Difficulties** — Easy / Normal / Hard / Expert
@@ -156,6 +158,32 @@ Outer-ring tiles → sidewalk → buildings → 🛣️ Road
 | Jail | 3 turns max. Pay $50, use card, or roll doubles to escape |
 | Salary | $200 for passing GO |
 | Bankruptcy | All assets transfer to creditor (the player owed rent) |
+| Held Cards | Rent-Free / Double-Rent / Rob cards drawn into hand, played later |
+| God Spirits | 财神 collects cash & grants free rent; 衰神 destroys cards & blocks building |
+
+### Held Action Cards (手牌)
+
+Some Chance/Community Chest cards are **held in your hand** instead of resolving immediately. Draw one from the 4 face-down choice, keep it, and play it at the right moment (open 🃏 手牌 on your turn):
+
+| Card | Effect | When to use |
+|------|--------|-------------|
+| 🎫 **Rent-Free** (免租卡) | Skip the next rent you owe | Land on an opponent's property and owe rent |
+| 🎫 **Double-Rent** (双倍租金卡) | Collect 2× rent once | An opponent lands on **your** property (you decide, interrupting their turn) |
+| 🎫 **Rob** (偷钱卡) | Steal $100 from a chosen opponent | On your own turn, pick a target |
+
+### God Spirits (财神 / 衰神)
+
+God spirits float over random board tiles as glowing billboards. **Land on a tile to pick the spirit up** — it attaches to you for **3 turns** (auto-leaves when the countdown expires, or dismiss early with 送神卡). New spirits respawn periodically to keep the board lively.
+
+| Spirit | Type | Effect |
+|--------|------|--------|
+| 😇 **财神 Wealth God** | Buff | On attach, collect $100 from every opponent. While attached you pay **no rent/tolls** (overrides Double-Rent). |
+| 👿 **衰神 Misfortune God** | Debuff | On attach, lose 2 random hand cards. While attached you **cannot build houses**. |
+
+| Card | Effect |
+|------|--------|
+| 🙏 **送神卡 Send-Away** | Dismiss the god currently attached to you |
+| ✨ **请神卡 Invite** | Summon the nearest god within your view onto yourself (watch out — it may be 衰神!) |
 
 ### Difficulty Scaling
 
