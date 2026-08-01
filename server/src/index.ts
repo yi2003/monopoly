@@ -43,7 +43,12 @@ for (const d of possibleDirs) {
 console.log(`CLIENT_DIST: ${clientDist || 'NOT FOUND, tried: ' + possibleDirs.join(', ')}`);
 if (clientDist) {
   app.use(express.static(clientDist));
-  app.get('*', (_req, res, next) => {
+  app.get('*', (req, res, next) => {
+    // Missing static asset files (e.g. stale hashed .js/.css referenced by an
+    // old cached index.html) should 404, not get index.html back as HTML —
+    // a browser would try to execute it as a script and blank out. Any path
+    // with a file extension that express.static couldn't serve → 404.
+    if (path.extname(req.path)) return next();
     const indexPath = path.join(clientDist, 'index.html');
     if (fs.existsSync(indexPath)) res.sendFile(indexPath);
     else next();
