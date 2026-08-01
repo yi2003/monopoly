@@ -10,6 +10,7 @@ export type GamePhase =
   | 'buying'
   | 'stock'
   | 'wheel'
+  | 'cardChoice'
   | 'debt'
   | 'awaitEnd'
   | 'ended';
@@ -286,6 +287,7 @@ export interface GameState {
   weatherTimer: number;
   dayTime: number; // 0-1, position in day/night cycle
   wheelResult: number | null; // sector index
+  cardChoice: { type: 'chance' | 'community_chest'; options: { idx: number }[] } | null; // face-down cards offered to current player
   lastCardDrawn: { type: CardType; card: Card } | null;
   gameEvent: GameEvent | null;
   ringTransferred: boolean; // prevent double-transfer spam
@@ -320,8 +322,7 @@ export interface ClientToServerEvents {
   enterInnerCity: (sector: number) => void;
   exitInnerCity: () => void;
   transferRing: (toRing: 'inner' | 'outer') => void;
-  drawChanceCard: () => void;
-  drawCommunityCard: () => void;
+  pickCard: (data: { choiceIndex: number }) => void;
   chat: (message: string) => void;
   ping: () => void;
 }

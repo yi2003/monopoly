@@ -20,6 +20,9 @@ import { updateStockPrices, processDividends, executeBuyStock, executeSellStock 
 import { initStocks } from '@monopoly/shared';
 import { decideBotAction } from './BotBrain';
 
+// How many face-down cards are offered for a chance/community-chest pick
+const CARD_CHOICE_COUNT = 4;
+
 export class GameManager {
   state: GameState;
   private botTimers: Map<string, NodeJS.Timeout> = new Map();
@@ -57,6 +60,7 @@ export class GameManager {
       weatherTimer: 30,
       dayTime: 0.3, // start at daytime
       wheelResult: null,
+      cardChoice: null,
       lastCardDrawn: null,
       gameEvent: null,
       ringTransferred: false,
@@ -213,11 +217,11 @@ export class GameManager {
       this.state.gameEvent = landing.gameEvent;
     }
 
-    // Set phase BEFORE drawCard — card effect may override it (e.g. move to property → buying)
+    // Set phase BEFORE offering cards — card effect may override it (e.g. move to property → buying)
     this.state.phase = landing.phase;
 
-    if (landing.cardType) {
-      this.drawCard(landing.cardType);
+    if (landing.cardType && this.currentPlayer.cash >= 0) {
+      this.offerCardChoice(landing.cardType);
     }
 
     // Check bankruptcy (card effect may have taken cash)
@@ -353,6 +357,7 @@ export class GameManager {
     this.state.diceRolled = false;
     this.state.lastCardDrawn = null;
     this.state.wheelResult = null;
+    this.state.cardChoice = null;
     this.state.gameEvent = null;
     this.state.ringTransferred = false;
 
@@ -438,21 +443,48 @@ export class GameManager {
 
   // ---- Cards ----
 
-  drawCard(type: 'chance' | 'community_chest'): void {
+  private offerCardChoice(type: 'chance' | 'community_chest'): void {
     const deck = type === 'chance' ? this.state.chanceDeck : this.state.communityDeck;
     const cards = type === 'chance' ? this.state.cards.chance : this.state.cards.community_chest;
 
-    if (deck.length === 0) {
-      // Reshuffle
-      const fresh = shuffle(cards.map((_, i) => i));
-      if (type === 'chance') this.state.chanceDeck = fresh;
-      else this.state.communityDeck = fresh;
+    if (deck.length < CARD_CHOICE_COUNT) {
+      // Not enough cards left — rebuild a fresh shuffled deck
       deck.length = 0;
-      deck.push(...fresh);
+      deck.push(...shuffle(cards.map((_, i) => i)));
     }
 
-    const cardIdx = deck.pop()!;
-    const card = cards[cardIdx];
+    const options: { idx: number }[] = [];
+    for (let i = 0; i < CARD_CHOICE_COUNT; i++) {
+      options.push({ idx: deck.pop()! });
+    }
+
+    this.state.cardChoice = { type, options };
+    this.state.phase = 'cardChoice';
+    // No emit here — rollDice emits once after landing processing
+  }
+
+  pickCard(choiceIndex: number): { success: boolean } {
+    if (this.state.phase !== 'cardChoice' || !this.state.cardChoice) return { success: false };
+    const choice = this.state.cardChoice;
+    if (!Number.isInteger(choiceIndex) || choiceIndex < 0 || choiceIndex >= choice.options.length) {
+      return { success: false };
+    }
+
+    const type = choice.type;
+    const deck = type === 'chance' ? this.state.chanceDeck : this.state.communityDeck;
+    const cards = type === 'chance' ? this.state.cards.chance : this.state.cards.community_chest;
+
+    // Chosen card is consumed; return the others to the bottom of the deck
+    // (unshift = bottom of the pop-from-end stack, so they don't repeat next offer)
+    const chosenIdx = choice.options[choiceIndex].idx;
+    const unchosen = choice.options
+      .filter((_, i) => i !== choiceIndex)
+      .map(o => o.idx);
+    deck.unshift(...unchosen);
+
+    this.state.cardChoice = null;
+
+    const card = cards[chosenIdx];
     this.state.lastCardDrawn = { type, card };
 
     // Emit gameEvent so all players see who drew which card
@@ -464,10 +496,21 @@ export class GameManager {
       descriptionCN: card.descriptionCN,
     };
 
-    // Apply effect
+    // Apply effect (move-family cards set phase to buying/awaitEnd)
     this.applyCardEffect(card);
     this.addLog(`${this.currentPlayer.name} 抽到: ${card.descriptionCN}`, 'card', `${this.currentPlayer.name} drew: ${card.description}`);
+
+    // Resolve the turn stage: if the card effect didn't change the phase, end it
+    if (this.state.phase === 'cardChoice') {
+      this.state.phase = 'awaitEnd';
+    }
+    // Card may have drained cash → debt
+    if (this.currentPlayer.cash < 0) {
+      this.state.phase = 'debt';
+    }
+
     this.emitChange();
+    return { success: true };
   }
 
   private applyCardEffect(card: { effect: any }): void {
@@ -757,32 +800,30 @@ export class GameManager {
     switch (decision.action) {
       case 'roll':
         if (player.status === 'jailed') {
+          // tryJailDice always leaves the phase at 'awaitEnd'
           this.tryJailDice();
-          // After jail dice, schedule follow-up
-          if (this.state.phase === 'awaitEnd') {
-            setTimeout(() => this.endTurn(), 1500);
-          } else if (this.state.phase === 'rolling') {
-            // Escaped jail with doubles, need to roll for movement
-            setTimeout(() => this.executeBotAction(), 2000);
-          }
         } else {
           this.rollDice();
         }
-        // After rolling, schedule follow-up
-        if (this.state.phase === 'buying' || this.state.phase === 'debt' || this.state.phase === 'stock' || this.state.phase === 'wheel') {
-          setTimeout(() => this.executeBotAction(), 2800);
-        } else if (this.state.phase === 'awaitEnd') {
-          setTimeout(() => this.endTurn(), 1500);
-        } else if (this.state.phase === 'rolling') {
-          // Extra roll (doubles) — re-roll
-          setTimeout(() => this.executeBotAction(), 1500);
-        }
+        this.scheduleBotAfterRoll();
         break;
 
-      case 'buy':
-        this.buyProperty();
+      case 'pickCard':
+        if (decision.choiceIndex !== undefined) {
+          this.pickCard(decision.choiceIndex);
+        }
+        this.scheduleBotAfterRoll();
+        break;
+
+      case 'buy': {
+        const res = this.buyProperty();
+        // If the buy fails validation, still leave the buying phase so the bot can't stall
+        if (!res.success && this.state.phase === 'buying') {
+          this.passBuyProperty();
+        }
         setTimeout(() => this.endTurn(), 1000);
         break;
+      }
 
       case 'pass':
         if (this.state.phase === 'buying') {
@@ -821,12 +862,18 @@ export class GameManager {
 
       case 'payJail':
         this.payJailFine();
-        setTimeout(() => this.rollDice(), 1000);
+        setTimeout(() => {
+          this.rollDice();
+          this.scheduleBotAfterRoll();
+        }, 1000);
         break;
 
       case 'useCard':
         this.useJailCard();
-        setTimeout(() => this.rollDice(), 1000);
+        setTimeout(() => {
+          this.rollDice();
+          this.scheduleBotAfterRoll();
+        }, 1000);
         break;
 
       case 'tryDoubles':
@@ -840,6 +887,23 @@ export class GameManager {
         break;
 
     }
+  }
+
+  /**
+   * After a bot rolls, picks a card, or pays bail, schedule the next step based
+   * on the resulting phase. Covers every phase so a bot can never stall.
+   */
+  private scheduleBotAfterRoll(): void {
+    const phase = this.state.phase;
+    if (phase === 'buying' || phase === 'debt' || phase === 'stock' || phase === 'wheel' || phase === 'cardChoice') {
+      setTimeout(() => this.executeBotAction(), 2800);
+    } else if (phase === 'awaitEnd') {
+      setTimeout(() => this.endTurn(), 1500);
+    } else if (phase === 'rolling') {
+      // Extra roll (doubles) — re-roll
+      setTimeout(() => this.executeBotAction(), 1500);
+    }
+    // 'ended' → nothing needed
   }
 
   clearBotTimers(): void {

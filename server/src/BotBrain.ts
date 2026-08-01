@@ -6,8 +6,9 @@ import type { GameState, Player } from '@monopoly/shared';
 import { getPropertyDef, getRailwayDef, getUtilityDef, canBuildHouse, getGroupTiles } from '@monopoly/shared';
 
 export interface BotDecision {
-  action: 'roll' | 'buy' | 'pass' | 'build' | 'sellHouse' | 'endTurn' | 'payJail' | 'useCard' | 'tryDoubles' | 'spinWheel';
+  action: 'roll' | 'buy' | 'pass' | 'build' | 'sellHouse' | 'endTurn' | 'payJail' | 'useCard' | 'tryDoubles' | 'spinWheel' | 'pickCard';
   tileIndex?: number;
+  choiceIndex?: number;
   stockAction?: { symbol: string; shares: number; action: 'buy' | 'sell' };
   delay: number; // ms before executing
 }
@@ -31,6 +32,10 @@ export function decideBotAction(state: GameState, player: Player): BotDecision {
       return decideStockAction(state, player);
     case 'wheel':
       return { action: 'spinWheel' as any, delay: REGULAR_DELAY };
+    case 'cardChoice': {
+      const n = state.cardChoice ? state.cardChoice.options.length : 0;
+      return { action: 'pickCard', choiceIndex: Math.floor(Math.random() * Math.max(n, 1)), delay: REGULAR_DELAY };
+    }
     default:
       return { action: 'pass', delay: REGULAR_DELAY };
   }

@@ -59,6 +59,7 @@ export const translations = {
     'phase.buying': '购买决策',
     'phase.stock': '股票交易',
     'phase.wheel': '大转盘',
+    'phase.cardChoice': '选卡阶段',
     'phase.debt': '债务处理',
     'phase.awaitEnd': '回合结束',
     'phase.ended': '游戏结束',
@@ -177,6 +178,9 @@ export const translations = {
     // Card Flip
     'card.chance': '机会',
     'card.community': '公益金',
+    'card.pickTitle': '选择一张卡片',
+    'card.pickWait': '请稍候...',
+    'card.pickWaitingFor': '{name} 正在选择卡片...',
 
     // Event Toast types
     'event.rent': '💰',
@@ -259,6 +263,7 @@ export const translations = {
     'phase.buying': 'Buy Decision',
     'phase.stock': 'Stock Trading',
     'phase.wheel': 'Wheel of Fortune',
+    'phase.cardChoice': 'Pick a Card',
     'phase.debt': 'Debt Settlement',
     'phase.awaitEnd': 'End Turn',
     'phase.ended': 'Game Over',
@@ -367,6 +372,9 @@ export const translations = {
 
     'card.chance': 'Chance',
     'card.community': 'Community Chest',
+    'card.pickTitle': 'Choose a card',
+    'card.pickWait': 'Please wait...',
+    'card.pickWaitingFor': '{name} is choosing a card...',
 
     'event.rent': '💰',
     'event.buy': '✅',

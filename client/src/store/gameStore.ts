@@ -72,6 +72,7 @@ const defaultGameState: GameState = {
   weatherTimer: 30,
   dayTime: 0.3,
   wheelResult: null,
+  cardChoice: null,
   lastCardDrawn: null,
   gameEvent: null,
   ringTransferred: false,

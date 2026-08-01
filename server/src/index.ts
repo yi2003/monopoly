@@ -383,16 +383,13 @@ io.on('connection', (socket) => {
     game.transferRing(toRing);
   });
 
-  socket.on('drawChanceCard', () => {
+  socket.on('pickCard', (data) => {
     const game = getGame();
-    if (!game) return;
-    game.drawCard('chance');
-  });
-
-  socket.on('drawCommunityCard', () => {
-    const game = getGame();
-    if (!game) return;
-    game.drawCard('community_chest');
+    if (!game || !data || !game.state.cardChoice) return;
+    // Only the current player may pick a card
+    const cp = game.state.players[game.state.currentPlayerIndex];
+    if (!cp || cp.id !== currentPlayerId) return;
+    game.pickCard(data.choiceIndex);
   });
 
   socket.on('chat', (message) => {
