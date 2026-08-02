@@ -123,6 +123,7 @@ export interface Player {
   consecutiveDoubles: number;
   skipNextTurn: boolean;
   freeBuildPending: boolean; // 免费建屋卡已激活 — next house build costs nothing
+  lastCreditorId: string | null; // who drained cash most recently — their assets go to the true creditor on bankruptcy
   status: PlayerStatus;
 
   // Stats

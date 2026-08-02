@@ -247,13 +247,13 @@ export interface TaxDef {
 
 export const TAXES: TaxDef[] = [
   { index: 5, nameCN: '所得税', amount: 100, isLuxury: false },
-  { index: 52, nameCN: '奢侈税', amount: 200, isLuxury: true },
+  { index: 52, nameCN: '奢侈税', amount: 150, isLuxury: true },
 ];
 
 // Outer ring taxes
 export const OUTER_TAXES: TaxDef[] = [
   { index: 89, nameCN: '碳排放税', amount: 150, isLuxury: false },
-  { index: 136, nameCN: '豪宅税', amount: 250, isLuxury: true },
+  { index: 136, nameCN: '豪宅税', amount: 200, isLuxury: true },
 ];
 
 // ---- Combined Arrays (for unified lookups) ----
@@ -371,7 +371,6 @@ function createInnerTile(i: number): Tile {
   const ring = Math.floor(localIdx / 8); // 0=outer, 1=middle, 2=inner
   const sector = localIdx % 8;
   const ringNames = ['外环', '中环', '内环'];
-  const ringFees = [50, 100, 200];
 
   const innerTypes = [
     'inner_square', 'inner_cafe', 'inner_chance', 'inner_rest',
@@ -380,7 +379,11 @@ function createInnerTile(i: number): Tile {
 
   const innerNamesCN = ['广场', '咖啡馆', '机会', '休息', '喷泉', '商店', '美食', '公益金'];
   const innerNamesEN = ['Square', 'Café', 'Chance', 'Rest', 'Fountain', 'Shop', 'Food', 'Community'];
-  const innerValues = [40, 15, 0, 0, 25, 0, -15, 0];
+  // Per-tile fee: positive = player earns, negative = player pays the bank.
+  // Entry into the inner city is billed separately (enterInnerCity), so tiles carry a
+  // small standalone balance instead of stacking a ring toll on top — the old formula
+  // made every inner-city tile a money printer.
+  const innerValues = [0, -15, 0, 0, 0, -10, -15, 25];
 
   const type = innerTypes[sector];
   const nameCN = `${ringNames[ring]}${innerNamesCN[sector]}`;
@@ -392,16 +395,16 @@ function createInnerTile(i: number): Tile {
     nameCN,
     type,
     ring: 'inner',
-    fee: ringFees[ring] + innerValues[sector],
+    fee: innerValues[sector],
   };
 }
 
 // ---- Railway Rent Table ----
 
 export const RAILWAY_RENT: Record<ThemeId, number[]> = {
-  classic: [25, 50, 100, 200],
-  shanghai: [25, 50, 100, 200], // + 1.5x combo bonus handled in rules
-  tokyo: [30, 60, 120, 240],
+  classic: [25, 50, 100, 200, 350, 500],
+  shanghai: [25, 50, 100, 200, 350, 500], // + 1.5x combo bonus handled in rules
+  tokyo: [30, 60, 120, 240, 400, 550],
 };
 
 // ---- Color Group Hex Values ----
@@ -517,7 +520,7 @@ export const COMMUNITY_CHEST_CARDS: Card[] = [
 
 export const GOD_DURATION_TURNS = 3; // turns a god stays attached before leaving
 export const GOD_VISION_RADIUS = 14; // world units (~4 tiles) for 请神卡 summon range
-export const GOD_WEALTH_AMOUNT = 100; // collected from each opponent by 财神
+export const GOD_WEALTH_AMOUNT = 50; // collected from each opponent by 财神 (halved to cap the swing)
 export const GOD_START_COUNT = 2; // gods spawned when the game starts
 export const GOD_RESPAWN_ROUNDS = 4; // spawn a new god every N rounds if below cap
 export const GOD_MAX_ON_BOARD = 3; // max god entities at once
@@ -646,7 +649,7 @@ export const MAX_JAIL_TURNS = 3;
 export const MAX_HOUSES = 5;
 export const HOUSE_HOTEL_THRESHOLD = 5; // 5 houses = hotel
 export const STOCK_TRADE_FEE = 0.03; // 3%
-export const MIN_STOCK_FEE = 5;
+export const MIN_STOCK_FEE = 2;
 
 // ---- Room Codes ----
 

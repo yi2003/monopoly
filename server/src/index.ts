@@ -200,6 +200,7 @@ io.on('connection', (socket) => {
       consecutiveDoubles: 0,
       skipNextTurn: false,
       freeBuildPending: false,
+      lastCreditorId: null,
       status: 'active',
       totalRentCollected: 0,
       totalRentPaid: 0,

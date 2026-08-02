@@ -152,8 +152,8 @@ Outer-ring tiles → sidewalk → buildings → 🛣️ Road
 |----------|---------|
 | Rent | Increases with houses (1-4) and hotel (5). Doubled for full group w/o houses |
 | Houses | Build evenly across group. Max 5 (hotel). Sell at half price |
-| Railways | Rent scales with count owned: $25 → $50 → $100 → $200 |
-| Utilities | Rent = dice roll × multiplier (4× for 1, 10× for 2) |
+| Railways | Rent scales with count owned: $25 → $50 → $100 → $200 → $350 → $500 |
+| Utilities | Rent = dice roll × multiplier (8× for 1, 20× for 2) |
 | Tax | Fixed or percentage-based, scales with difficulty |
 | Jail | 3 turns max. Pay $50, use card, or roll doubles to escape |
 | Salary | $200 for passing GO |
@@ -177,7 +177,7 @@ God spirits float over random board tiles as glowing billboards. **Land on a til
 
 | Spirit | Type | Effect |
 |--------|------|--------|
-| 😇 **财神 Wealth God** | Buff | On attach, collect $100 from every opponent. While attached you pay **no rent/tolls** (overrides Double-Rent). |
+| 😇 **财神 Wealth God** | Buff | On attach, collect $50 from every opponent. While attached you pay **no rent/tolls** (overrides Double-Rent). |
 | 👿 **衰神 Misfortune God** | Debuff | On attach, lose 2 random hand cards. While attached you **cannot build houses**. |
 
 | Card | Effect |
@@ -189,7 +189,7 @@ God spirits float over random board tiles as glowing billboards. **Land on a til
 
 | Setting | Easy | Normal | Hard | Expert |
 |---------|------|--------|------|--------|
-| Maintenance Fee | 0% | 3% | 5% | 8% |
+| Maintenance Fee | 0% | 0% | 5% | 8% |
 | Rent Multiplier | 0.6× | 1.0× | 1.5× | 2.0× |
 | Tax Multiplier | 0.6× | 1.0× | 1.5× | 2.0× |
 | START Salary | $300 | $200 | $150 | $100 |

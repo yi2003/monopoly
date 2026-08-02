@@ -81,7 +81,7 @@ export class RuleEngine {
 
   // ---- Landing on tile ----
 
-  processLanding(position: number, extraRentMultiplier = 1, ignoreGod = false): {
+  processLanding(position: number, extraRentMultiplier = 1, ignoreGod = false, diceOverride?: number): {
     phase: 'buying' | 'stock' | 'wheel' | 'debt' | 'rentChoice' | 'god' | 'awaitEnd';
     rentAmount: number;
     rentTarget: string | null;
@@ -112,6 +112,7 @@ export class RuleEngine {
             0, this.effConfig.rentMultiplier,
           );
           rentTarget = owner.id;
+          player.lastCreditorId = owner.id;
           // 财神附身 → 免付租金(覆盖双倍租金卡,不进 rentChoice)
           if (player.god?.kind === 'wealth') {
             this.addLog(`${player.name} 受财神庇佑，免付 ${owner.name} 的租金`, 'info', `${player.name} exempt from rent (Wealth God)`);
@@ -150,6 +151,7 @@ export class RuleEngine {
           const theme = THEMES[this.state.config.theme];
           rentAmount = Math.round(calcRailwayRent(owner, railwayCount, theme) * extraRentMultiplier);
           rentTarget = owner.id;
+          player.lastCreditorId = owner.id;
           if (player.god?.kind === 'wealth') {
             this.addLog(`${player.name} 受财神庇佑，免付 ${owner.name} 的过路费`, 'info', `${player.name} exempt from fee (Wealth God)`);
             return { phase: 'awaitEnd', rentAmount: 0, rentTarget: owner.id, cardType: null };
@@ -180,9 +182,10 @@ export class RuleEngine {
         const owner = this.findOwner(position);
         if (owner && owner.id !== player.id) {
           const utilityCount = owner.properties.filter(p => getUtilityDef(p) !== undefined).length;
-          const diceSum = this.state.dice?.total || 0;
+          const diceSum = diceOverride ?? (this.state.dice?.total || 0);
           rentAmount = Math.round(calcUtilityRent(utilityCount, diceSum) * extraRentMultiplier);
           rentTarget = owner.id;
+          player.lastCreditorId = owner.id;
           if (player.god?.kind === 'wealth') {
             this.addLog(`${player.name} 受财神庇佑，免付 ${owner.name} 的公用事业费`, 'info', `${player.name} exempt from fee (Wealth God)`);
             return { phase: 'awaitEnd', rentAmount: 0, rentTarget: owner.id, cardType: null };
@@ -212,6 +215,7 @@ export class RuleEngine {
       case 'tax': {
         const taxAmount = Math.round(tile.amount * this.effConfig.taxMultiplier);
         player.cash -= taxAmount;
+        player.lastCreditorId = null; // paid to the bank — no creditor on bankruptcy
         this.addLog(`🏛️ ${player.name} → 银行 缴纳税费 $${taxAmount}`, 'info', `🏛️ ${player.name} → Bank tax $${taxAmount}`);
         return {
           phase: 'awaitEnd', rentAmount: taxAmount, rentTarget: null, cardType: null,
@@ -311,10 +315,10 @@ export class RuleEngine {
 
   // ---- Building ----
 
-  validateBuildHouse(tileIndex: number): string | null {
+  validateBuildHouse(tileIndex: number, free = false): string | null {
     if (this.state.phase !== 'rolling' && this.state.phase !== 'awaitEnd') return '现在不能建房';
     if (!this.currentPlayer.properties.includes(tileIndex)) return '你不拥有该地产';
-    if (!canBuildHouse(this.currentPlayer, tileIndex)) return '不满足建房条件';
+    if (!canBuildHouse(this.currentPlayer, tileIndex, free)) return '不满足建房条件';
     return null;
   }
 
@@ -380,6 +384,7 @@ export class RuleEngine {
       player.heldCards = [];
       player.god = null;
       player.freeBuildPending = false;
+      player.lastCreditorId = null;
       player.cash = 0;
       this.addLog(`💀 ${player.name} 破产！全部资产 → ${creditor.name}`, 'bankrupt', `💀 ${player.name} bankrupt! Assets → ${creditor.name}`);
     } else {
@@ -390,6 +395,7 @@ export class RuleEngine {
       player.heldCards = [];
       player.god = null;
       player.freeBuildPending = false;
+      player.lastCreditorId = null;
       player.cash = 0;
       this.addLog(`💀 ${player.name} 破产！资产回归银行`, 'bankrupt', `💀 ${player.name} bankrupt! Assets returned to bank`);
     }
@@ -404,9 +410,14 @@ export class RuleEngine {
   }
 
   findCreditor(): Player | null {
-    // Find the player who is owed the most rent
-    // Simplified: find the last player who collected rent from this player
-    return this.state.players.find(p => p.id !== this.currentPlayer.id && p.status === 'active') || null;
+    // The real creditor is whoever drained the player's cash most recently
+    // (rent owner / robber / 财神 bearer). No specific creditor → assets go to the bank.
+    const id = this.currentPlayer.lastCreditorId;
+    if (id) {
+      const c = this.state.players.find(p => p.id === id && p.status === 'active' && !p.isSpectator);
+      if (c) return c;
+    }
+    return null;
   }
 
   checkWinner(): Player | null {

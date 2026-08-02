@@ -7,7 +7,6 @@ import {
   createTiles, CHANCE_CARDS, COMMUNITY_CHEST_CARDS,
   SHANGHAI_EXTRA_CHANCE_CARDS, SHANGHAI_EXTRA_COMMUNITY_CHEST_CARDS,
   TOKYO_EXTRA_CHANCE_CARDS, TOKYO_EXTRA_COMMUNITY_CHEST_CARDS,
-  GO_SALARY,
   JAIL_FINE, CORNER_GO, CORNER_JAIL, CORNER_GOTO_JAIL,
   OUTER_RING_OFFSET, GROUND_INNER_RING_SIZE, RAILWAYS,
   PLAYER_COLORS, DEFAULT_AVATAR,
@@ -110,6 +109,7 @@ export class GameManager {
       consecutiveDoubles: 0,
       skipNextTurn: false,
       freeBuildPending: false,
+      lastCreditorId: null,
       status: 'active',
       totalRentCollected: 0,
       totalRentPaid: 0,
@@ -149,6 +149,7 @@ export class GameManager {
       player.god = null;
       player.skipNextTurn = false;
       player.freeBuildPending = false;
+      player.lastCreditorId = null;
       player.status = 'active';
     }
 
@@ -260,11 +261,11 @@ export class GameManager {
   }
 
   buildHouse(tileIndex: number): { success: boolean; error?: string } {
-    const err = this.engine.validateBuildHouse(tileIndex);
+    // 免费建屋卡激活时，本次建房不扣款（校验时跳过现金门槛，否则没钱时用不出这张卡）
+    const free = this.currentPlayer.freeBuildPending;
+    const err = this.engine.validateBuildHouse(tileIndex, free);
     if (err) return { success: false, error: err };
 
-    // 免费建屋卡激活时，本次建房不扣款
-    const free = this.currentPlayer.freeBuildPending;
     this.engine.executeBuildHouse(tileIndex, free);
     if (free) {
       this.currentPlayer.freeBuildPending = false;
@@ -594,7 +595,9 @@ export class GameManager {
         const { position, passedGo } = moveToTile(effect.target, player.position);
         player.position = position;
         if (passedGo && effect.collectGo) {
-          player.cash += GO_SALARY[this.state.config.theme];
+          // Use the difficulty-adjusted salary (matches dice passes, unlike the base constant)
+          const eff = getEffectiveConfig(this.state.config.theme, this.state.config.difficulty);
+          player.cash += eff.goSalary;
         }
         // Re-process landing (may enter buying / rentChoice)
         this.consumeLanding(this.engine.processLanding(position), { emit: false, keepGameEvent: true });
@@ -605,12 +608,16 @@ export class GameManager {
         const nearest = findNearestTile(player.position, effect.tileType);
         player.position = nearest;
         const payMultiplier = effect.payMultiplier || 1;
-        this.consumeLanding(this.engine.processLanding(nearest, payMultiplier), { emit: false, keepGameEvent: true });
+        // A card move leaves no die on the table — roll one so a "pay 10× dice"
+        // utility landing actually resolves instead of silently costing $0.
+        const diceOverride = effect.tileType === 'utility' ? rollDice().die1 : undefined;
+        this.consumeLanding(this.engine.processLanding(nearest, payMultiplier, false, diceOverride), { emit: false, keepGameEvent: true });
         break;
       }
 
       case 'cash': {
         player.cash += effect.amount;
+        if (effect.amount < 0) player.lastCreditorId = null; // paid to the bank
         break;
       }
 
@@ -619,10 +626,12 @@ export class GameManager {
         for (const other of others) {
           if (effect.amount > 0) {
             other.cash -= effect.amount;
+            other.lastCreditorId = player.id;
             player.cash += effect.amount;
           } else {
             other.cash += Math.abs(effect.amount);
             player.cash -= Math.abs(effect.amount);
+            player.lastCreditorId = other.id;
           }
         }
         break;
@@ -644,9 +653,11 @@ export class GameManager {
       case 'repairs': {
         let total = 0;
         for (const [idx, count] of Object.entries(player.houses)) {
-          total += count >= 5 ? effect.perHotel * count : effect.perHouse * count;
+          // A hotel is one building (count 5) — charge the hotel rate once, not ×5
+          total += count >= 5 ? effect.perHotel : effect.perHouse * count;
         }
         player.cash -= total;
+        player.lastCreditorId = null; // paid to the bank
         break;
       }
 
@@ -824,6 +835,7 @@ export class GameManager {
 
     const stolen = Math.min(card.effect.amount, target.cash);
     target.cash -= stolen;
+    target.lastCreditorId = player.id;
     player.cash += stolen;
     player.heldCards = player.heldCards.filter(id => id !== cardId);
     this.addLog(`🦹 ${player.name} 偷走了 ${target.name} 的 $${stolen}`, 'info', `🦹 ${player.name} stole $${stolen} from ${target.name}`);
@@ -907,6 +919,7 @@ export class GameManager {
     prompt: { tileIndex: number; tileName: string; tileNameCN: string },
   ): void {
     payer.cash -= amount;
+    payer.lastCreditorId = owner.id;
     owner.cash += amount;
     if (amount > 0) {
       this.emitEvent({
@@ -978,6 +991,7 @@ export class GameManager {
       let total = 0;
       for (const t of targets) {
         t.cash -= GOD_WEALTH_AMOUNT;
+        t.lastCreditorId = player.id;
         total += GOD_WEALTH_AMOUNT;
       }
       player.cash += total;
@@ -1053,17 +1067,19 @@ export class GameManager {
         break;
       case 'moveToGO':
         player.position = CORNER_GO;
-        player.cash += GO_SALARY[this.state.config.theme];
+        player.cash += getEffectiveConfig(this.state.config.theme, this.state.config.difficulty).goSalary;
         break;
       case 'cashPerPlayer':
         for (const other of this.state.players) {
           if (other.id === player.id || other.status === 'bankrupt') continue;
           if (sector.effect.amount > 0) {
             other.cash -= sector.effect.amount;
+            other.lastCreditorId = player.id;
             player.cash += sector.effect.amount;
           } else {
             other.cash += Math.abs(sector.effect.amount);
             player.cash -= Math.abs(sector.effect.amount);
+            player.lastCreditorId = other.id;
           }
         }
         break;
@@ -1071,10 +1087,10 @@ export class GameManager {
         player.getOutOfJailCards++;
         break;
       case 'freeHouse': {
-        // Build one free house on first buildable property
+        // Build one house for FREE on the first buildable property (free=true skips the cash check)
         for (const idx of player.properties) {
-          const err = this.engine.validateBuildHouse(idx);
-          if (!err) { this.engine.executeBuildHouse(idx); break; }
+          const err = this.engine.validateBuildHouse(idx, true);
+          if (!err) { this.engine.executeBuildHouse(idx, true); break; }
         }
         break;
       }
@@ -1125,7 +1141,7 @@ export class GameManager {
     if (tile.type !== 'railway') return { success: false, error: '当前位置不是铁路' };
 
     const owner = this.state.players.find(p => p.properties.includes(player.position));
-    const cost = (owner && owner.id === player.id) ? 0 : 50;
+    const cost = (owner && owner.id === player.id) ? 0 : 200;
     if (player.cash < cost) return { success: false, error: '现金不足' };
 
     player.cash -= cost;

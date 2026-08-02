@@ -70,10 +70,12 @@ export function calcPropertyRent(
 export function calcRailwayRent(
   owner: Player,
   railwayCount: number,
-  theme: { railwayComboBonus: boolean },
+  theme: { railwayComboBonus: boolean; railwayRent?: number[] },
 ): number {
-  const baseTable = [25, 50, 100, 200];
-  const idx = Math.min(railwayCount - 1, 3);
+  // Each ring has 6 railways — extend the classic 4-stop table so the 5th/6th
+  // railway still pays off instead of being dead purchases.
+  const baseTable = theme.railwayRent?.length ? theme.railwayRent : [25, 50, 100, 200, 350, 500];
+  const idx = Math.min(railwayCount - 1, baseTable.length - 1);
   let rent = baseTable[Math.max(0, idx)];
 
   // Shanghai bonus: ≥2 railways ×1.5
@@ -92,7 +94,7 @@ export function calcUtilityRent(utilityCount: number, diceValue: number): number
 
 // ---- Build Validation ----
 
-export function canBuildHouse(player: Player, tileIndex: number): boolean {
+export function canBuildHouse(player: Player, tileIndex: number, free = false): boolean {
   if (player.god?.kind === 'misfortune') return false; // 衰神禁建
   const prop = getPropertyDef(tileIndex);
   if (!prop) return false;
@@ -109,8 +111,8 @@ export function canBuildHouse(player: Player, tileIndex: number): boolean {
     if (currentHouses + 1 - otherHouses > 1) return false;
   }
 
-  // Check cash
-  if (player.cash < prop.houseCost) return false;
+  // Check cash — a free build (免费建屋卡 / wheel "免费建房") must not require the money
+  if (!free && player.cash < prop.houseCost) return false;
 
   return true;
 }
