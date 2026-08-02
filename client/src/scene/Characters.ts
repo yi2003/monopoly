@@ -3,10 +3,11 @@
 // ============================================================
 
 import * as THREE from 'three';
-import type { GameState, Player, AvatarId } from '@monopoly/shared';
+import type { GameState, Player, AvatarId, GodKind } from '@monopoly/shared';
 import { getCharacterTilePos, OUTER_RING_OFFSET, GROUND_INNER_RING_SIZE } from '@monopoly/shared';
 import { audioManager } from '../audio/AudioManager';
 import { buildCharacterModel } from './CharacterModel';
+import { drawGodFollowerGlyph, GOD_FOLLOWER_W, GOD_FOLLOWER_H } from './GodSprites';
 
 interface CharacterData {
   playerId: string;
@@ -24,6 +25,21 @@ const WALK_SPEED = 5.5; // tiles per second
 const WAYPOINT_THRESHOLD = 0.08;
 const REACTION_DURATION = 0.6;
 
+// Attached-god follower (财神/衰神 hovering above the bearer)
+const GOD_FOLLOWER_Y = 2.2; // above the name label (1.45)
+const GOD_FOLLOWER_SCALE = 0.72; // width; height keeps canvas aspect
+const GOD_FOLLOWER_SPAWN = 0.35; // pop-in duration (s)
+
+interface GodFollower {
+  kind: GodKind;
+  sprite: THREE.Sprite;
+  texture: THREE.CanvasTexture;
+  ctx: CanvasRenderingContext2D;
+  lastTurns: number;
+  phase: number; // bob / pulse phase
+  spawnT: number; // elapsed pop-in time
+}
+
 interface ReactionState {
   type: 'hurt' | 'celebrate';
   elapsed: number;
@@ -36,6 +52,7 @@ export class Characters {
   private characters: Map<string, CharacterData> = new Map();
   private prevPositions: Map<string, number> = new Map();
   private reactions: Map<string, ReactionState> = new Map();
+  private godFollowers: Map<string, GodFollower> = new Map();
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -94,6 +111,18 @@ export class Characters {
       if (!state.players.find(p => p.id === id)) {
         this.removeCharacter(id);
       }
+    }
+
+    // Sync attached-god followers (财神/衰神 hovering above the bearer)
+    const followed = new Set<string>();
+    for (const player of state.players) {
+      if (player.isSpectator || player.status === 'bankrupt' || !player.god) continue;
+      if (!this.characters.has(player.id)) continue;
+      followed.add(player.id);
+      this.ensureGodFollower(player.id, player.god.kind, player.god.turnsLeft);
+    }
+    for (const id of [...this.godFollowers.keys()]) {
+      if (!followed.has(id)) this.removeGodFollower(id);
     }
   }
 
@@ -289,6 +318,24 @@ export class Characters {
         this.reactions.delete(playerId);
       }
     }
+
+    // ── Animate attached-god followers (bob / pulse / pop-in) ──
+    for (const f of this.godFollowers.values()) {
+      f.phase += dt * 2.2;
+      f.spawnT = Math.min(f.spawnT + dt, GOD_FOLLOWER_SPAWN);
+
+      // easeOutBack pop-in on attach
+      const k = f.spawnT / GOD_FOLLOWER_SPAWN;
+      const c1 = 1.70158;
+      const c3 = c1 + 1;
+      const ease = 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2);
+
+      const bob = Math.sin(f.phase) * 0.08;
+      const pulse = 1 + Math.sin(f.phase * 0.8) * 0.05;
+      const s = GOD_FOLLOWER_SCALE * pulse * ease;
+      f.sprite.position.y = GOD_FOLLOWER_Y + bob;
+      f.sprite.scale.set(s, s * (GOD_FOLLOWER_H / GOD_FOLLOWER_W), 1);
+    }
   }
 
   private animateWalk(charData: CharacterData, dt: number): void {
@@ -368,6 +415,60 @@ export class Characters {
     this.reactions.set(playerId, { type, elapsed: 0, duration: REACTION_DURATION });
   }
 
+  /** Create or refresh the god billboard hovering above a character's head */
+  private ensureGodFollower(playerId: string, kind: GodKind, turns: number): void {
+    const existing = this.godFollowers.get(playerId);
+    if (existing) {
+      // Refresh the turns-left counter when it changes
+      if (existing.lastTurns !== turns) {
+        drawGodFollowerGlyph(existing.ctx, existing.kind, turns);
+        existing.texture.needsUpdate = true;
+        existing.lastTurns = turns;
+      }
+      return;
+    }
+
+    const cd = this.characters.get(playerId);
+    if (!cd) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = GOD_FOLLOWER_W;
+    canvas.height = GOD_FOLLOWER_H;
+    const ctx = canvas.getContext('2d')!;
+    drawGodFollowerGlyph(ctx, kind, turns);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false });
+    const sprite = new THREE.Sprite(mat);
+    const h = GOD_FOLLOWER_SCALE * (GOD_FOLLOWER_H / GOD_FOLLOWER_W);
+    sprite.scale.set(GOD_FOLLOWER_SCALE, h, 1);
+    sprite.position.set(0, GOD_FOLLOWER_Y, 0);
+    sprite.renderOrder = 999;
+    cd.group.add(sprite);
+
+    this.godFollowers.set(playerId, {
+      kind,
+      sprite,
+      texture,
+      ctx,
+      lastTurns: turns,
+      phase: Math.random() * Math.PI * 2,
+      spawnT: 0,
+    });
+  }
+
+  private removeGodFollower(playerId: string): void {
+    const f = this.godFollowers.get(playerId);
+    if (!f) return;
+    const cd = this.characters.get(playerId);
+    if (cd) cd.group.remove(f.sprite);
+    f.sprite.material.dispose();
+    f.texture.dispose();
+    this.godFollowers.delete(playerId);
+  }
+
   /** Get world position for a tile on the ground ring */
   private getTileWorldPos(index: number): { x: number; z: number } {
     // Ground ring tiles (inner or outer)
@@ -385,9 +486,11 @@ export class Characters {
       this.characters.delete(id);
       this.prevPositions.delete(id);
     }
+    this.removeGodFollower(id);
   }
 
   dispose(): void {
+    for (const id of [...this.godFollowers.keys()]) this.removeGodFollower(id);
     for (const [, cd] of this.characters) {
       this.group.remove(cd.group);
       cd.group.traverse(c => {

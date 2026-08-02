@@ -117,3 +117,41 @@ export class GodSprites {
     this.scene.remove(this.group);
   }
 }
+
+// ============================================================
+// Attached-god follower billboard (财神/衰神 hovering over the bearer)
+// Smaller than board sprites, with a turns-left counter. Attached to
+// the character group in Characters.ts so it follows the player.
+// ============================================================
+
+export const GOD_FOLLOWER_W = 96;
+export const GOD_FOLLOWER_H = 112;
+
+export function drawGodFollowerGlyph(
+  ctx: CanvasRenderingContext2D,
+  kind: GodKind,
+  turns: number,
+): void {
+  const { color, glow } = GOD_COLORS[kind];
+  const cx = GOD_FOLLOWER_W / 2;
+
+  // Soft glow disc behind the glyph
+  const grad = ctx.createRadialGradient(cx, 44, 6, cx, 44, 40);
+  grad.addColorStop(0, 'rgba(255,255,255,0.4)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.08)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, 44, 40, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Emoji glyph with glow
+  ctx.font = '40px serif';
+  glowText(ctx, GOD_EMOJI[kind], cx, 46, { color, glow, blur: 16, passes: 4 });
+
+  // Turns-left counter pill ("×N")
+  ctx.font = 'bold 18px "Microsoft YaHei", "PingFang SC", sans-serif';
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(18, 84, 60, 22);
+  glowText(ctx, `×${turns}`, cx, 92, { color: '#ffffff', glow: color, blur: 8, passes: 2 });
+}
