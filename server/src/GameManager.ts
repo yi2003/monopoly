@@ -14,7 +14,7 @@ import {
 import { getEffectiveConfig, THEMES } from '@monopoly/shared';
 import {
   rollDice, findNearestTile, moveToTile, findCardById, playerHasHeldCardKind,
-  nearestGodWithin, isGroundTile,
+  nearestGodWithin, isGroundTile, getPropertyDef,
 } from '@monopoly/shared';
 import {
   GOD_DURATION_TURNS, GOD_WEALTH_AMOUNT, GOD_START_COUNT, GOD_RESPAWN_ROUNDS, GOD_MAX_ON_BOARD,
@@ -29,7 +29,7 @@ import { decideBotAction } from './BotBrain';
 // How many face-down cards are offered for a chance/community-chest pick
 const CARD_CHOICE_COUNT = 4;
 // Max held action cards a player can carry (beyond this, drawn ones are discarded)
-const MAX_HELD_CARDS = 5;
+const MAX_HELD_CARDS = 6;
 
 export class GameManager {
   state: GameState;
@@ -108,6 +108,7 @@ export class GameManager {
       god: null,
       consecutiveDoubles: 0,
       skipNextTurn: false,
+      freeBuildPending: false,
       status: 'active',
       totalRentCollected: 0,
       totalRentPaid: 0,
@@ -145,6 +146,8 @@ export class GameManager {
       player.houses = {};
       player.stocks = [];
       player.god = null;
+      player.skipNextTurn = false;
+      player.freeBuildPending = false;
       player.status = 'active';
     }
 
@@ -259,7 +262,13 @@ export class GameManager {
     const err = this.engine.validateBuildHouse(tileIndex);
     if (err) return { success: false, error: err };
 
-    this.engine.executeBuildHouse(tileIndex);
+    // 免费建屋卡激活时，本次建房不扣款
+    const free = this.currentPlayer.freeBuildPending;
+    this.engine.executeBuildHouse(tileIndex, free);
+    if (free) {
+      this.currentPlayer.freeBuildPending = false;
+      this.addLog(`${this.currentPlayer.name} 的免费建屋卡已消耗`, 'info', `${this.currentPlayer.name}'s Free-Build card consumed`);
+    }
     this.emitChange();
     return { success: true };
   }
@@ -349,6 +358,24 @@ export class GameManager {
     ) {
       next = (next + 1) % this.state.players.length;
       attempts++;
+    }
+
+    // Skip players flagged to miss their turn (跳回合卡)
+    let skipGuard = 0;
+    while (this.state.players[next].skipNextTurn && skipGuard < this.state.players.length) {
+      const skipped = this.state.players[next];
+      skipped.skipNextTurn = false;
+      this.addLog(`⏭️ ${skipped.name} 的回合被跳过`, 'info', `⏭️ ${skipped.name}'s turn skipped`);
+      next = (next + 1) % this.state.players.length;
+      let guard = 0;
+      while (
+        (this.state.players[next].status === 'bankrupt' || this.state.players[next].isSpectator) &&
+        guard < this.state.players.length
+      ) {
+        next = (next + 1) % this.state.players.length;
+        guard++;
+      }
+      skipGuard++;
     }
 
     // Only increment round when wrapping around to first player
@@ -475,10 +502,22 @@ export class GameManager {
       deck.push(...shuffle(cards.map((_, i) => i)));
     }
 
-    const options: { idx: number }[] = [];
-    for (let i = 0; i < CARD_CHOICE_COUNT; i++) {
-      options.push({ idx: deck.pop()! });
+    // Guarantee at least one holdable (action) card among the face-down options,
+    // so every card-tile landing has a real chance to net a hand card.
+    const picked: number[] = [];
+    const holdIdx = deck.find(idx => cards[idx].hold);
+    if (holdIdx !== undefined) {
+      const removeAt = deck.indexOf(holdIdx);
+      if (removeAt !== -1) {
+        deck.splice(removeAt, 1);
+        picked.push(holdIdx);
+      }
     }
+    while (picked.length < CARD_CHOICE_COUNT) {
+      picked.push(deck.pop()!);
+    }
+
+    const options: { idx: number }[] = shuffle(picked).map(idx => ({ idx }));
 
     this.state.cardChoice = { type, options };
     this.state.phase = 'cardChoice';
@@ -724,13 +763,63 @@ export class GameManager {
       return { success: true };
     }
 
-    // Rob card — steal from a target player
-    if (card.effect.kind !== 'rob') return { success: false, error: '此卡不能在此使用' };
+    // 免费建屋卡 — activate a free-build buff (next build costs nothing)
+    if (card.effect.kind === 'buildFree') {
+      if (player.freeBuildPending) return { success: false, error: '免费建屋效果已激活' };
+      player.freeBuildPending = true;
+      player.heldCards = player.heldCards.filter(id => id !== cardId);
+      this.addLog(`🏗️ ${player.name} 使用免费建屋卡，下次建房免费`, 'info', `🏗️ ${player.name} used Free-Build card — next build is free`);
+      this.emitEvent({ kind: 'cardUsed', playerId: player.id, cardId, description: card.description, descriptionCN: card.descriptionCN });
+      this.emitChange();
+      return { success: true };
+    }
 
+    // Target-based active cards (skipTurn / stealProperty / swapPositions / rob)
     const target = this.state.players.find(p => p.id === targetId);
     if (!target || target.id === player.id || target.status === 'bankrupt' || target.isSpectator) {
       return { success: false, error: '无效的目标玩家' };
     }
+
+    // 跳回合卡 — make the target skip their next turn
+    if (card.effect.kind === 'skipTurn') {
+      target.skipNextTurn = true;
+      player.heldCards = player.heldCards.filter(id => id !== cardId);
+      this.addLog(`⏭️ ${player.name} 对 ${target.name} 使用跳回合卡`, 'info', `⏭️ ${player.name} used Skip-Turn card on ${target.name}`);
+      this.emitEvent({ kind: 'cardUsed', playerId: player.id, cardId, description: card.description, descriptionCN: card.descriptionCN, targetId: target.id });
+      this.emitChange();
+      return { success: true };
+    }
+
+    // 强征地产卡 — steal one unimproved property from the target
+    if (card.effect.kind === 'stealProperty') {
+      const stealable = target.properties.filter(idx => !target.houses[idx] && getPropertyDef(idx));
+      if (stealable.length === 0) return { success: false, error: '目标没有可强征的无建筑地产' };
+      const stolenIdx = stealable[0];
+      target.properties = target.properties.filter(idx => idx !== stolenIdx);
+      player.properties.push(stolenIdx);
+      player.heldCards = player.heldCards.filter(id => id !== cardId);
+      const prop = getPropertyDef(stolenIdx)!;
+      this.addLog(`🏛️ ${player.name} 强征了 ${target.name} 的「${prop.nameCN}」`, 'info', `🏛️ ${player.name} claimed ${prop.nameEN} from ${target.name}`);
+      this.emitEvent({ kind: 'cardUsed', playerId: player.id, cardId, description: card.description, descriptionCN: card.descriptionCN, targetId: target.id });
+      this.emitChange();
+      return { success: true };
+    }
+
+    // 移形换位卡 — swap board positions with the target
+    if (card.effect.kind === 'swapPositions') {
+      if (target.status === 'jailed') return { success: false, error: '不能与在押玩家换位' };
+      const tmpPos = player.position; const tmpRing = player.groundRing; const tmpIR = player.innerCityRing; const tmpIS = player.innerCitySector;
+      player.position = target.position; player.groundRing = target.groundRing; player.innerCityRing = target.innerCityRing; player.innerCitySector = target.innerCitySector;
+      target.position = tmpPos; target.groundRing = tmpRing; target.innerCityRing = tmpIR; target.innerCitySector = tmpIS;
+      player.heldCards = player.heldCards.filter(id => id !== cardId);
+      this.addLog(`🌀 ${player.name} 与 ${target.name} 交换了位置`, 'info', `🌀 ${player.name} swapped positions with ${target.name}`);
+      this.emitEvent({ kind: 'cardUsed', playerId: player.id, cardId, description: card.description, descriptionCN: card.descriptionCN, targetId: target.id });
+      this.emitChange();
+      return { success: true };
+    }
+
+    // Rob card — steal from a target player
+    if (card.effect.kind !== 'rob') return { success: false, error: '此卡不能在此使用' };
 
     const stolen = Math.min(card.effect.amount, target.cash);
     target.cash -= stolen;

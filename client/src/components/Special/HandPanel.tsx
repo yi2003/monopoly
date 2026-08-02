@@ -11,17 +11,43 @@ import { useUIStore } from '../../store/uiStore';
 import { useI18n } from '../../i18n/useI18n';
 import { getSocket } from '../../network/socket';
 
+const TARGET_CARD_KINDS = ['rob', 'skipTurn', 'stealProperty', 'swapPositions'];
+const ACTIVE_NO_TARGET_KINDS = ['dismissGod', 'summonGod', 'buildFree'];
+
 export default function HandPanel() {
   const gameState = useGameStore(s => s.gameState);
   const playerId = useGameStore(s => s.playerId);
   const showHandModal = useUIStore(s => s.showHandModal);
   const toggleHandModal = useUIStore(s => s.toggleHandModal);
   const { t, lang } = useI18n();
-  const [robTargetFor, setRobTargetFor] = useState<number | null>(null);
+  const [targetFor, setTargetFor] = useState<number | null>(null);
+
+  const targetTitle = (kind: string): string => {
+    switch (kind) {
+      case 'rob': return t('rob.chooseTarget');
+      case 'skipTurn': return t('card.skipTurnTarget');
+      case 'stealProperty': return t('card.stealTarget');
+      case 'swapPositions': return t('card.swapTarget');
+      default: return t('rob.chooseTarget');
+    }
+  };
+
+  const actionLabel = (kind: string): string => {
+    switch (kind) {
+      case 'rob': return t('rob.steal');
+      case 'skipTurn': return t('card.skipTurnUse');
+      case 'stealProperty': return t('card.stealUse');
+      case 'swapPositions': return t('card.swapUse');
+      case 'dismissGod': return t('hand.dismiss');
+      case 'summonGod': return t('hand.summon');
+      case 'buildFree': return t('card.buildFreeUse');
+      default: return t('hand.use');
+    }
+  };
 
   // Reset target picker when the panel is closed
   useEffect(() => {
-    if (!showHandModal) setRobTargetFor(null);
+    if (!showHandModal) setTargetFor(null);
   }, [showHandModal]);
 
   if (!showHandModal || !gameState) return null;
@@ -32,12 +58,11 @@ export default function HandPanel() {
     .map(id => allCards.find(c => c.id === id))
     .filter((c): c is NonNullable<typeof c> => !!c);
 
-  const robCard = held.find(c => c.effect.kind === 'rob');
   const targets = gameState.players.filter(p => p.id !== playerId && p.status !== 'bankrupt' && !p.isSpectator);
 
-  const handleRobTarget = (targetId: string) => {
-    if (!robCard) return;
-    getSocket()?.emit('useHeldCard', { cardId: robCard.id, targetId });
+  const handleTargetPick = (targetId: string) => {
+    if (targetFor === null) return;
+    getSocket()?.emit('useHeldCard', { cardId: targetFor, targetId });
     toggleHandModal();
   };
 
@@ -56,15 +81,15 @@ export default function HandPanel() {
           <div className="hand-list">
             {held.map(card => {
               const name = lang === 'zh' ? card.descriptionCN : card.description;
-              const isRob = card.effect.kind === 'rob';
-              const isActiveNoTarget = card.effect.kind === 'dismissGod' || card.effect.kind === 'summonGod';
+              const isTarget = TARGET_CARD_KINDS.includes(card.effect.kind);
+              const isActiveNoTarget = ACTIVE_NO_TARGET_KINDS.includes(card.effect.kind);
               return (
                 <div key={card.id} className="hand-card">
                   <div className="hand-card-name">{name}</div>
-                  {isRob ? (
-                    robTargetFor === card.id ? (
+                  {isTarget ? (
+                    targetFor === card.id ? (
                       <div className="rob-targets">
-                        <div className="rob-targets-title">{t('rob.chooseTarget')}</div>
+                        <div className="rob-targets-title">{targetTitle(card.effect.kind)}</div>
                         {targets.length === 0 ? (
                           <div className="hand-empty">—</div>
                         ) : (
@@ -72,7 +97,7 @@ export default function HandPanel() {
                             <button
                               key={p.id}
                               className="btn btn-sm btn-outline rob-target"
-                              onClick={() => handleRobTarget(p.id)}
+                              onClick={() => handleTargetPick(p.id)}
                             >
                               <span>{p.name}</span>
                               <span className="rob-target-cash">${p.cash.toLocaleString()}</span>
@@ -81,8 +106,8 @@ export default function HandPanel() {
                         )}
                       </div>
                     ) : (
-                      <button className="btn btn-sm btn-primary hand-use" onClick={() => setRobTargetFor(card.id)}>
-                        {t('hand.use')} · {t('rob.steal')}
+                      <button className="btn btn-sm btn-primary hand-use" onClick={() => setTargetFor(card.id)}>
+                        {t('hand.use')} · {actionLabel(card.effect.kind)}
                       </button>
                     )
                   ) : isActiveNoTarget ? (
@@ -93,7 +118,7 @@ export default function HandPanel() {
                         toggleHandModal();
                       }}
                     >
-                      {card.effect.kind === 'dismissGod' ? t('hand.dismiss') : t('hand.summon')}
+                      {actionLabel(card.effect.kind)}
                     </button>
                   ) : (
                     <div className="hand-passive">

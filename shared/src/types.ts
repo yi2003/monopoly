@@ -116,6 +116,7 @@ export interface Player {
   god: { kind: GodKind; turnsLeft: number } | null; // attached god spirit
   consecutiveDoubles: number;
   skipNextTurn: boolean;
+  freeBuildPending: boolean; // 免费建屋卡已激活 — next house build costs nothing
   status: PlayerStatus;
 
   // Stats
@@ -204,7 +205,11 @@ export type CardEffect =
   | { kind: 'doubleRent' } // charge 2× rent when an opponent lands on your property
   | { kind: 'rob'; amount: number } // steal from a target player on your turn
   | { kind: 'dismissGod' } // 送神卡 — dismiss the god attached to you
-  | { kind: 'summonGod' }; // 请神卡 — summon the nearest god within view onto yourself
+  | { kind: 'summonGod' } // 请神卡 — summon the nearest god within view onto yourself
+  | { kind: 'skipTurn' } // 跳回合卡 — make a target player skip their next turn
+  | { kind: 'buildFree' } // 免费建屋卡 — your next house build is free
+  | { kind: 'stealProperty' } // 强征地产卡 — steal one unimproved property from a target
+  | { kind: 'swapPositions' }; // 移形换位卡 — swap board positions with a target
 
 // ---- Stocks ----
 

@@ -412,6 +412,8 @@ export const CHANCE_CARDS: Card[] = [
   { id: 501, type: 'chance', hold: true, description: 'Double-Rent Card: collect 2× rent once', descriptionCN: '双倍租金卡：收取一次双倍租金', effect: { kind: 'doubleRent' } },
   { id: 502, type: 'chance', hold: true, description: 'Rob Card: steal $100 from any player', descriptionCN: '偷钱卡：偷走一名玩家$100', effect: { kind: 'rob', amount: 100 } },
   { id: 504, type: 'chance', hold: true, description: 'Invite Card: summon the nearest god within view', descriptionCN: '请神卡：召唤视野内最近的神仙附身', effect: { kind: 'summonGod' } },
+  { id: 505, type: 'chance', hold: true, description: 'Skip-Turn Card: make a player miss their next turn', descriptionCN: '跳回合卡：让一名对手跳过下回合', effect: { kind: 'skipTurn' } },
+  { id: 506, type: 'chance', hold: true, description: 'Swap Positions Card: swap board positions with a player', descriptionCN: '移形换位卡：和一名玩家交换位置', effect: { kind: 'swapPositions' } },
 ];
 
 // ---- Theme-specific Extra Chance Cards ----
@@ -460,6 +462,8 @@ export const COMMUNITY_CHEST_CARDS: Card[] = [
   // Held action cards — drawn into hand, played later
   { id: 500, type: 'community_chest', hold: true, description: 'Rent-Free Card: skip one rent payment', descriptionCN: '免租卡：免付一次租金', effect: { kind: 'rentFree' } },
   { id: 503, type: 'community_chest', hold: true, description: 'Send-Away Card: dismiss a god attached to you', descriptionCN: '送神卡：送走附身在你身上的神仙', effect: { kind: 'dismissGod' } },
+  { id: 507, type: 'community_chest', hold: true, description: 'Free Build Card: build one house for free', descriptionCN: '免费建屋卡：免费建一栋房子', effect: { kind: 'buildFree' } },
+  { id: 508, type: 'community_chest', hold: true, description: 'Property Claim Card: steal one unimproved property', descriptionCN: '强征地产卡：抢走对手一块无建筑的地', effect: { kind: 'stealProperty' } },
 ];
 
 // ---- God spirit constants ----

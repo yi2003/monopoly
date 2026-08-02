@@ -245,6 +245,7 @@ export default function HUD() {
                 {p.status === 'jailed' && ' 🔒'}
                 {p.god && (p.god.kind === 'wealth' ? ' 😇' : ' 👿')}
                 {p.god && ` ×${p.god.turnsLeft}`}
+                {p.freeBuildPending && ' 🏗️'}
               </span>
               <span className={`player-card-cash ${cashFlash[p.id] ? 'pulse-' + cashFlash[p.id] : ''}`}>${p.cash.toLocaleString()}</span>
             </div>

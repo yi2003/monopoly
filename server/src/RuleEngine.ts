@@ -318,13 +318,17 @@ export class RuleEngine {
     return null;
   }
 
-  executeBuildHouse(tileIndex: number): void {
+  executeBuildHouse(tileIndex: number, free = false): void {
     const player = this.currentPlayer;
     const prop = getPropertyDef(tileIndex)!;
     player.houses[tileIndex] = (player.houses[tileIndex] || 0) + 1;
-    player.cash -= prop.houseCost;
+    if (!free) player.cash -= prop.houseCost;
     const count = player.houses[tileIndex];
-    this.addLog(`${player.name} 在 ${prop.nameCN} 建造了${count === 5 ? '酒店' : `第${count}栋房屋`} ($${prop.houseCost})`, 'buy', `${player.name} built ${count === 5 ? 'a hotel' : `${count} house(s)`} on ${prop.nameEN} ($${prop.houseCost})`);
+    if (free) {
+      this.addLog(`${player.name} 在 ${prop.nameCN} 免费建造了${count === 5 ? '酒店' : `第${count}栋房屋`}`, 'buy', `${player.name} built ${count === 5 ? 'a hotel' : `${count} house(s)`} for free on ${prop.nameEN}`);
+    } else {
+      this.addLog(`${player.name} 在 ${prop.nameCN} 建造了${count === 5 ? '酒店' : `第${count}栋房屋`} ($${prop.houseCost})`, 'buy', `${player.name} built ${count === 5 ? 'a hotel' : `${count} house(s)`} on ${prop.nameEN} ($${prop.houseCost})`);
+    }
   }
 
   validateSellHouse(tileIndex: number): string | null {
@@ -375,6 +379,7 @@ export class RuleEngine {
       player.stocks = [];
       player.heldCards = [];
       player.god = null;
+      player.freeBuildPending = false;
       player.cash = 0;
       this.addLog(`💀 ${player.name} 破产！全部资产 → ${creditor.name}`, 'bankrupt', `💀 ${player.name} bankrupt! Assets → ${creditor.name}`);
     } else {
@@ -384,6 +389,7 @@ export class RuleEngine {
       player.stocks = [];
       player.heldCards = [];
       player.god = null;
+      player.freeBuildPending = false;
       player.cash = 0;
       this.addLog(`💀 ${player.name} 破产！资产回归银行`, 'bankrupt', `💀 ${player.name} bankrupt! Assets returned to bank`);
     }

@@ -199,6 +199,7 @@ io.on('connection', (socket) => {
       god: null,
       consecutiveDoubles: 0,
       skipNextTurn: false,
+      freeBuildPending: false,
       status: 'active',
       totalRentCollected: 0,
       totalRentPaid: 0,
@@ -280,6 +281,7 @@ io.on('connection', (socket) => {
         gamePlayer.god = null;
         gamePlayer.consecutiveDoubles = 0;
         gamePlayer.skipNextTurn = false;
+        gamePlayer.freeBuildPending = false;
         gamePlayer.status = 'active';
         game.state.players.push(gamePlayer);
       }

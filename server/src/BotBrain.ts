@@ -62,9 +62,19 @@ function decideRollingAction(state: GameState, player: Player): BotDecision {
   const godAction = maybeHandleGod(state, player);
   if (godAction) return godAction;
 
+  // New action cards (skip-turn / steal-property / swap-positions)
+  const attack = maybeUseNewActionCards(state, player);
+  if (attack) return attack;
+
   // Consider using a rob card
   const rob = maybeRob(state, player);
   if (rob) return rob;
+
+  // Bank a free-build card right before an imminent build
+  const buildFreeId = findHeldCardId(player, state.cards, 'buildFree');
+  if (buildFreeId !== undefined && !player.freeBuildPending && findBestBuild(state, player) !== null) {
+    return { action: 'useHeldCard', cardId: buildFreeId, delay: REGULAR_DELAY };
+  }
 
   // Consider building before rolling
   const buildTarget = findBestBuild(state, player);
@@ -120,9 +130,19 @@ function decideAwaitEndAction(state: GameState, player: Player): BotDecision {
   const godAction = maybeHandleGod(state, player);
   if (godAction) return godAction;
 
+  // New action cards (skip-turn / steal-property / swap-positions)
+  const attack = maybeUseNewActionCards(state, player);
+  if (attack) return attack;
+
   // Consider using a rob card
   const rob = maybeRob(state, player);
   if (rob) return rob;
+
+  // Bank a free-build card right before an imminent build
+  const buildFreeId = findHeldCardId(player, state.cards, 'buildFree');
+  if (buildFreeId !== undefined && !player.freeBuildPending && findBestBuild(state, player) !== null) {
+    return { action: 'useHeldCard', cardId: buildFreeId, delay: REGULAR_DELAY };
+  }
 
   // Try to build
   const buildTarget = findBestBuild(state, player);
@@ -187,6 +207,53 @@ function pickRichestActiveOpponent(state: GameState, selfId: string): Player | n
   for (const p of state.players) {
     if (p.id === selfId || p.isSpectator || p.status === 'bankrupt') continue;
     if (!best || p.cash > best.cash) best = p;
+  }
+  return best;
+}
+
+function maybeUseNewActionCards(state: GameState, player: Player): BotDecision | null {
+  // 跳回合卡 — deny the richest opponent their next turn
+  const skipId = findHeldCardId(player, state.cards, 'skipTurn');
+  if (skipId !== undefined && Math.random() < 0.4) {
+    const target = pickRichestActiveOpponent(state, player.id);
+    if (target) return { action: 'useHeldCard', cardId: skipId, targetId: target.id, delay: REGULAR_DELAY };
+  }
+
+  // 强征地产卡 — claim an unimproved property from the richest holder
+  const stealId = findHeldCardId(player, state.cards, 'stealProperty');
+  if (stealId !== undefined && Math.random() < 0.5) {
+    const target = pickOpponentWithUnimproved(state, player.id);
+    if (target) return { action: 'useHeldCard', cardId: stealId, targetId: target.id, delay: REGULAR_DELAY };
+  }
+
+  // 移形换位卡 — teleport ahead of the furthest opponent
+  const swapId = findHeldCardId(player, state.cards, 'swapPositions');
+  if (swapId !== undefined && Math.random() < 0.35) {
+    const target = pickAheadOpponent(state, player);
+    if (target) return { action: 'useHeldCard', cardId: swapId, targetId: target.id, delay: REGULAR_DELAY };
+  }
+
+  return null;
+}
+
+/** Richest opponent who owns at least one unimproved color property */
+function pickOpponentWithUnimproved(state: GameState, selfId: string): Player | null {
+  let best: Player | null = null;
+  for (const p of state.players) {
+    if (p.id === selfId || p.isSpectator || p.status === 'bankrupt') continue;
+    const hasUnimproved = p.properties.some(idx => !p.houses[idx] && getPropertyDef(idx));
+    if (!hasUnimproved) continue;
+    if (!best || p.cash > best.cash) best = p;
+  }
+  return best;
+}
+
+/** Non-jailed opponent who is furthest ahead on the board (past the caller) */
+function pickAheadOpponent(state: GameState, player: Player): Player | null {
+  let best: Player | null = null;
+  for (const p of state.players) {
+    if (p.id === player.id || p.isSpectator || p.status === 'bankrupt' || p.status === 'jailed') continue;
+    if (p.position > player.position && (!best || p.position > best.position)) best = p;
   }
   return best;
 }
