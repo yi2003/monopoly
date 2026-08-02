@@ -7,9 +7,9 @@ import type { GameState, CameraMode } from '@monopoly/shared';
 import type { FirstPersonController } from '../roam/FirstPersonController';
 import { getCharacterTilePos } from '@monopoly/shared';
 
-const ORBIT_MIN = 28;
-const ORBIT_MAX = 150;
-const ORBIT_DEFAULT = 90;
+const ORBIT_MIN = 48;
+const ORBIT_MAX = 170;
+const ORBIT_DEFAULT = 105;
 const THIRD_PERSON_DISTANCE = 18;
 const THIRD_PERSON_HEIGHT = 10;
 

@@ -9,6 +9,7 @@ import {
   TOKYO_EXTRA_CHANCE_CARDS, TOKYO_EXTRA_COMMUNITY_CHEST_CARDS,
   GO_SALARY,
   JAIL_FINE, CORNER_GO, CORNER_JAIL, CORNER_GOTO_JAIL,
+  OUTER_RING_OFFSET, GROUND_INNER_RING_SIZE, RAILWAYS,
   PLAYER_COLORS, DEFAULT_AVATAR,
 } from '@monopoly/shared';
 import { getEffectiveConfig, THEMES } from '@monopoly/shared';
@@ -650,8 +651,8 @@ export class GameManager {
       }
 
       case 'moveBack': {
-        const ringStart = player.groundRing === 'inner' ? 0 : 72;
-        const ringSize = 48;
+        const ringStart = player.groundRing === 'inner' ? 0 : OUTER_RING_OFFSET;
+        const ringSize = GROUND_INNER_RING_SIZE;
         const localPos = player.position - ringStart;
         const newLocalPos = localPos - effect.spaces;
         player.position = newLocalPos < 0 ? ringStart + ringSize + newLocalPos : ringStart + newLocalPos;
@@ -1148,7 +1149,7 @@ export class GameManager {
     player.cash -= fee;
     player.innerCityRing = 1; // outer ring (1-based: 1=outer, 2=middle, 3=inner)
     player.innerCitySector = sector;
-    player.position = 48 + sector; // First tile of outer ring
+    player.position = GROUND_INNER_RING_SIZE + sector; // First tile of outer ring
     this.addLog(`${player.name} 进入内城`, 'info', `${player.name} entered inner city`);
     this.emitChange();
     return { success: true };
@@ -1159,8 +1160,8 @@ export class GameManager {
     player.innerCityRing = 0;
     player.innerCitySector = 0;
     player.groundRing = 'inner';
-    // Exit to nearest railway on inner ground ring
-    const railways = [5, 11, 17, 29, 35, 41];
+    // Exit to a random railway on the inner ground ring
+    const railways = RAILWAYS.map(r => r.index);
     player.position = railways[Math.floor(Math.random() * railways.length)];
     this.addLog(`${player.name} 离开内城`, 'info', `${player.name} left inner city`);
     this.emitChange();
@@ -1185,8 +1186,8 @@ export class GameManager {
     player.groundRing = toRing;
 
     // Map to corresponding railway on target ring
-    const localIdx = (player.position >= 72) ? player.position - 72 : player.position;
-    player.position = toRing === 'outer' ? 72 + localIdx : localIdx;
+    const localIdx = (player.position >= OUTER_RING_OFFSET) ? player.position - OUTER_RING_OFFSET : player.position;
+    player.position = toRing === 'outer' ? OUTER_RING_OFFSET + localIdx : localIdx;
 
     // Process landing on new tile (may enter buying / rentChoice)
     this.state.ringTransferred = true;

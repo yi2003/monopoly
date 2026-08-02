@@ -54,6 +54,9 @@ export type ColorGroup =
   | 'plum'
   | 'green'
   | 'blue'
+  | 'gray'
+  | 'indigo'
+  | 'crimson'
   // Outer ring groups
   | 'outer_amber'
   | 'outer_mint'
@@ -65,6 +68,9 @@ export type ColorGroup =
   | 'outer_ruby'
   | 'outer_copper'
   | 'outer_navy'
+  | 'outer_aqua'
+  | 'outer_olive'
+  | 'outer_silver'
   | 'railway'
   | 'utility';
 
@@ -102,7 +108,7 @@ export interface Player {
   autoPilot: boolean; // human player enabled auto-play
 
   cash: number;
-  position: number; // tile index 0-119
+  position: number; // tile index 0-143
   innerCityRing: number; // 0=on ground ring, 1=outer, 2=middle, 3=inner
   innerCitySector: number; // 0-7
   groundRing: 'inner' | 'outer'; // which ground ring (when innerCityRing === 0)
@@ -276,7 +282,7 @@ export type WheelEffect =
 export interface GodEntity {
   id: number;
   kind: GodKind;
-  tileIndex: number; // ground tile (0-47 inner ring, 72-119 outer ring)
+  tileIndex: number; // ground tile (0-59 inner ring, 84-143 outer ring)
 }
 
 // ---- Held action card prompt (rent decision) ----

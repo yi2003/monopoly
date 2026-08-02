@@ -6,6 +6,7 @@
 import type { GameState, Player, Tile } from '@monopoly/shared';
 import {
   OUTER_RING_OFFSET,
+  GROUND_INNER_RING_SIZE,
   GROUP_COLORS,
   calcPropertyRent, calcRailwayRent, calcUtilityRent,
   getEffectiveConfig, THEMES,
@@ -26,20 +27,20 @@ export interface DicePreviewEntry {
 function targetPosition(player: Player, steps: number): number {
   if (player.innerCityRing > 0) {
     // Inner city: circular within the current 8-tile ring
-    const ringOffset = 48 + (player.innerCityRing - 1) * 8;
+    const ringOffset = GROUND_INNER_RING_SIZE + (player.innerCityRing - 1) * 8;
     const local = (player.position - ringOffset + steps) % 8;
     return ringOffset + (local < 0 ? local + 8 : local);
   }
-  // Ground ring: wrap at 48 tiles
+  // Ground ring: wrap at ring size tiles
   const ringStart = player.groundRing === 'inner' ? 0 : OUTER_RING_OFFSET;
-  const ringSize = 48;
+  const ringSize = GROUND_INNER_RING_SIZE;
   return ringStart + (((player.position - ringStart) + steps) % ringSize);
 }
 
 function passesGo(player: Player, steps: number): boolean {
   if (player.innerCityRing > 0) return false;
   const ringStart = player.groundRing === 'inner' ? 0 : OUTER_RING_OFFSET;
-  const ringSize = 48;
+  const ringSize = GROUND_INNER_RING_SIZE;
   return (player.position - ringStart) + steps >= ringSize;
 }
 

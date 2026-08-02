@@ -1,9 +1,9 @@
 // ============================================================
-// Board — inner ground-ring tiles (0-47) + outer ground-ring tiles (72-119)
+// Board — inner ground-ring tiles (0-59) + outer ground-ring tiles (84-143)
 // ============================================================
 
 import * as THREE from 'three';
-import type { GameState } from '@monopoly/shared';
+import type { GameState, Tile } from '@monopoly/shared';
 import { getModelClone } from './ModelLoader';
 import { TREE_MODEL_URL } from './CityBuilder';
 import { tileSlabTex } from '../textures/surfaces';
@@ -11,12 +11,13 @@ import {
   GROUP_COLORS, ALL_PROPERTIES, ALL_RAILWAYS, ALL_UTILITIES,
   TILE_W, TILE_D, CORNER_SIZE, INNER_BOARD_HALF, OUTER_BOARD_HALF,
   GROUND_INNER_RING_SIZE, GROUND_OUTER_RING_SIZE, OUTER_RING_OFFSET,
-  getGroundTilePosition, isCornerIndex,
+  getGroundTilePosition, isCornerIndex, createTiles,
 } from '@monopoly/shared';
 
 export class Board {
   private scene: THREE.Scene;
   private group: THREE.Group;
+  private tiles: Tile[] = [];
   private tileMeshes: Map<number, THREE.Group> = new Map();
   private ownerRings: Map<number, THREE.Mesh> = new Map();
 
@@ -36,6 +37,7 @@ export class Board {
     this.scene = scene;
     this.group = new THREE.Group();
     this.scene.add(this.group);
+    this.tiles = createTiles();
     this.build();
   }
 
@@ -149,6 +151,21 @@ export class Board {
     }
   }
 
+  /** Tile type for an index, from the shared tile definitions (data-driven, no magic indices). */
+  private tileType(index: number): Tile['type'] | undefined {
+    return this.tiles[index]?.type;
+  }
+
+  /** Which utility variant a tile is, for its marker. */
+  private utilityKind(index: number): 'electric' | 'water' | 'telecom' | 'gas' | undefined {
+    const def = ALL_UTILITIES.find(u => u.index === index);
+    if (!def) return undefined;
+    if (def.nameEN.includes('Electric')) return 'electric';
+    if (def.nameEN.includes('Water')) return 'water';
+    if (def.nameEN.includes('Telecom')) return 'telecom';
+    return 'gas';
+  }
+
   private buildTile(index: number): void {
     const pos = getGroundTilePosition(index);
     const tileGroup = new THREE.Group();
@@ -203,21 +220,19 @@ export class Board {
     }
 
     // Utility icon
-    if (ALL_UTILITIES.some(u => u.index === index)) {
+    const utilKind = this.utilityKind(index);
+    if (utilKind) {
+      const iconColor = utilKind === 'electric' ? '#FFD700' : utilKind === 'water' ? '#2196F3' : utilKind === 'telecom' ? '#00E5FF' : '#FF9800';
+      const iconEmissive = utilKind === 'electric' ? '#FFA000' : utilKind === 'water' ? '#1565C0' : utilKind === 'telecom' ? '#00838F' : '#E65100';
       const iconGeo = new THREE.SphereGeometry(0.3, 16, 16);
-      const iconMat = new THREE.MeshStandardMaterial({
-        color: index === 14 ? '#FFD700' : '#2196F3',
-        roughness: 0.2,
-        emissive: index === 14 ? '#FFA000' : '#1565C0',
-        emissiveIntensity: 0.4,
-      });
+      const iconMat = new THREE.MeshStandardMaterial({ color: iconColor, roughness: 0.2, emissive: iconEmissive, emissiveIntensity: 0.4 });
       const icon = new THREE.Mesh(iconGeo, iconMat);
       icon.position.set(0, 0.45, 0);
       tileGroup.add(icon);
     }
 
     // Special tiles
-    if (index === 0) {
+    if (this.tileType(index) === 'go') {
       // GO: golden arrow
       const arrowShape = new THREE.Shape();
       arrowShape.moveTo(0, 0.5);
@@ -238,7 +253,7 @@ export class Board {
       tileGroup.add(arrow);
     }
 
-    if (index === 12) {
+    if (this.tileType(index) === 'jail') {
       // Jail: bars
       for (let b = 0; b < 4; b++) {
         const barGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.5, 8);
@@ -249,7 +264,7 @@ export class Board {
       }
     }
 
-    if (index === 24) {
+    if (this.tileType(index) === 'stock_market') {
       // Stock market: bar chart
       const barData = [0.6, 0.9, 0.5, 1.2, 0.8];
       barData.forEach((h, b) => {
@@ -264,7 +279,7 @@ export class Board {
       });
     }
 
-    if (index === 38) {
+    if (this.tileType(index) === 'wheel') {
       // Wheel: circular disc with sectors
       const discGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.1, 32);
       const discMat = new THREE.MeshStandardMaterial({ color: '#FF6F00', roughness: 0.4 });
@@ -284,7 +299,7 @@ export class Board {
     }
 
     // Chance: spinning "?" cube
-    if ([7, 26, 42].includes(index)) {
+    if (this.tileType(index) === 'chance') {
       const qGroup = new THREE.Group();
       const qGeo = new THREE.BoxGeometry(0.55, 0.55, 0.55);
       const qMat = new THREE.MeshStandardMaterial({ color: '#FF9800', roughness: 0.3, emissive: '#FF9800', emissiveIntensity: 0.3 });
@@ -297,7 +312,7 @@ export class Board {
     }
 
     // Community Chest: treasure chest
-    if ([2, 19].includes(index)) {
+    if (this.tileType(index) === 'community_chest') {
       const chestGroup = new THREE.Group();
       // Base box
       const chestGeo = new THREE.BoxGeometry(0.6, 0.4, 0.4);
@@ -321,7 +336,7 @@ export class Board {
     }
 
     // Tax: gold coin stack
-    if ([4, 46].includes(index)) {
+    if (this.tileType(index) === 'tax') {
       for (let c = 0; c < 3; c++) {
         const coinGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.08, 16);
         const coinMat = new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.2, metalness: 0.9 });
@@ -360,7 +375,7 @@ export class Board {
     }
 
     // Electric Company: lightning bolt
-    if (index === 14) {
+    if (utilKind === 'electric') {
       const boltShape = new THREE.Shape();
       boltShape.moveTo(0, 0);
       boltShape.lineTo(0.25, 0.6);
@@ -379,7 +394,7 @@ export class Board {
     }
 
     // Water Works: water droplet
-    if (index === 32) {
+    if (utilKind === 'water') {
       const dropGeo = new THREE.SphereGeometry(0.25, 12, 12);
       dropGeo.scale(1, 1.3, 1);
       const drop = new THREE.Mesh(dropGeo, new THREE.MeshStandardMaterial({ color: '#2196F3', roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.8 }));
@@ -402,7 +417,7 @@ export class Board {
     }
 
     // Go To Jail: police badge
-    if (index === 36) {
+    if (this.tileType(index) === 'goto_jail') {
       const badgeGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.08, 6);
       const badge = new THREE.Mesh(badgeGeo, new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.2, metalness: 0.9 }));
       badge.position.set(0, 0.25, TILE_D / 2 - 1.2);
@@ -446,7 +461,7 @@ export class Board {
     // Spin chance cubes
     const time = Date.now() * 0.001;
     for (const [idx, tileGroup] of this.tileMeshes) {
-      if ([7, 26, 42].includes(idx)) {
+      if (this.tileType(idx) === 'chance') {
         const qCube = tileGroup.getObjectByName('chanceCube');
         if (qCube) {
           qCube.rotation.y += 0.02;

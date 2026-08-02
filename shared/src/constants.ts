@@ -4,29 +4,37 @@
 
 import type { Tile, Card, Stock, WheelSector, ColorGroup, ThemeId, AvatarId } from './types';
 
-// ---- Board Layout (48 inner ground + 48 outer ground + 24 inner city) ----
+// ---- Board Layout (60 inner ground + 60 outer ground + 24 inner city) ----
 
-export const GROUND_INNER_RING_SIZE = 48;
-export const GROUND_OUTER_RING_SIZE = 48;
-export const BOARD_SIZE = GROUND_INNER_RING_SIZE + GROUND_OUTER_RING_SIZE; // 96
+export const GROUND_INNER_RING_SIZE = 60;
+export const GROUND_OUTER_RING_SIZE = 60;
+export const BOARD_SIZE = GROUND_INNER_RING_SIZE + GROUND_OUTER_RING_SIZE; // 120
 export const INNER_CITY_SIZE = 24;
-export const TOTAL_TILES = BOARD_SIZE + INNER_CITY_SIZE; // 120
-export const TILES_PER_SIDE = 12; // tiles per side (excluding wrap count)
+export const TOTAL_TILES = BOARD_SIZE + INNER_CITY_SIZE; // 144
+export const TILES_PER_SIDE = 15; // tiles per side (1 corner + 14 edge tiles) — must match boardLayout.SIDE_LENGTH
 
-// Corner tile indices — inner ring
+// Corner tile indices — inner ring (corners sit at multiples of TILES_PER_SIDE)
 export const CORNER_GO = 0;
-export const CORNER_JAIL = 12;
-export const CORNER_STOCK = 24;
-export const CORNER_GOTO_JAIL = 36;
+export const CORNER_JAIL = TILES_PER_SIDE;              // 15
+export const CORNER_STOCK = 2 * TILES_PER_SIDE;         // 30
+export const CORNER_GOTO_JAIL = 3 * TILES_PER_SIDE;     // 45
 
 // Outer ring starts after inner ring + inner city
-export const OUTER_RING_OFFSET = GROUND_INNER_RING_SIZE + INNER_CITY_SIZE; // 72
+export const OUTER_RING_OFFSET = GROUND_INNER_RING_SIZE + INNER_CITY_SIZE; // 84
 
 // Corner tile indices — outer ring
-export const OUTER_CORNER_GO = OUTER_RING_OFFSET;        // 72
-export const OUTER_CORNER_JAIL = OUTER_RING_OFFSET + 12;  // 84
-export const OUTER_CORNER_STOCK = OUTER_RING_OFFSET + 24; // 96
-export const OUTER_CORNER_GOTO_JAIL = OUTER_RING_OFFSET + 36; // 108
+export const OUTER_CORNER_GO = OUTER_RING_OFFSET;               // 84
+export const OUTER_CORNER_JAIL = OUTER_RING_OFFSET + TILES_PER_SIDE;         // 99
+export const OUTER_CORNER_STOCK = OUTER_RING_OFFSET + 2 * TILES_PER_SIDE;    // 114
+export const OUTER_CORNER_GOTO_JAIL = OUTER_RING_OFFSET + 3 * TILES_PER_SIDE; // 129
+
+// ---- Special tile positions (local index within a ring, shared by createSpecialTile & 3D renderers) ----
+// Corners are at local 0 / TILES_PER_SIDE / 2*TILES_PER_SIDE / 3*TILES_PER_SIDE.
+
+export const COMMUNITY_CHEST_LOCALS = [4, 27];
+export const CHANCE_LOCALS = [10, 29, 38, 56];
+export const TAX_LOCALS = [5, 52];
+export const WHEEL_LOCAL = 44;
 
 // ---- Property Definitions ----
 
@@ -44,102 +52,137 @@ export interface PropertyDef {
 export const PROPERTIES: PropertyDef[] = [
   // ===== Brown Group =====
   { index: 1, nameCN: '滨海小筑', nameEN: 'Seaside Cottage', group: 'brown', price: 60, rent: [2, 10, 30, 90, 160, 250], houseCost: 50, mortgageValue: 30 },
-  { index: 3, nameCN: '田园别墅', nameEN: 'Garden Villa', group: 'brown', price: 60, rent: [4, 20, 60, 180, 320, 450], houseCost: 50, mortgageValue: 30 },
+  { index: 2, nameCN: '田园别墅', nameEN: 'Garden Villa', group: 'brown', price: 60, rent: [4, 20, 60, 180, 320, 450], houseCost: 50, mortgageValue: 30 },
+  { index: 3, nameCN: '青瓦居', nameEN: 'Grey Cottage', group: 'brown', price: 60, rent: [2, 10, 30, 90, 160, 250], houseCost: 50, mortgageValue: 30 },
 
   // ===== Light Blue Group =====
-  { index: 6, nameCN: '湖滨公寓', nameEN: 'Lakeside Apt', group: 'lightblue', price: 100, rent: [6, 30, 90, 270, 400, 550], houseCost: 50, mortgageValue: 50 },
+  { index: 7, nameCN: '湖滨公寓', nameEN: 'Lakeside Apt', group: 'lightblue', price: 100, rent: [6, 30, 90, 270, 400, 550], houseCost: 50, mortgageValue: 50 },
   { index: 8, nameCN: '阳光花苑', nameEN: 'Sunshine Garden', group: 'lightblue', price: 100, rent: [6, 30, 90, 270, 400, 550], houseCost: 50, mortgageValue: 50 },
   { index: 9, nameCN: '碧水湾', nameEN: 'Crystal Bay', group: 'lightblue', price: 120, rent: [8, 40, 100, 300, 450, 600], houseCost: 50, mortgageValue: 60 },
 
   // ===== Teal Group =====
-  { index: 10, nameCN: '翡翠大道', nameEN: 'Jade Avenue', group: 'teal', price: 140, rent: [10, 50, 150, 450, 625, 750], houseCost: 100, mortgageValue: 70 },
-  { index: 22, nameCN: '明珠广场', nameEN: 'Pearl Plaza', group: 'teal', price: 140, rent: [10, 50, 150, 450, 625, 750], houseCost: 100, mortgageValue: 70 },
-  { index: 23, nameCN: '翠苑阁', nameEN: 'Emerald Court', group: 'teal', price: 160, rent: [12, 60, 180, 500, 700, 900], houseCost: 100, mortgageValue: 80 },
+  { index: 11, nameCN: '翡翠大道', nameEN: 'Jade Avenue', group: 'teal', price: 140, rent: [10, 50, 150, 450, 625, 750], houseCost: 100, mortgageValue: 70 },
+  { index: 12, nameCN: '明珠广场', nameEN: 'Pearl Plaza', group: 'teal', price: 140, rent: [10, 50, 150, 450, 625, 750], houseCost: 100, mortgageValue: 70 },
+  { index: 13, nameCN: '翠苑阁', nameEN: 'Emerald Court', group: 'teal', price: 160, rent: [12, 60, 180, 500, 700, 900], houseCost: 100, mortgageValue: 80 },
 
   // ===== Pink Group =====
-  { index: 13, nameCN: '樱花园', nameEN: 'Cherry Garden', group: 'pink', price: 180, rent: [14, 70, 200, 550, 750, 950], houseCost: 100, mortgageValue: 90 },
-  { index: 15, nameCN: '玫瑰庄园', nameEN: 'Rose Estate', group: 'pink', price: 180, rent: [14, 70, 200, 550, 750, 950], houseCost: 100, mortgageValue: 90 },
-  { index: 16, nameCN: '牡丹亭', nameEN: 'Peony Pavilion', group: 'pink', price: 200, rent: [16, 80, 220, 600, 800, 1000], houseCost: 100, mortgageValue: 100 },
+  { index: 16, nameCN: '樱花园', nameEN: 'Cherry Garden', group: 'pink', price: 180, rent: [14, 70, 200, 550, 750, 950], houseCost: 100, mortgageValue: 90 },
+  { index: 17, nameCN: '玫瑰庄园', nameEN: 'Rose Estate', group: 'pink', price: 180, rent: [14, 70, 200, 550, 750, 950], houseCost: 100, mortgageValue: 90 },
+  { index: 18, nameCN: '牡丹亭', nameEN: 'Peony Pavilion', group: 'pink', price: 200, rent: [16, 80, 220, 600, 800, 1000], houseCost: 100, mortgageValue: 100 },
 
   // ===== Orange Group =====
-  { index: 18, nameCN: '金橘里', nameEN: 'Tangerine Lane', group: 'orange', price: 220, rent: [18, 90, 250, 700, 875, 1050], houseCost: 150, mortgageValue: 110 },
-  { index: 20, nameCN: '枫林路', nameEN: 'Maple Road', group: 'orange', price: 220, rent: [18, 90, 250, 700, 875, 1050], houseCost: 150, mortgageValue: 110 },
-  { index: 21, nameCN: '橙光天地', nameEN: 'Amber Heights', group: 'orange', price: 240, rent: [20, 100, 300, 750, 925, 1100], houseCost: 150, mortgageValue: 120 },
+  { index: 20, nameCN: '金橘里', nameEN: 'Tangerine Lane', group: 'orange', price: 220, rent: [18, 90, 250, 700, 875, 1050], houseCost: 150, mortgageValue: 110 },
+  { index: 21, nameCN: '枫林路', nameEN: 'Maple Road', group: 'orange', price: 220, rent: [18, 90, 250, 700, 875, 1050], houseCost: 150, mortgageValue: 110 },
+  { index: 22, nameCN: '橙光天地', nameEN: 'Amber Heights', group: 'orange', price: 240, rent: [20, 100, 300, 750, 925, 1100], houseCost: 150, mortgageValue: 120 },
 
   // ===== Red Group =====
-  { index: 25, nameCN: '红磡广场', nameEN: 'Hung Hom Square', group: 'red', price: 260, rent: [22, 110, 330, 800, 975, 1150], houseCost: 150, mortgageValue: 130 },
-  { index: 27, nameCN: '赤霞台', nameEN: 'Crimson Terrace', group: 'red', price: 260, rent: [22, 110, 330, 800, 975, 1150], houseCost: 150, mortgageValue: 130 },
-  { index: 28, nameCN: '红河谷', nameEN: 'Red Valley', group: 'red', price: 280, rent: [24, 120, 360, 850, 1025, 1200], houseCost: 150, mortgageValue: 140 },
+  { index: 24, nameCN: '红磡广场', nameEN: 'Hung Hom Square', group: 'red', price: 260, rent: [22, 110, 330, 800, 975, 1150], houseCost: 150, mortgageValue: 130 },
+  { index: 25, nameCN: '赤霞台', nameEN: 'Crimson Terrace', group: 'red', price: 260, rent: [22, 110, 330, 800, 975, 1150], houseCost: 150, mortgageValue: 130 },
+  { index: 26, nameCN: '红河谷', nameEN: 'Red Valley', group: 'red', price: 280, rent: [24, 120, 360, 850, 1025, 1200], houseCost: 150, mortgageValue: 140 },
 
   // ===== Yellow Group =====
-  { index: 30, nameCN: '金色海岸', nameEN: 'Gold Coast', group: 'yellow', price: 300, rent: [26, 130, 390, 900, 1100, 1275], houseCost: 200, mortgageValue: 150 },
-  { index: 31, nameCN: '黄浦名邸', nameEN: 'Huangpu Mansion', group: 'yellow', price: 300, rent: [26, 130, 390, 900, 1100, 1275], houseCost: 200, mortgageValue: 150 },
+  { index: 31, nameCN: '金色海岸', nameEN: 'Gold Coast', group: 'yellow', price: 300, rent: [26, 130, 390, 900, 1100, 1275], houseCost: 200, mortgageValue: 150 },
+  { index: 32, nameCN: '黄浦名邸', nameEN: 'Huangpu Mansion', group: 'yellow', price: 300, rent: [26, 130, 390, 900, 1100, 1275], houseCost: 200, mortgageValue: 150 },
   { index: 33, nameCN: '金茂府', nameEN: 'Jinmao Residency', group: 'yellow', price: 320, rent: [28, 150, 450, 1000, 1200, 1400], houseCost: 200, mortgageValue: 160 },
 
-  // ===== Plum Group =====
-  { index: 34, nameCN: '紫晶大道', nameEN: 'Amethyst Blvd', group: 'plum', price: 350, rent: [35, 175, 500, 1100, 1300, 1500], houseCost: 200, mortgageValue: 175 },
-  { index: 44, nameCN: '丁香花园', nameEN: 'Lilac Garden', group: 'plum', price: 350, rent: [35, 175, 500, 1100, 1300, 1500], houseCost: 200, mortgageValue: 175 },
-  { index: 47, nameCN: '紫藤山庄', nameEN: 'Wisteria Hills', group: 'plum', price: 400, rent: [50, 200, 600, 1400, 1700, 2000], houseCost: 200, mortgageValue: 200 },
-
   // ===== Green Group =====
-  { index: 37, nameCN: '绿洲花园', nameEN: 'Oasis Garden', group: 'green', price: 400, rent: [50, 200, 600, 1400, 1700, 2000], houseCost: 200, mortgageValue: 200 },
-  { index: 39, nameCN: '翠湖天地', nameEN: 'Green Lake Estate', group: 'green', price: 400, rent: [50, 200, 600, 1400, 1700, 2000], houseCost: 200, mortgageValue: 200 },
-  { index: 40, nameCN: '碧桂园', nameEN: 'Jade Heights', group: 'green', price: 420, rent: [55, 220, 650, 1500, 1800, 2100], houseCost: 200, mortgageValue: 210 },
+  { index: 35, nameCN: '绿洲花园', nameEN: 'Oasis Garden', group: 'green', price: 400, rent: [50, 200, 600, 1400, 1700, 2000], houseCost: 200, mortgageValue: 200 },
+  { index: 36, nameCN: '翠湖天地', nameEN: 'Green Lake Estate', group: 'green', price: 400, rent: [50, 200, 600, 1400, 1700, 2000], houseCost: 200, mortgageValue: 200 },
+  { index: 37, nameCN: '碧桂园', nameEN: 'Jade Heights', group: 'green', price: 420, rent: [55, 220, 650, 1500, 1800, 2100], houseCost: 200, mortgageValue: 210 },
+
+  // ===== Plum Group =====
+  { index: 39, nameCN: '紫晶大道', nameEN: 'Amethyst Blvd', group: 'plum', price: 350, rent: [35, 175, 500, 1100, 1300, 1500], houseCost: 200, mortgageValue: 175 },
+  { index: 40, nameCN: '丁香花园', nameEN: 'Lilac Garden', group: 'plum', price: 350, rent: [35, 175, 500, 1100, 1300, 1500], houseCost: 200, mortgageValue: 175 },
+  { index: 41, nameCN: '紫藤山庄', nameEN: 'Wisteria Hills', group: 'plum', price: 400, rent: [50, 200, 600, 1400, 1700, 2000], houseCost: 200, mortgageValue: 200 },
 
   // ===== Blue Group =====
-  { index: 43, nameCN: '派克街', nameEN: 'Park Street', group: 'blue', price: 450, rent: [70, 280, 800, 1800, 2200, 2500], houseCost: 200, mortgageValue: 225 },
-  { index: 45, nameCN: '蓝钻广场', nameEN: 'Blue Diamond Plaza', group: 'blue', price: 480, rent: [80, 320, 880, 2000, 2400, 2800], houseCost: 200, mortgageValue: 240 },
+  { index: 46, nameCN: '派克街', nameEN: 'Park Street', group: 'blue', price: 450, rent: [70, 280, 800, 1800, 2200, 2500], houseCost: 200, mortgageValue: 225 },
+  { index: 47, nameCN: '蓝钻广场', nameEN: 'Blue Diamond Plaza', group: 'blue', price: 480, rent: [80, 320, 880, 2000, 2400, 2800], houseCost: 200, mortgageValue: 240 },
+  { index: 48, nameCN: '蓝湾公馆', nameEN: 'Blue Bay Mansion', group: 'blue', price: 500, rent: [85, 350, 950, 2100, 2500, 3000], houseCost: 200, mortgageValue: 250 },
+
+  // ===== Gray Group =====
+  { index: 49, nameCN: '灰砖巷', nameEN: 'Grey Brick Lane', group: 'gray', price: 240, rent: [20, 100, 300, 750, 925, 1100], houseCost: 150, mortgageValue: 120 },
+  { index: 50, nameCN: '银灰里', nameEN: 'Silver Grey Lane', group: 'gray', price: 260, rent: [22, 110, 330, 800, 975, 1150], houseCost: 150, mortgageValue: 130 },
+  { index: 51, nameCN: '石板街', nameEN: 'Slate Street', group: 'gray', price: 280, rent: [24, 120, 360, 850, 1025, 1200], houseCost: 150, mortgageValue: 140 },
+
+  // ===== Indigo Group =====
+  { index: 53, nameCN: '靛青路', nameEN: 'Indigo Road', group: 'indigo', price: 320, rent: [28, 150, 450, 1000, 1200, 1400], houseCost: 200, mortgageValue: 160 },
+  { index: 54, nameCN: '靛蓝坊', nameEN: 'Indigo Workshop', group: 'indigo', price: 340, rent: [30, 160, 480, 1100, 1300, 1500], houseCost: 200, mortgageValue: 170 },
+  { index: 55, nameCN: '靛紫巷', nameEN: 'Indigo Violet Lane', group: 'indigo', price: 360, rent: [35, 175, 500, 1100, 1300, 1500], houseCost: 200, mortgageValue: 180 },
+
+  // ===== Crimson Group =====
+  { index: 57, nameCN: '绯红坊', nameEN: 'Crimson Court', group: 'crimson', price: 300, rent: [26, 130, 390, 900, 1100, 1275], houseCost: 200, mortgageValue: 150 },
+  { index: 58, nameCN: '绛红里', nameEN: 'Deep Crimson Lane', group: 'crimson', price: 320, rent: [28, 150, 450, 1000, 1200, 1400], houseCost: 200, mortgageValue: 160 },
+  { index: 59, nameCN: '胭脂巷', nameEN: 'Rouge Alley', group: 'crimson', price: 340, rent: [30, 160, 480, 1100, 1300, 1500], houseCost: 200, mortgageValue: 170 },
 ];
 
-// ---- Outer Ring Property Definitions (indices 72-119) ----
+// ---- Outer Ring Property Definitions (indices 84-143) ----
 
 export const OUTER_PROPERTIES: PropertyDef[] = [
   // ===== Outer Amber Group =====
-  { index: 73, nameCN: '琥珀巷', nameEN: 'Amber Alley', group: 'outer_amber', price: 80, rent: [4, 20, 60, 180, 320, 450], houseCost: 50, mortgageValue: 40 },
-  { index: 75, nameCN: '蜜糖路', nameEN: 'Honey Lane', group: 'outer_amber', price: 100, rent: [6, 30, 90, 270, 400, 550], houseCost: 50, mortgageValue: 50 },
+  { index: 85, nameCN: '琥珀巷', nameEN: 'Amber Alley', group: 'outer_amber', price: 80, rent: [4, 20, 60, 180, 320, 450], houseCost: 50, mortgageValue: 40 },
+  { index: 86, nameCN: '蜜糖路', nameEN: 'Honey Lane', group: 'outer_amber', price: 100, rent: [6, 30, 90, 270, 400, 550], houseCost: 50, mortgageValue: 50 },
+  { index: 87, nameCN: '金沙巷', nameEN: 'Gold Sand Lane', group: 'outer_amber', price: 120, rent: [8, 40, 100, 300, 450, 600], houseCost: 50, mortgageValue: 60 },
 
   // ===== Outer Mint Group =====
-  { index: 78, nameCN: '薄荷广场', nameEN: 'Mint Plaza', group: 'outer_mint', price: 120, rent: [8, 40, 100, 300, 450, 600], houseCost: 50, mortgageValue: 60 },
-  { index: 80, nameCN: '薄荷花园', nameEN: 'Mint Garden', group: 'outer_mint', price: 120, rent: [8, 40, 100, 300, 450, 600], houseCost: 50, mortgageValue: 60 },
-  { index: 81, nameCN: '翡翠台', nameEN: 'Mint Terrace', group: 'outer_mint', price: 140, rent: [10, 50, 150, 450, 625, 750], houseCost: 100, mortgageValue: 70 },
+  { index: 91, nameCN: '薄荷广场', nameEN: 'Mint Plaza', group: 'outer_mint', price: 120, rent: [8, 40, 100, 300, 450, 600], houseCost: 50, mortgageValue: 60 },
+  { index: 92, nameCN: '薄荷花园', nameEN: 'Mint Garden', group: 'outer_mint', price: 120, rent: [8, 40, 100, 300, 450, 600], houseCost: 50, mortgageValue: 60 },
+  { index: 93, nameCN: '翡翠台', nameEN: 'Mint Terrace', group: 'outer_mint', price: 140, rent: [10, 50, 150, 450, 625, 750], houseCost: 100, mortgageValue: 70 },
 
   // ===== Outer Coral Group =====
-  { index: 85, nameCN: '珊瑚街', nameEN: 'Coral Street', group: 'outer_coral', price: 160, rent: [12, 60, 180, 500, 700, 900], houseCost: 100, mortgageValue: 80 },
-  { index: 87, nameCN: '海贝湾', nameEN: 'Shell Bay', group: 'outer_coral', price: 180, rent: [14, 70, 200, 550, 750, 950], houseCost: 100, mortgageValue: 90 },
-  { index: 88, nameCN: '海星阁', nameEN: 'Starfish Court', group: 'outer_coral', price: 200, rent: [16, 80, 220, 600, 800, 1000], houseCost: 100, mortgageValue: 100 },
+  { index: 95, nameCN: '珊瑚街', nameEN: 'Coral Street', group: 'outer_coral', price: 160, rent: [12, 60, 180, 500, 700, 900], houseCost: 100, mortgageValue: 80 },
+  { index: 96, nameCN: '海贝湾', nameEN: 'Shell Bay', group: 'outer_coral', price: 180, rent: [14, 70, 200, 550, 750, 950], houseCost: 100, mortgageValue: 90 },
+  { index: 97, nameCN: '海星阁', nameEN: 'Starfish Court', group: 'outer_coral', price: 200, rent: [16, 80, 220, 600, 800, 1000], houseCost: 100, mortgageValue: 100 },
 
   // ===== Outer Lime Group =====
-  { index: 90, nameCN: '柠檬大道', nameEN: 'Lemon Avenue', group: 'outer_lime', price: 220, rent: [18, 90, 250, 700, 875, 1050], houseCost: 150, mortgageValue: 110 },
-  { index: 92, nameCN: '青柠花园', nameEN: 'Lime Garden', group: 'outer_lime', price: 240, rent: [20, 100, 300, 750, 925, 1100], houseCost: 150, mortgageValue: 120 },
-  { index: 93, nameCN: '柑橘台', nameEN: 'Citrus Heights', group: 'outer_lime', price: 260, rent: [22, 110, 330, 800, 975, 1150], houseCost: 150, mortgageValue: 130 },
+  { index: 100, nameCN: '柠檬大道', nameEN: 'Lemon Avenue', group: 'outer_lime', price: 220, rent: [18, 90, 250, 700, 875, 1050], houseCost: 150, mortgageValue: 110 },
+  { index: 101, nameCN: '青柠花园', nameEN: 'Lime Garden', group: 'outer_lime', price: 240, rent: [20, 100, 300, 750, 925, 1100], houseCost: 150, mortgageValue: 120 },
+  { index: 102, nameCN: '柑橘台', nameEN: 'Citrus Heights', group: 'outer_lime', price: 260, rent: [22, 110, 330, 800, 975, 1150], houseCost: 150, mortgageValue: 130 },
 
   // ===== Outer Violet Group =====
-  { index: 97, nameCN: '紫罗兰路', nameEN: 'Violet Road', group: 'outer_violet', price: 280, rent: [24, 120, 360, 850, 1025, 1200], houseCost: 150, mortgageValue: 140 },
-  { index: 99, nameCN: '薰衣草巷', nameEN: 'Lavender Lane', group: 'outer_violet', price: 300, rent: [26, 130, 390, 900, 1100, 1275], houseCost: 200, mortgageValue: 150 },
-  { index: 100, nameCN: '丁香台', nameEN: 'Lilac Terrace', group: 'outer_violet', price: 320, rent: [28, 150, 450, 1000, 1200, 1400], houseCost: 200, mortgageValue: 160 },
-
-  // ===== Outer Rose Group =====
-  { index: 102, nameCN: '玫瑰大道', nameEN: 'Rose Boulevard', group: 'outer_rose', price: 350, rent: [35, 175, 500, 1100, 1300, 1500], houseCost: 200, mortgageValue: 175 },
-  { index: 103, nameCN: '芙蓉广场', nameEN: 'Hibiscus Plaza', group: 'outer_rose', price: 380, rent: [40, 200, 600, 1300, 1500, 1800], houseCost: 200, mortgageValue: 190 },
-  { index: 106, nameCN: '牡丹大道', nameEN: 'Peony Avenue', group: 'outer_rose', price: 400, rent: [50, 200, 600, 1400, 1700, 2000], houseCost: 200, mortgageValue: 200 },
-
-  // ===== Outer Sky Group =====
-  { index: 109, nameCN: '蓝天路', nameEN: 'Sky Way', group: 'outer_sky', price: 420, rent: [55, 220, 650, 1500, 1800, 2100], houseCost: 200, mortgageValue: 210 },
-  { index: 111, nameCN: '云中阁', nameEN: 'Cloud Court', group: 'outer_sky', price: 440, rent: [60, 240, 700, 1600, 1900, 2200], houseCost: 200, mortgageValue: 220 },
-  { index: 115, nameCN: '星光台', nameEN: 'Starlight Terrace', group: 'outer_sky', price: 460, rent: [65, 260, 750, 1700, 2000, 2300], houseCost: 200, mortgageValue: 230 },
+  { index: 104, nameCN: '紫罗兰路', nameEN: 'Violet Road', group: 'outer_violet', price: 280, rent: [24, 120, 360, 850, 1025, 1200], houseCost: 150, mortgageValue: 140 },
+  { index: 105, nameCN: '薰衣草巷', nameEN: 'Lavender Lane', group: 'outer_violet', price: 300, rent: [26, 130, 390, 900, 1100, 1275], houseCost: 200, mortgageValue: 150 },
+  { index: 106, nameCN: '丁香台', nameEN: 'Lilac Terrace', group: 'outer_violet', price: 320, rent: [28, 150, 450, 1000, 1200, 1400], houseCost: 200, mortgageValue: 160 },
 
   // ===== Outer Ruby Group =====
-  { index: 82, nameCN: '红宝石街', nameEN: 'Ruby Street', group: 'outer_ruby', price: 500, rent: [70, 300, 850, 1850, 2200, 2600], houseCost: 200, mortgageValue: 250 },
-  { index: 94, nameCN: '石榴石路', nameEN: 'Garnet Road', group: 'outer_ruby', price: 520, rent: [75, 320, 880, 1900, 2300, 2700], houseCost: 200, mortgageValue: 260 },
-  { index: 107, nameCN: '钻石广场', nameEN: 'Diamond Plaza', group: 'outer_ruby', price: 550, rent: [85, 350, 950, 2100, 2500, 3000], houseCost: 200, mortgageValue: 275 },
+  { index: 108, nameCN: '红宝石街', nameEN: 'Ruby Street', group: 'outer_ruby', price: 500, rent: [70, 300, 850, 1850, 2200, 2600], houseCost: 200, mortgageValue: 250 },
+  { index: 109, nameCN: '石榴石路', nameEN: 'Garnet Road', group: 'outer_ruby', price: 520, rent: [75, 320, 880, 1900, 2300, 2700], houseCost: 200, mortgageValue: 260 },
+  { index: 110, nameCN: '钻石广场', nameEN: 'Diamond Plaza', group: 'outer_ruby', price: 550, rent: [85, 350, 950, 2100, 2500, 3000], houseCost: 200, mortgageValue: 275 },
 
-  // ===== Outer Copper Group =====
-  { index: 116, nameCN: '铜锣湾', nameEN: 'Copper Cove', group: 'outer_copper', price: 50, rent: [2, 10, 30, 90, 160, 250], houseCost: 50, mortgageValue: 25 },
-  { index: 118, nameCN: '铜雀台', nameEN: 'Bronze Terrace', group: 'outer_copper', price: 70, rent: [4, 20, 60, 120, 250, 400], houseCost: 50, mortgageValue: 35 },
+  // ===== Outer Rose Group =====
+  { index: 115, nameCN: '玫瑰大道', nameEN: 'Rose Boulevard', group: 'outer_rose', price: 350, rent: [35, 175, 500, 1100, 1300, 1500], houseCost: 200, mortgageValue: 175 },
+  { index: 116, nameCN: '芙蓉广场', nameEN: 'Hibiscus Plaza', group: 'outer_rose', price: 380, rent: [40, 200, 600, 1300, 1500, 1800], houseCost: 200, mortgageValue: 190 },
+  { index: 117, nameCN: '牡丹大道', nameEN: 'Peony Avenue', group: 'outer_rose', price: 400, rent: [50, 200, 600, 1400, 1700, 2000], houseCost: 200, mortgageValue: 200 },
+
+  // ===== Outer Sky Group =====
+  { index: 119, nameCN: '蓝天路', nameEN: 'Sky Way', group: 'outer_sky', price: 420, rent: [55, 220, 650, 1500, 1800, 2100], houseCost: 200, mortgageValue: 210 },
+  { index: 120, nameCN: '云中阁', nameEN: 'Cloud Court', group: 'outer_sky', price: 440, rent: [60, 240, 700, 1600, 1900, 2200], houseCost: 200, mortgageValue: 220 },
+  { index: 121, nameCN: '星光台', nameEN: 'Starlight Terrace', group: 'outer_sky', price: 460, rent: [65, 260, 750, 1700, 2000, 2300], houseCost: 200, mortgageValue: 230 },
 
   // ===== Outer Navy Group =====
-  { index: 112, nameCN: '深蓝港', nameEN: 'Navy Harbor', group: 'outer_navy', price: 580, rent: [90, 380, 1000, 2200, 2600, 3200], houseCost: 200, mortgageValue: 290 },
-  { index: 119, nameCN: '海军路', nameEN: 'Marina Drive', group: 'outer_navy', price: 620, rent: [100, 420, 1100, 2400, 2800, 3500], houseCost: 200, mortgageValue: 310 },
+  { index: 123, nameCN: '深蓝港', nameEN: 'Navy Harbor', group: 'outer_navy', price: 580, rent: [90, 380, 1000, 2200, 2600, 3200], houseCost: 200, mortgageValue: 290 },
+  { index: 124, nameCN: '海军路', nameEN: 'Marina Drive', group: 'outer_navy', price: 620, rent: [100, 420, 1100, 2400, 2800, 3500], houseCost: 200, mortgageValue: 310 },
+  { index: 125, nameCN: '深海湾', nameEN: 'Deep Sea Bay', group: 'outer_navy', price: 660, rent: [110, 460, 1200, 2600, 3000, 3800], houseCost: 200, mortgageValue: 330 },
+
+  // ===== Outer Copper Group =====
+  { index: 130, nameCN: '铜锣湾', nameEN: 'Copper Cove', group: 'outer_copper', price: 50, rent: [2, 10, 30, 90, 160, 250], houseCost: 50, mortgageValue: 25 },
+  { index: 131, nameCN: '铜雀台', nameEN: 'Bronze Terrace', group: 'outer_copper', price: 70, rent: [4, 20, 60, 120, 250, 400], houseCost: 50, mortgageValue: 35 },
+  { index: 132, nameCN: '铜宝台', nameEN: 'Copper Gem Court', group: 'outer_copper', price: 90, rent: [6, 30, 90, 270, 400, 550], houseCost: 50, mortgageValue: 45 },
+
+  // ===== Outer Aqua Group =====
+  { index: 133, nameCN: '青碧湾', nameEN: 'Aqua Bay', group: 'outer_aqua', price: 200, rent: [16, 80, 220, 600, 800, 1000], houseCost: 100, mortgageValue: 100 },
+  { index: 134, nameCN: '碧波里', nameEN: 'Azure Wave Lane', group: 'outer_aqua', price: 220, rent: [18, 90, 250, 700, 875, 1050], houseCost: 150, mortgageValue: 110 },
+  { index: 135, nameCN: '翡翠湖', nameEN: 'Jade Lake', group: 'outer_aqua', price: 240, rent: [20, 100, 300, 750, 925, 1100], houseCost: 150, mortgageValue: 120 },
+
+  // ===== Outer Olive Group =====
+  { index: 137, nameCN: '橄榄街', nameEN: 'Olive Street', group: 'outer_olive', price: 320, rent: [28, 150, 450, 1000, 1200, 1400], houseCost: 200, mortgageValue: 160 },
+  { index: 138, nameCN: '橄榄园', nameEN: 'Olive Garden', group: 'outer_olive', price: 340, rent: [30, 160, 480, 1100, 1300, 1500], houseCost: 200, mortgageValue: 170 },
+  { index: 139, nameCN: '橄榄山', nameEN: 'Olive Hill', group: 'outer_olive', price: 360, rent: [35, 175, 500, 1100, 1300, 1500], houseCost: 200, mortgageValue: 180 },
+
+  // ===== Outer Silver Group =====
+  { index: 141, nameCN: '银光路', nameEN: 'Silverlight Road', group: 'outer_silver', price: 480, rent: [70, 300, 850, 1850, 2200, 2600], houseCost: 200, mortgageValue: 240 },
+  { index: 142, nameCN: '银辉广场', nameEN: 'Silver Plaza', group: 'outer_silver', price: 500, rent: [75, 320, 880, 1900, 2300, 2700], houseCost: 200, mortgageValue: 250 },
+  { index: 143, nameCN: '银霄台', nameEN: 'Silver Sky Terrace', group: 'outer_silver', price: 520, rent: [80, 320, 880, 2000, 2400, 2800], houseCost: 200, mortgageValue: 260 },
 ];
 
 // ---- Railway Definitions ----
@@ -154,22 +197,22 @@ export interface RailwayDef {
 }
 
 export const RAILWAYS: RailwayDef[] = [
-  { index: 5, nameCN: '读书线', nameEN: 'Study Line', price: 200, mortgageValue: 100, direction: 0 },
-  { index: 11, nameCN: '机场线', nameEN: 'Airport Line', price: 200, mortgageValue: 100, direction: 1 },
-  { index: 17, nameCN: '宾州线', nameEN: 'Penn Line', price: 200, mortgageValue: 100, direction: 2 },
-  { index: 29, nameCN: 'B&O线', nameEN: 'B&O Line', price: 200, mortgageValue: 100, direction: 3 },
-  { index: 35, nameCN: '港口线', nameEN: 'Port Line', price: 200, mortgageValue: 100, direction: 4 },
-  { index: 41, nameCN: '短线', nameEN: 'Short Line', price: 200, mortgageValue: 100, direction: 5 },
+  { index: 6, nameCN: '读书线', nameEN: 'Study Line', price: 200, mortgageValue: 100, direction: 0 },
+  { index: 14, nameCN: '机场线', nameEN: 'Airport Line', price: 200, mortgageValue: 100, direction: 1 },
+  { index: 23, nameCN: '宾州线', nameEN: 'Penn Line', price: 200, mortgageValue: 100, direction: 2 },
+  { index: 28, nameCN: 'B&O线', nameEN: 'B&O Line', price: 200, mortgageValue: 100, direction: 3 },
+  { index: 34, nameCN: '港口线', nameEN: 'Port Line', price: 200, mortgageValue: 100, direction: 4 },
+  { index: 43, nameCN: '短线', nameEN: 'Short Line', price: 200, mortgageValue: 100, direction: 5 },
 ];
 
-// Outer ring railways (offset by 72)
+// Outer ring railways (offset by OUTER_RING_OFFSET)
 export const OUTER_RAILWAYS: RailwayDef[] = [
-  { index: 77, nameCN: '环城线', nameEN: 'Loop Line', price: 250, mortgageValue: 125, direction: 0 },
-  { index: 83, nameCN: '快线', nameEN: 'Express Line', price: 250, mortgageValue: 125, direction: 1 },
-  { index: 89, nameCN: '高铁线', nameEN: 'HSR Line', price: 250, mortgageValue: 125, direction: 2 },
-  { index: 101, nameCN: '城际线', nameEN: 'Intercity Line', price: 250, mortgageValue: 125, direction: 3 },
-  { index: 107, nameCN: '观光线', nameEN: 'Scenic Line', price: 250, mortgageValue: 125, direction: 4 },
-  { index: 113, nameCN: '滨海线', nameEN: 'Coastal Line', price: 250, mortgageValue: 125, direction: 5 },
+  { index: 90, nameCN: '环城线', nameEN: 'Loop Line', price: 250, mortgageValue: 125, direction: 0 },
+  { index: 98, nameCN: '快线', nameEN: 'Express Line', price: 250, mortgageValue: 125, direction: 1 },
+  { index: 107, nameCN: '高铁线', nameEN: 'HSR Line', price: 250, mortgageValue: 125, direction: 2 },
+  { index: 112, nameCN: '城际线', nameEN: 'Intercity Line', price: 250, mortgageValue: 125, direction: 3 },
+  { index: 118, nameCN: '观光线', nameEN: 'Scenic Line', price: 250, mortgageValue: 125, direction: 4 },
+  { index: 127, nameCN: '滨海线', nameEN: 'Coastal Line', price: 250, mortgageValue: 125, direction: 5 },
 ];
 
 // ---- Utility Definitions ----
@@ -183,14 +226,14 @@ export interface UtilityDef {
 }
 
 export const UTILITIES: UtilityDef[] = [
-  { index: 14, nameCN: '电力公司', nameEN: 'Electric Company', price: 150, mortgageValue: 75 },
-  { index: 32, nameCN: '自来水厂', nameEN: 'Water Works', price: 150, mortgageValue: 75 },
+  { index: 19, nameCN: '电力公司', nameEN: 'Electric Company', price: 150, mortgageValue: 75 },
+  { index: 42, nameCN: '自来水厂', nameEN: 'Water Works', price: 150, mortgageValue: 75 },
 ];
 
 // Outer ring utilities
 export const OUTER_UTILITIES: UtilityDef[] = [
-  { index: 86, nameCN: '通信公司', nameEN: 'Telecom Company', price: 180, mortgageValue: 90 },
-  { index: 104, nameCN: '燃气公司', nameEN: 'Gas Company', price: 180, mortgageValue: 90 },
+  { index: 103, nameCN: '通信公司', nameEN: 'Telecom Company', price: 180, mortgageValue: 90 },
+  { index: 126, nameCN: '燃气公司', nameEN: 'Gas Company', price: 180, mortgageValue: 90 },
 ];
 
 // ---- Tax Definitions ----
@@ -203,14 +246,14 @@ export interface TaxDef {
 }
 
 export const TAXES: TaxDef[] = [
-  { index: 4, nameCN: '所得税', amount: 100, isLuxury: false },
-  { index: 46, nameCN: '奢侈税', amount: 200, isLuxury: true },
+  { index: 5, nameCN: '所得税', amount: 100, isLuxury: false },
+  { index: 52, nameCN: '奢侈税', amount: 200, isLuxury: true },
 ];
 
 // Outer ring taxes
 export const OUTER_TAXES: TaxDef[] = [
-  { index: 76, nameCN: '碳排放税', amount: 150, isLuxury: false },
-  { index: 118, nameCN: '豪宅税', amount: 250, isLuxury: true },
+  { index: 89, nameCN: '碳排放税', amount: 150, isLuxury: false },
+  { index: 136, nameCN: '豪宅税', amount: 250, isLuxury: true },
 ];
 
 // ---- Combined Arrays (for unified lookups) ----
@@ -236,9 +279,9 @@ export function createTiles(): Tile[] {
     isGroundOuter(i) ? 'ground-outer' as const :
     'inner' as const;
 
-  // Process all tile indices: inner ground (0-47) + inner city (48-71) + outer ground (72-119)
+  // Process all tile indices: inner ground (0-59) + inner city (60-83) + outer ground (84-143)
   for (let i = 0; i < TOTAL_TILES; i++) {
-    // Inner city tiles (48-71)
+    // Inner city tiles (60-83)
     if (i >= GROUND_INNER_RING_SIZE && i < OUTER_RING_OFFSET) {
       tiles.push(createInnerTile(i));
       continue;
@@ -293,32 +336,30 @@ function createSpecialTile(i: number): Tile {
     return { index: i, name: 'GO', nameCN: '起点', type: 'go', ring };
   }
   // Jail
-  if (localIdx === 12) {
+  if (localIdx === TILES_PER_SIDE) {
     return { index: i, name: 'Jail', nameCN: '监狱', type: 'jail', ring };
   }
   // Stock Market
-  if (localIdx === 24) {
+  if (localIdx === 2 * TILES_PER_SIDE) {
     return { index: i, name: 'Stock Market', nameCN: '股市', type: 'stock_market', ring };
   }
   // Go To Jail
-  if (localIdx === 36) {
+  if (localIdx === 3 * TILES_PER_SIDE) {
     return { index: i, name: 'Go To Jail', nameCN: '进监狱', type: 'goto_jail', ring };
   }
 
   // Community Chest
-  if ((i >= OUTER_RING_OFFSET && (localIdx === 2 || localIdx === 19)) ||
-      (i < GROUND_INNER_RING_SIZE && (i === 2 || i === 19))) {
+  if (COMMUNITY_CHEST_LOCALS.includes(localIdx)) {
     return { index: i, name: 'Community Chest', nameCN: '公益金', type: 'community_chest', ring };
   }
 
   // Chance
-  if ((i >= OUTER_RING_OFFSET && [7, 26, 42].includes(localIdx)) ||
-      (i < GROUND_INNER_RING_SIZE && [7, 26, 42].includes(i))) {
+  if (CHANCE_LOCALS.includes(localIdx)) {
     return { index: i, name: 'Chance', nameCN: '机会', type: 'chance', ring };
   }
 
   // Wheel
-  if (localIdx === 38) {
+  if (localIdx === WHEEL_LOCAL) {
     return { index: i, name: 'Wheel of Fortune', nameCN: '大转盘', type: 'wheel', ring };
   }
 
@@ -326,7 +367,7 @@ function createSpecialTile(i: number): Tile {
 }
 
 function createInnerTile(i: number): Tile {
-  const localIdx = i - BOARD_SIZE; // 0-23
+  const localIdx = i - GROUND_INNER_RING_SIZE; // 0-23
   const ring = Math.floor(localIdx / 8); // 0=outer, 1=middle, 2=inner
   const sector = localIdx % 8;
   const ringNames = ['外环', '中环', '内环'];
@@ -376,6 +417,9 @@ export const GROUP_COLORS: Record<ColorGroup, string> = {
   plum: '#8B008B',
   green: '#228B22',
   blue: '#0000CD',
+  gray: '#808080',
+  indigo: '#4B0082',
+  crimson: '#DC143C',
   // Outer ring groups
   outer_amber: '#FFBF00',
   outer_mint: '#98FB98',
@@ -387,6 +431,9 @@ export const GROUP_COLORS: Record<ColorGroup, string> = {
   outer_ruby: '#E0115F',
   outer_copper: '#B87333',
   outer_navy: '#000080',
+  outer_aqua: '#00CED1',
+  outer_olive: '#808000',
+  outer_silver: '#C0C0C0',
   railway: '#FFD700',
   utility: '#C0C0C0',
 };
@@ -397,7 +444,7 @@ export const CHANCE_CARDS: Card[] = [
   { id: 0, type: 'chance', description: 'Advance to GO', descriptionCN: '前进到起点', effect: { kind: 'move', target: 0, collectGo: true } },
   { id: 1, type: 'chance', description: 'Bank pays you $50', descriptionCN: '银行付给你$50', effect: { kind: 'cash', amount: 50 } },
   { id: 2, type: 'chance', description: 'Pay poor tax of $15', descriptionCN: '缴纳济贫税$15', effect: { kind: 'cash', amount: -15 } },
-  { id: 3, type: 'chance', description: 'Advance to Stock Market', descriptionCN: '前进到股市', effect: { kind: 'move', target: 24, collectGo: true } },
+  { id: 3, type: 'chance', description: 'Advance to Stock Market', descriptionCN: '前进到股市', effect: { kind: 'move', target: CORNER_STOCK, collectGo: true } },
   { id: 4, type: 'chance', description: 'Go to Jail', descriptionCN: '进监狱', effect: { kind: 'jail' } },
   { id: 5, type: 'chance', description: 'Get Out of Jail Free', descriptionCN: '免费出狱卡', effect: { kind: 'getOutOfJail' } },
   { id: 6, type: 'chance', description: 'Advance to nearest Railway', descriptionCN: '前进到最近的铁路', effect: { kind: 'moveToNearest', tileType: 'railway', payMultiplier: 2 } },
@@ -469,7 +516,7 @@ export const COMMUNITY_CHEST_CARDS: Card[] = [
 // ---- God spirit constants ----
 
 export const GOD_DURATION_TURNS = 3; // turns a god stays attached before leaving
-export const GOD_VISION_RADIUS = 12; // world units (~4 tiles) for 请神卡 summon range
+export const GOD_VISION_RADIUS = 14; // world units (~4 tiles) for 请神卡 summon range
 export const GOD_WEALTH_AMOUNT = 100; // collected from each opponent by 财神
 export const GOD_START_COUNT = 2; // gods spawned when the game starts
 export const GOD_RESPAWN_ROUNDS = 4; // spawn a new god every N rounds if below cap

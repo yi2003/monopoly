@@ -3,17 +3,23 @@
 // Used by: Board, Characters, Houses, CityBuilder, SceneManager, CameraController
 // ============================================================
 
-import { OUTER_RING_OFFSET } from './constants';
+import { OUTER_RING_OFFSET, TILES_PER_SIDE } from './constants';
 
 export const TILE_W = 2.8;
 export const TILE_D = 5.5;
 export const CORNER_SIZE = 5.0;
-export const SIDE_LENGTH = 12; // tiles per side
-export const SPACING = 0.15;   // gap between adjacent tiles
+export const SIDE_LENGTH = TILES_PER_SIDE; // tiles per side (1 corner + 14 edge tiles)
+export const SPACING = 0.15;   // nominal gap between adjacent tiles (actual gap derives from ringStep)
 
-export const INNER_BOARD_HALF = CORNER_SIZE + 7 * TILE_W; // 24.6
+export const INNER_BOARD_HALF = 28; // inner ring half-extent (corner-to-center); tiles fill each side edge-to-edge
 export const ROAD_GAP = 4.0; // road width between inner and outer ring
-export const OUTER_BOARD_HALF = INNER_BOARD_HALF + TILE_D + ROAD_GAP; // 34.1
+export const OUTER_BOARD_HALF = INNER_BOARD_HALF + TILE_D + ROAD_GAP; // 37.5
+
+// Dynamic step so a side's tiles span the whole side (corner to next corner)
+// with the last tile's outer edge touching the next corner's inner edge.
+export function ringStep(boardHalf: number): number {
+  return (2 * boardHalf - CORNER_SIZE - TILE_W / 2) / (SIDE_LENGTH - 1);
+}
 
 export interface TilePos3D {
   x: number;
@@ -29,7 +35,7 @@ export function getGroundTilePosition(index: number): TilePos3D {
   const localIdx = isOuter ? index - OUTER_RING_OFFSET : index;
   const side = Math.floor(localIdx / SIDE_LENGTH);
   const sideIdx = localIdx % SIDE_LENGTH;
-  const offset = CORNER_SIZE / 2 + sideIdx * (TILE_W + SPACING);
+  const offset = CORNER_SIZE / 2 + sideIdx * ringStep(boardHalf);
 
   switch (side) {
     case 0: // Bottom — going RIGHT (+X)
@@ -63,7 +69,7 @@ export function getCharacterTilePos(index: number): { x: number; z: number } {
   const localIdx = isOuter ? index - OUTER_RING_OFFSET : index;
   const side = Math.floor(localIdx / SIDE_LENGTH);
   const sideIdx = localIdx % SIDE_LENGTH;
-  const offset = CORNER_SIZE / 2 + sideIdx * (TILE_W + SPACING); // tile center (same as getGroundTilePosition)
+  const offset = CORNER_SIZE / 2 + sideIdx * ringStep(boardHalf); // tile center (same as getGroundTilePosition)
 
   switch (side) {
     case 0: return { x: -boardHalf + offset, z: -boardHalf }; // bottom

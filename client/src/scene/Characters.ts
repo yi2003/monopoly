@@ -133,7 +133,7 @@ export class Characters {
     // Determine which ring we're on
     const isOuter = from >= OUTER_RING_OFFSET || to >= OUTER_RING_OFFSET;
     const ringStart = isOuter ? OUTER_RING_OFFSET : 0;
-    const ringEnd = ringStart + 48;
+    const ringEnd = ringStart + GROUND_INNER_RING_SIZE;
 
     // Ring transfer: snap directly (no animation)
     if ((from >= OUTER_RING_OFFSET) !== (to >= OUTER_RING_OFFSET)) {

@@ -29,7 +29,7 @@ The entire city transforms when you switch eras — buildings, vehicles, pedestr
 - **3D Board & City** — Procedurally generated buildings with era-specific facade textures, ring roads with vehicles, pedestrians on sidewalks, day/night cycle, and weather effects
 - **Multiplayer** — Real-time gameplay via WebSocket with room-based matchmaking
 - **Bot Players** — AI opponents with configurable difficulty
-- **Dual Ring Board** — Inner ring + outer ring (96 ground tiles) + inner city (24 tiles), with property trading, houses, and hotels
+- **Dual Ring Board** — Inner ring + outer ring (120 ground tiles, 15 per side) + inner city (24 tiles), with property trading, houses, and hotels
 - **Stock Market** — Buy/sell stocks with dynamic pricing (TECH, GOLD, AI, BANK, GREEN)
 - **Quiz System** — Knowledge questions trigger at turn start with rewards/penalties
 - **Wheel of Fortune** — Spin for cash, stocks, jail escape, and more
@@ -130,7 +130,7 @@ Inner-city buildings | Inner-ring tiles → sidewalk → buildings | sidewalk |
 Outer-ring tiles → sidewalk → buildings → 🛣️ Road
 ```
 
-- **120 tiles total**: 48 inner ground + 48 outer ground + 24 inner city
+- **144 tiles total**: 60 inner ground + 60 outer ground + 24 inner city
 - **Ring road** with lane markings on the outermost perimeter
 - **Vehicles** (era-specific: vintage sedans → EVs → flying drone taxis) drive on the ring road
 - **Pedestrians** (era-specific outfits) walk on sidewalks between tiles and buildings

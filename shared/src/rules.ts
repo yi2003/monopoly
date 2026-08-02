@@ -3,7 +3,7 @@
 // ============================================================
 
 import type { Player, PropertyTile, Tile, ColorGroup, Stock, Card, CardEffect, GodEntity } from './types';
-import { ALL_PROPERTIES, ALL_RAILWAYS, ALL_UTILITIES, STOCKS, OUTER_RING_OFFSET, GOD_VISION_RADIUS } from './constants';
+import { ALL_PROPERTIES, ALL_RAILWAYS, ALL_UTILITIES, STOCKS, OUTER_RING_OFFSET, GROUND_INNER_RING_SIZE, GOD_VISION_RADIUS } from './constants';
 import { getCharacterTilePos } from './boardLayout';
 
 // ---- Helper: find property definition by tile index ----
@@ -242,7 +242,7 @@ export function advancePosition(
 
   if (innerCityRing === 0) {
     // On a ground ring
-    const ringSize = 48;
+    const ringSize = GROUND_INNER_RING_SIZE;
     const ringStart = groundRing === 'inner' ? 0 : OUTER_RING_OFFSET;
     const localPos = currentPos - ringStart;
     let newLocalPos = localPos + steps;
@@ -253,7 +253,7 @@ export function advancePosition(
     return { position: ringStart + newLocalPos, passedGo, ring: 0, sector: 0, groundRing };
   } else {
     // In inner city: circular within ring
-    const ringOffset = 48 + (innerCityRing - 1) * 8;
+    const ringOffset = GROUND_INNER_RING_SIZE + (innerCityRing - 1) * 8;
     const localPos = currentPos - ringOffset;
     let newLocalPos = localPos + steps;
     if (newLocalPos >= 8) {
@@ -336,7 +336,7 @@ export function findHeldCardId(
 // ---- God spirit helpers ----
 
 export function isGroundTile(index: number): boolean {
-  return index < 48 || index >= OUTER_RING_OFFSET;
+  return index < GROUND_INNER_RING_SIZE || index >= OUTER_RING_OFFSET;
 }
 
 export function findGodAt(gods: GodEntity[], tileIndex: number): GodEntity | undefined {

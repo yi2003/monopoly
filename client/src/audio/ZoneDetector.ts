@@ -82,7 +82,7 @@ function buildCache(state: GameState): void {
 
     if (tile.ring === 'inner') {
       // Inner city tiles cluster around center with sector/ring layout
-      const localIdx = i - (GROUND_INNER_RING_SIZE + 24); // 0-23
+      const localIdx = i - GROUND_INNER_RING_SIZE; // 0-23
       const ringIndex = Math.floor(localIdx / 8); // 0=outer, 1=middle, 2=inner
       const sector = localIdx % 8;
       const angle = (sector / 8) * Math.PI * 2 - Math.PI / 2;

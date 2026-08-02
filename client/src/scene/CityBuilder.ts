@@ -9,6 +9,7 @@ import {
   ALL_PROPERTIES,
   TILE_W, TILE_D,
   INNER_BOARD_HALF, OUTER_BOARD_HALF, OUTER_RING_OFFSET,
+  GROUND_INNER_RING_SIZE, GROUND_OUTER_RING_SIZE,
   getGroundTilePosition, isCornerIndex,
   ERAS, getEra,
 } from '@monopoly/shared';
@@ -371,7 +372,7 @@ export class CityBuilder {
   // ---- Inner Ring Buildings ----
 
   private buildInnerRing(): void {
-    for (let i = 0; i < 48; i++) {
+    for (let i = 0; i < GROUND_INNER_RING_SIZE; i++) {
       const { x, z, rotation, isCorner } = getTileBoardPos(i);
       if (isCorner) continue;
 
@@ -419,7 +420,7 @@ export class CityBuilder {
   private buildOuterRing(): void {
     const OUTER_COMMERCIAL_COVERAGE = 0.90;
 
-    for (let i = 0; i < 48; i++) {
+    for (let i = 0; i < GROUND_OUTER_RING_SIZE; i++) {
       const tileIndex = OUTER_RING_OFFSET + i;
       const pos = getGroundTilePosition(tileIndex);
       if (isCornerIndex(tileIndex)) continue;
@@ -658,13 +659,13 @@ export class CityBuilder {
   }
 
   private buildLampPosts(): void {
-    for (let i = 0; i < 48; i++) {
+    for (let i = 0; i < GROUND_INNER_RING_SIZE; i++) {
       if (i % LAMP_POST_SPACING_OUTER !== 0) continue;
       const { x, z, rotation, isCorner } = getTileBoardPos(i);
       if (isCorner) continue;
       this.createLampPost(x, z, rotation, 'outer');
     }
-    for (let i = 0; i < 48; i++) {
+    for (let i = 0; i < GROUND_INNER_RING_SIZE; i++) {
       if (i % LAMP_POST_SPACING_INNER !== 0) continue;
       const { x, z, rotation, isCorner } = getTileBoardPos(i);
       if (isCorner) continue;
@@ -779,7 +780,7 @@ export class CityBuilder {
 
   private buildFireHydrants(): void {
     const eraId = this.era;
-    for (let i = 0; i < 48; i++) {
+    for (let i = 0; i < GROUND_INNER_RING_SIZE; i++) {
       if (i % 5 !== 1) continue;
       const { x, z, isCorner } = getTileBoardPos(i);
       if (isCorner) continue;
@@ -795,7 +796,7 @@ export class CityBuilder {
 
   private buildMailboxes(): void {
     const eraId = this.era;
-    for (let i = 0; i < 48; i++) {
+    for (let i = 0; i < GROUND_INNER_RING_SIZE; i++) {
       if (i % 7 !== 3) continue;
       const { x, z, isCorner } = getTileBoardPos(i);
       if (isCorner) continue;
@@ -811,7 +812,7 @@ export class CityBuilder {
 
   private buildTrashCans(): void {
     const eraId = this.era;
-    for (let i = 0; i < 48; i++) {
+    for (let i = 0; i < GROUND_INNER_RING_SIZE; i++) {
       if (i % 6 !== 2) continue;
       const { x, z, isCorner } = getTileBoardPos(i);
       if (isCorner) continue;
@@ -835,7 +836,7 @@ export class CityBuilder {
 
   private buildBenches(): void {
     const eraId = this.era;
-    for (let i = 0; i < 48; i++) {
+    for (let i = 0; i < GROUND_INNER_RING_SIZE; i++) {
       if (i % 8 !== 4) continue;
       const { x, z, rotation, isCorner } = getTileBoardPos(i);
       if (isCorner) continue;
@@ -871,7 +872,8 @@ export class CityBuilder {
     const curbMat = new THREE.MeshStandardMaterial({ color: '#BDBDBD', roughness: 0.7 });
 
     const innerCenter = 0;
-    const roadLen = 60;
+    const half = INNER_BOARD_HALF - 2; // cross roads span inside the inner ring
+    const roadLen = 2 * half;
 
     const nsGeo = new THREE.BoxGeometry(ROAD_WIDTH, 0.05, roadLen);
     const ns = new THREE.Mesh(nsGeo, roadMat);
@@ -885,7 +887,7 @@ export class CityBuilder {
     ew.receiveShadow = true;
     this.roadGroup.add(ew);
 
-    for (let s = -30; s <= 30; s += 1.5) {
+    for (let s = -half; s <= half; s += 1.5) {
       const dashGeo = new THREE.BoxGeometry(0.12, 0.06, 1.0);
       const dash = new THREE.Mesh(dashGeo, laneMat);
       dash.position.set(innerCenter, 0.03, s);
@@ -899,7 +901,7 @@ export class CityBuilder {
       this.roadGroup.add(curb);
     }
 
-    for (let s = -28; s <= 28; s += 3.5) {
+    for (let s = -(half - 2); s <= half - 2; s += 3.5) {
       for (const [dx, dz] of [[ROAD_WIDTH / 2 + 1.0, s], [-(ROAD_WIDTH / 2 + 1.0), s], [s, ROAD_WIDTH / 2 + 1.0], [s, -(ROAD_WIDTH / 2 + 1.0)]]) {
         const poleGeo = new THREE.CylinderGeometry(0.06, 0.08, 1.8, 8);
         const poleMat = new THREE.MeshStandardMaterial({ color: '#424242', roughness: 0.3, metalness: 0.5 });
@@ -1698,7 +1700,7 @@ export class CityBuilder {
       : 'young';
     const rng = new Rng(`trees-${eraDef.id}`);
 
-    for (let i = 0; i < 48; i++) {
+    for (let i = 0; i < GROUND_INNER_RING_SIZE; i++) {
       if (i % 8 !== 2) continue;
       const { x, z, rotation, isCorner } = getTileBoardPos(i);
       if (isCorner) continue;
@@ -1732,7 +1734,7 @@ export class CityBuilder {
       }
 
       const dirX = Math.sin(rotation), dirZ = Math.cos(rotation);
-      const sidewalkOffset = (i < 48 ? 1 : -1) * (TILE_D / 2 + SIDEWALK_WIDTH / 2);
+      const sidewalkOffset = (i < GROUND_INNER_RING_SIZE ? 1 : -1) * (TILE_D / 2 + SIDEWALK_WIDTH / 2);
       treeGroup.position.set(x + dirX * (TILE_D / 2 + SIDEWALK_WIDTH - 1.2), 0, z + dirZ * (TILE_D / 2 + SIDEWALK_WIDTH - 1.2));
       this.propGroup.add(treeGroup);
     }

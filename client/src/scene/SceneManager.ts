@@ -241,6 +241,7 @@ export class SceneManager {
     const OUTER_HALF = OUTER_BOARD_HALF;
     const SIDEWALK_WIDTH = 2.0;
     const ROAD_WIDTH = 4.0;
+    const innerCityHalf = BOARD_HALF_TILES - 2; // cross roads span inside the inner ring
 
     // Road is OUTSIDE the outer-ring buildings (outermost element)
     // outer-ring tile → sidewalk → buildings → ROAD
@@ -271,12 +272,12 @@ export class SceneManager {
       ],
       // Inner city cross roads (N-S and E-W through center)
       [
-        new THREE.Vector3(-30, 0, 0),
-        new THREE.Vector3(30, 0, 0),
+        new THREE.Vector3(-innerCityHalf, 0, 0),
+        new THREE.Vector3(innerCityHalf, 0, 0),
       ],
       [
-        new THREE.Vector3(0, 0, -30),
-        new THREE.Vector3(0, 0, 30),
+        new THREE.Vector3(0, 0, -innerCityHalf),
+        new THREE.Vector3(0, 0, innerCityHalf),
       ],
     ];
 
@@ -297,7 +298,7 @@ export class SceneManager {
       for (let side = 0; side < 4; side++) {
         const isHorizontal = side % 2 === 0;
         const sign = side < 2 ? -1 : 1;
-        const length = 60;
+        const length = 2 * wz.half;
         const start = isHorizontal
           ? new THREE.Vector3(-length / 2, 0, sign * (wz.half + walkOffset))
           : new THREE.Vector3(sign * (wz.half + walkOffset), 0, -length / 2);
@@ -310,7 +311,7 @@ export class SceneManager {
 
     // Also add walk zones along inner city cross roads (center)
     for (const axis of ['x', 'z']) {
-      const half = 25;
+      const half = innerCityHalf - 1;
       const offset = 2.5; // sidewalk offset from road center
       this.walkZones.push({
         start: new THREE.Vector3(axis === 'x' ? -half : -offset, 0, axis === 'z' ? -half : -offset),
