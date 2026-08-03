@@ -4,8 +4,8 @@ import { useUIStore } from '../../store/uiStore';
 import { getSocket } from '../../network/socket';
 import { getDice3DInstance } from '../../scene/Dice3D';
 import DicePreview from './DicePreview';
-import type { CameraMode, QualityMode } from '@monopoly/shared';
-import { THEMES, DIFFICULTIES } from '@monopoly/shared';
+import type { CameraMode, QualityMode, ThemeId } from '@monopoly/shared';
+import { THEMES, DIFFICULTIES, getRailwayDef } from '@monopoly/shared';
 import { useI18n } from '../../i18n/useI18n';
 
 // ---- Dice dot patterns (3×3 grid, same as 3D dice) ----
@@ -79,6 +79,9 @@ export default function HUD() {
 
   // Force re-render when phase delay expires
   const [delayTick, setDelayTick] = useState(0);
+
+  // High-speed rail destination picker (railway tiles)
+  const [showHsrPicker, setShowHsrPicker] = useState(false);
   useEffect(() => {
     const remaining = phaseDelayUntil - Date.now();
     if (remaining > 0) {
@@ -156,6 +159,49 @@ export default function HUD() {
   const onInnerRing = myPlayer?.groundRing === 'inner';
   const ringTransferred = gameState?.ringTransferred ?? false;
   const canTransferRing = isMyTurn && onRailway && myPlayer?.innerCityRing === 0 && !ringTransferred;
+
+  // Inner city + high-speed rail actions (also on railway tiles)
+  const inInnerCity = (myPlayer?.innerCityRing ?? 0) > 0;
+  const railDef = onRailway && myPlayer ? getRailwayDef(myPlayer.position) : undefined;
+  const railDir = railDef?.direction ?? 0;
+  const canEnterInnerCity = isMyTurn && onRailway && !inInnerCity;
+  const canHsr = isMyTurn && onRailway && !inInnerCity;
+  const canExitInnerCity = isMyTurn && inInnerCity;
+  const hsrCost = onRailway && myPlayer?.properties.includes(myPlayer.position) ? 0 : 200;
+  const otherThemes = (gameState
+    ? (Object.keys(THEMES) as ThemeId[]).filter(id => id !== gameState.config.theme)
+    : []) as ThemeId[];
+
+  const railwayActions = (
+    <>
+      {canEnterInnerCity && (
+        <button className="btn btn-sm btn-outline" onClick={() => socket?.emit('enterInnerCity', railDir)}>
+          {t('hud.enterInnerCity')} ($50)
+        </button>
+      )}
+      {canExitInnerCity && (
+        <button className="btn btn-sm btn-outline" onClick={() => socket?.emit('exitInnerCity')}>
+          {t('hud.exitInnerCity')}
+        </button>
+      )}
+      {canHsr && (
+        <>
+          <button className="btn btn-sm btn-outline" onClick={() => setShowHsrPicker(v => !v)}>
+            {hsrCost === 0 ? t('hud.hsrFree') : `${t('hud.highSpeedRail')} $${hsrCost}`}
+          </button>
+          {showHsrPicker && otherThemes.map(th => (
+            <button
+              key={th}
+              className="btn btn-sm btn-outline"
+              onClick={() => { socket?.emit('takeHighSpeedRail', th); setShowHsrPicker(false); }}
+            >
+              🚄 {lang === 'zh' ? THEMES[th].nameCN : THEMES[th].name}
+            </button>
+          ))}
+        </>
+      )}
+    </>
+  );
 
   return (
     <div className="hud">
@@ -325,6 +371,7 @@ export default function HUD() {
                 {t('hud.transferRing')} ({onInnerRing ? t('hud.toOuter') : t('hud.toInner')})
               </button>
             )}
+            {railwayActions}
           </div>
         )}
 
@@ -383,6 +430,7 @@ export default function HUD() {
                 {t('hud.transferRing')} ({onInnerRing ? t('hud.toOuter') : t('hud.toInner')})
               </button>
             )}
+            {railwayActions}
             <button className="btn btn-primary" onClick={handleEndTurn}>
               {t('hud.endTurn')}
             </button>
