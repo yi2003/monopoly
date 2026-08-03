@@ -7,6 +7,23 @@ import type { GameState, Tile } from '@monopoly/shared';
 import { getModelClone } from './ModelLoader';
 import { TREE_MODEL_URL } from './CityBuilder';
 import { tileSlabTex } from '../textures/surfaces';
+import { tex } from '../util/canvas';
+
+/** Cached "JAIL" sign texture for the prison model (dark plate with white letters). */
+function jailSignTex(): THREE.Texture {
+  return tex('jail-sign', 256, 64, (x, w, h) => {
+    x.fillStyle = '#263238';
+    x.fillRect(0, 0, w, h);
+    x.strokeStyle = '#B0BEC5';
+    x.lineWidth = 6;
+    x.strokeRect(6, 6, w - 12, h - 12);
+    x.fillStyle = '#ECEFF1';
+    x.font = `700 ${Math.floor(h * 0.62)}px "Barlow Condensed", Impact, sans-serif`;
+    x.textAlign = 'center';
+    x.textBaseline = 'middle';
+    x.fillText('JAIL', w / 2, h * 0.54);
+  });
+}
 import {
   GROUP_COLORS, ALL_PROPERTIES, ALL_RAILWAYS, ALL_UTILITIES,
   TILE_W, TILE_D, CORNER_SIZE, INNER_BOARD_HALF, OUTER_BOARD_HALF,
@@ -254,14 +271,8 @@ export class Board {
     }
 
     if (this.tileType(index) === 'jail') {
-      // Jail: bars
-      for (let b = 0; b < 4; b++) {
-        const barGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.5, 8);
-        const barMat = new THREE.MeshStandardMaterial({ color: '#616161', roughness: 0.3, metalness: 0.6 });
-        const bar = new THREE.Mesh(barGeo, barMat);
-        bar.position.set(-0.6 + b * 0.4, 0.8, -TILE_D / 2 + 1.5);
-        tileGroup.add(bar);
-      }
+      // Jail: stylized prison model (cell block + guard tower + barred gate + JAIL sign)
+      this.buildJailModel(tileGroup);
     }
 
     if (this.tileType(index) === 'stock_market') {
@@ -427,16 +438,154 @@ export class Board {
 
     // Corner treatments
     if (isCornerIndex(index)) {
-      const cornerPillarGeo = new THREE.CylinderGeometry(0.35, 0.4, 1.0, 8);
-      const cornerPillarMat = new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.3, metalness: 0.8 });
-      this.goldMaterials.push(cornerPillarMat);
-      const pillar = new THREE.Mesh(cornerPillarGeo, cornerPillarMat);
-      pillar.position.set(0, 0.6, 0);
-      tileGroup.add(pillar);
+      // Jail corners carry a full prison model above instead of the generic gold pillar
+      if (this.tileType(index) !== 'jail') {
+        const cornerPillarGeo = new THREE.CylinderGeometry(0.35, 0.4, 1.0, 8);
+        const cornerPillarMat = new THREE.MeshStandardMaterial({ color: '#FFD700', roughness: 0.3, metalness: 0.8 });
+        this.goldMaterials.push(cornerPillarMat);
+        const pillar = new THREE.Mesh(cornerPillarGeo, cornerPillarMat);
+        pillar.position.set(0, 0.6, 0);
+        tileGroup.add(pillar);
+      }
     }
 
     this.group.add(tileGroup);
     this.tileMeshes.set(index, tileGroup);
+  }
+
+  /**
+   * Stylized prison model for a Jail corner tile — a cell block with barred windows,
+   * a guard tower with a beacon lamp, a barred fence enclosure and a front gate
+   * topped with a "JAIL" sign. Built from primitives to match the board's toy aesthetic.
+   */
+  private buildJailModel(group: THREE.Group): void {
+    const stone = new THREE.MeshStandardMaterial({ color: '#8D8D8D', roughness: 0.85 });
+    const stoneDark = new THREE.MeshStandardMaterial({ color: '#616161', roughness: 0.8 });
+    const barMat = new THREE.MeshStandardMaterial({ color: '#37474F', roughness: 0.3, metalness: 0.8 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: '#455A64', roughness: 0.7 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: '#2b2b2b', roughness: 0.4 });
+
+    /** Vertical bar of the given height, centered at y. */
+    const bar = (x: number, y: number, z: number, h: number): THREE.Mesh => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, h, 8), barMat);
+      m.position.set(x, y, z);
+      m.castShadow = true;
+      return m;
+    };
+
+    // Foundation slab
+    const foundation = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.18, 3.6), stoneDark);
+    foundation.position.y = 0.09;
+    foundation.castShadow = true;
+    foundation.receiveShadow = true;
+    group.add(foundation);
+
+    // ---- Cell block (back) ----
+    const cellBody = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.3, 1.0), stone);
+    cellBody.position.set(0, 0.65, -0.95);
+    cellBody.castShadow = true;
+    cellBody.receiveShadow = true;
+    group.add(cellBody);
+
+    const cellRoof = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.14, 1.2), roofMat);
+    cellRoof.position.set(0, 1.37, -0.95);
+    cellRoof.castShadow = true;
+    group.add(cellRoof);
+
+    // Barred windows on the front face (facing the yard)
+    const frontZ = -0.42;
+    for (const wx of [-0.75, 0, 0.75]) {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.45, 0.05), darkMat);
+      win.position.set(wx, 0.75, frontZ);
+      group.add(win);
+      for (let bx = -0.18; bx <= 0.18; bx += 0.12) {
+        group.add(bar(wx + bx, 0.75, frontZ + 0.04, 0.5));
+      }
+    }
+    // Rail above the windows
+    const winRail = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.07, 0.07), barMat);
+    winRail.position.set(0, 1.05, frontZ + 0.04);
+    group.add(winRail);
+
+    // ---- Guard tower (front-right) ----
+    const tx = 1.35, tz = 1.15;
+    const towerBase = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.38, 0.9, 10), stone);
+    towerBase.position.set(tx, 0.45, tz);
+    towerBase.castShadow = true;
+    group.add(towerBase);
+
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.12, 1.05), stoneDark);
+    platform.position.set(tx, 0.96, tz);
+    platform.castShadow = true;
+    group.add(platform);
+
+    for (const s of [-1, 1]) {
+      const pwX = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.26, 0.09), stone);
+      pwX.position.set(tx + s * 0.48, 1.15, tz);
+      pwX.castShadow = true;
+      group.add(pwX);
+      const pwZ = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.26, 1.05), stone);
+      pwZ.position.set(tx, 1.15, tz + s * 0.48);
+      pwZ.castShadow = true;
+      group.add(pwZ);
+    }
+
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.55, 10), roofMat);
+    cone.position.set(tx, 1.56, tz);
+    cone.castShadow = true;
+    group.add(cone);
+
+    // Beacon lamp on the tower top
+    const lampMat = new THREE.MeshStandardMaterial({ color: '#FFC107', emissive: '#FFB300', emissiveIntensity: 1.6, roughness: 0.3 });
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 10), lampMat);
+    lamp.position.set(tx, 1.92, tz);
+    group.add(lamp);
+
+    // ---- Barred fence (left + back) ----
+    const addFence = (axis: 'x' | 'z', pos: number, along: number): void => {
+      const railGeo = axis === 'x'
+        ? new THREE.BoxGeometry(0.07, 0.08, along)
+        : new THREE.BoxGeometry(along, 0.08, 0.07);
+      const rBot = new THREE.Mesh(railGeo, barMat);
+      rBot.position.set(axis === 'x' ? pos : 0, 0.2, axis === 'x' ? 0 : pos);
+      group.add(rBot);
+      const rTop = new THREE.Mesh(railGeo.clone(), barMat);
+      rTop.position.set(axis === 'x' ? pos : 0, 0.85, axis === 'x' ? 0 : pos);
+      group.add(rTop);
+      for (let d = -1.1; d <= 1.1; d += 0.28) {
+        if (axis === 'x') group.add(bar(pos, 0.52, d, 0.75));
+        else group.add(bar(d, 0.52, pos, 0.75));
+      }
+    };
+    addFence('x', -1.6, 2.4); // left wall
+    addFence('z', -1.6, 2.4); // back wall
+
+    // ---- Front gate with vertical bars ----
+    const gateZ = 1.6;
+    for (const gx of [-1.0, 1.0]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.3, 0.16), stoneDark);
+      post.position.set(gx, 0.65, gateZ);
+      post.castShadow = true;
+      group.add(post);
+    }
+    const gRail = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.1, 0.1), barMat);
+    gRail.position.set(0, 1.3, gateZ);
+    group.add(gRail);
+    for (let gx = -0.8; gx <= 0.8; gx += 0.32) {
+      group.add(bar(gx, 0.7, gateZ, 0.95));
+    }
+
+    // "JAIL" sign plate above the gate (double-sided so it reads from any camera angle)
+    const signMat = new THREE.MeshStandardMaterial({ map: jailSignTex(), roughness: 0.5, side: THREE.DoubleSide });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.38), signMat);
+    sign.position.set(0, 1.55, gateZ + 0.03);
+    group.add(sign);
+    // Small sign posts
+    for (const sx of [-0.65, 0.65]) {
+      const sp = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.42, 0.05), barMat);
+      sp.position.set(sx, 1.35, gateZ);
+      group.add(sp);
+    }
   }
 
   /** Replace tree placeholders with actual GLB models (call after preload) */
